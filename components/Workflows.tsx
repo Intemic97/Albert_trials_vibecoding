@@ -72,6 +72,13 @@ import { useNodeExecution } from './Workflows/hooks/useNodeExecution';
 
 // Import extracted modal components
 import { DataPreviewModal } from './Workflows/modals/DataPreviewModal';
+import { ExecutionHistoryInlineModal } from './Workflows/modals/ExecutionHistoryInlineModal';
+import { FeedbackPopupModal } from './Workflows/modals/FeedbackPopupModal';
+import { ExitConfirmationModal } from './Workflows/modals/ExitConfirmationModal';
+import { QuickConnectModal } from './Workflows/modals/QuickConnectModal';
+import { TagsManageModal } from './Workflows/modals/TagsManageModal';
+import { TemplatesGalleryInlineModal } from './Workflows/modals/TemplatesGalleryInlineModal';
+import { TemplatePreviewModal } from './Workflows/modals/TemplatePreviewModal';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
@@ -5669,874 +5676,93 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             )}
 
             {/* Execution History Modal */}
-            {showExecutionHistory && (
-                <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none" onClick={() => setShowExecutionHistory(false)}>
-                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                        {/* Header */}
-                        <div className="bg-gradient-to-r from-teal-600 to-teal-700 px-6 py-4 text-white rounded-t-xl shrink-0">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <History size={24} />
-                                    <div>
-                                        <h3 className="font-normal text-lg">Execution History</h3>
-                                        <p className="text-teal-200 text-sm">View past workflow executions and their results</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setShowExecutionHistory(false)} className="text-white/80 hover:text-white">
-                                    <X size={24} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 overflow-hidden flex">
-                            {/* Executions List */}
-                            <div className="w-1/3 border-r border-[var(--border-light)] overflow-y-auto">
-                                <div className="p-3 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
-                                    <button
-                                        onClick={loadExecutionHistory}
-                                        className="w-full px-3 py-2 bg-teal-100 text-[#1e554f] rounded-lg text-sm font-medium hover:bg-teal-200 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        {loadingExecutions ? (
-                                            <div className="w-4 h-4 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin" />
-                                        ) : (
-                                            <History size={14} />
-                                        )}
-                                        Refresh
-                                    </button>
-                                </div>
-                                {loadingExecutions ? (
-                                    <div className="p-8 text-center text-[var(--text-secondary)]">
-                                        <div className="w-8 h-8 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                                        Loading...
-                                    </div>
-                                ) : executionHistory.length === 0 ? (
-                                    <div className="p-8 text-center text-[var(--text-secondary)]">
-                                        <History size={32} className="mx-auto mb-2 text-[var(--text-tertiary)]" />
-                                        <p>No executions yet</p>
-                                        <p className="text-xs mt-1">Run the workflow or send a webhook to see executions here</p>
-                                    </div>
-                                ) : (
-                                    <div className="divide-y divide-slate-100">
-                                        {executionHistory.map((exec) => (
-                                            <button
-                                                key={exec.id}
-                                                onClick={() => setSelectedExecution(exec)}
-                                                className={`w-full p-3 text-left hover:bg-[var(--bg-tertiary)] transition-colors ${selectedExecution?.id === exec.id ? 'bg-[#256A65]/5 border-l-2 border-[#256A65]' : ''}`}
-                                            >
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                                        exec.status === 'completed' ? 'bg-[#256A65]/10 text-[#1e554f]' :
-                                                        exec.status === 'failed' ? 'bg-red-100 text-red-700' :
-                                                        exec.status === 'running' ? 'bg-yellow-100 text-yellow-700' :
-                                                        'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
-                                                    }`}>
-                                                        {exec.status}
-                                                    </span>
-                                                    {exec.triggerType && (
-                                                        <span className="text-xs text-[var(--text-tertiary)]">{exec.triggerType}</span>
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-[var(--text-secondary)]">{formatDate(exec.createdAt)}</p>
-                                                <p className="text-xs text-[var(--text-tertiary)] font-mono truncate">{exec.id}</p>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Execution Details */}
-                            <div className="flex-1 overflow-y-auto p-4">
-                                {selectedExecution ? (
-                                    <div className="space-y-4">
-                                        <div className="bg-[var(--bg-tertiary)] rounded-lg p-4">
-                                            <h4 className="font-normal text-[var(--text-primary)] mb-2">Execution Details</h4>
-                                            <div className="grid grid-cols-2 gap-2 text-sm">
-                                                <div>
-                                                    <span className="text-[var(--text-secondary)]">Status:</span>
-                                                    <span className={`ml-2 font-medium ${
-                                                        selectedExecution.status === 'completed' ? 'text-[#256A65]' :
-                                                        selectedExecution.status === 'failed' ? 'text-red-600' :
-                                                        'text-[var(--text-secondary)]'
-                                                    }`}>{selectedExecution.status}</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-[var(--text-secondary)]">Trigger:</span>
-                                                    <span className="ml-2 font-medium text-[var(--text-primary)]">{selectedExecution.triggerType || 'manual'}</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-[var(--text-secondary)]">Started:</span>
-                                                    <span className="ml-2 text-[var(--text-primary)]">{formatDate(selectedExecution.startedAt)}</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-[var(--text-secondary)]">Completed:</span>
-                                                    <span className="ml-2 text-[var(--text-primary)]">{formatDate(selectedExecution.completedAt)}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {selectedExecution.inputs && Object.keys(selectedExecution.inputs).length > 0 && (
-                                            <div className="bg-blue-500/10 rounded-lg p-4">
-                                                <h4 className="font-normal text-blue-500 mb-2 flex items-center gap-2">
-                                                    <ArrowRight size={16} />
-                                                    Inputs
-                                                </h4>
-                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-blue-100 overflow-x-auto max-h-40">
-                                                    {JSON.stringify(selectedExecution.inputs, null, 2)}
-                                                </pre>
-                                            </div>
-                                        )}
-
-                                        {selectedExecution.nodeResults && Object.keys(selectedExecution.nodeResults).length > 0 && (
-                                            <div className="bg-[#256A65]/5 rounded-lg p-4">
-                                                <h4 className="font-normal text-[#1e554f] mb-2 flex items-center gap-2">
-                                                    <CheckCircle size={16} />
-                                                    Node Results
-                                                </h4>
-                                                <div className="space-y-2">
-                                                    {Object.entries(selectedExecution.nodeResults).map(([nodeId, result]: [string, any]) => {
-                                                        const node = nodes.find(n => n.id === nodeId);
-                                                        // Try to get node label from multiple sources
-                                                        const nodeLabel = node?.label || result.nodeLabel || result.label || `Node ${nodeId.substring(0, 8)}`;
-                                                        const nodeType = node?.type || result.nodeType || '';
-                                                        
-                                                        return (
-                                                            <div key={nodeId} className="bg-[var(--bg-card)] p-3 rounded border border-[#256A65]/20">
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="font-medium text-[var(--text-primary)]">{nodeLabel}</span>
-                                                                    {nodeType && <span className="text-xs text-[var(--text-tertiary)]">({nodeType})</span>}
-                                                                    {result.success && <Check size={14} className="text-[#256A65]" />}
-                                                                </div>
-                                                                {result.message && (
-                                                                    <p className="text-xs text-[var(--text-secondary)] mb-1">{result.message}</p>
-                                                                )}
-                                                                {result.outputData && (
-                                                                    <pre className="text-xs bg-[var(--bg-tertiary)] p-2 rounded overflow-x-auto max-h-32">
-                                                                        {JSON.stringify(result.outputData, null, 2)}
-                                                                    </pre>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {selectedExecution.error && (
-                                            <div className="bg-red-50 rounded-lg p-4">
-                                                <h4 className="font-normal text-red-800 mb-2 flex items-center gap-2">
-                                                    <XCircle size={16} />
-                                                    Error
-                                                </h4>
-                                                <pre className="text-xs bg-[var(--bg-card)] p-3 rounded border border-red-100 text-red-600 overflow-x-auto">
-                                                    {selectedExecution.error}
-                                                </pre>
-                                            </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-[var(--text-tertiary)]">
-                                        <div className="text-center">
-                                            <Eye size={48} className="mx-auto mb-3 text-[var(--text-tertiary)]" />
-                                            <p>Select an execution to view details</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ExecutionHistoryInlineModal
+                showExecutionHistory={showExecutionHistory}
+                onClose={() => setShowExecutionHistory(false)}
+                executionHistory={executionHistory}
+                selectedExecution={selectedExecution}
+                setSelectedExecution={setSelectedExecution}
+                loadExecutionHistory={loadExecutionHistory}
+                loadingExecutions={loadingExecutions}
+                nodes={nodes}
+                formatDate={formatDate}
+            />
 
             {/* Node Feedback Popup */}
-            {feedbackPopupNodeId && (
-                <div className="fixed inset-0 flex items-center justify-center z-[60] p-4 bg-black/40 backdrop-blur-sm pointer-events-none" onClick={closeFeedbackPopup}>
-                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                        {/* Header */}
-                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
-                                    <MessageSquare size={18} className="text-[var(--text-secondary)]" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
-                                        Share Your Feedback
-                                    </h3>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Node: {feedbackPopupNodeLabel}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="px-6 py-4">
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                                    What would you like this node to do?
-                                </label>
-                                <textarea
-                                    value={feedbackText}
-                                    onChange={(e) => setFeedbackText(e.target.value)}
-                                    placeholder="Describe the functionality you'd like to see, any improvements, or share your ideas..."
-                                    rows={4}
-                                    className="w-full px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] resize-none placeholder:text-[var(--text-tertiary)] hover:border-[var(--border-medium)] transition-colors"
-                                    autoFocus
-                                />
-                                <p className="text-xs text-[var(--text-secondary)] mt-2">
-                                    Your feedback helps us improve the platform. Thank you!
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex gap-2 justify-end">
-                            <button
-                                onClick={closeFeedbackPopup}
-                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={submitFeedback}
-                                disabled={!feedbackText.trim() || isSubmittingFeedback}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isSubmittingFeedback ? (
-                                    <>
-                                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        Sending...
-                                    </>
-                                ) : (
-                                    'Submit Feedback'
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <FeedbackPopupModal
+                feedbackPopupNodeId={feedbackPopupNodeId}
+                feedbackPopupNodeLabel={feedbackPopupNodeLabel}
+                feedbackText={feedbackText}
+                setFeedbackText={setFeedbackText}
+                isSubmittingFeedback={isSubmittingFeedback}
+                onSubmit={submitFeedback}
+                onClose={closeFeedbackPopup}
+            />
 
             {/* Exit Confirmation Modal */}
-            {showExitConfirmation && (
-                <div className="fixed inset-0 flex items-center justify-center z-[70] p-4 pointer-events-none" onClick={() => setShowExitConfirmation(false)}>
-                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                        {/* Header */}
-                        <div className="px-6 py-5 border-b border-[var(--border-light)]">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center flex-shrink-0">
-                                    <AlertCircle size={20} className="text-[var(--text-secondary)]" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Unsaved Changes</h3>
-                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Do you want to save your workflow before leaving?</p>
-                                </div>
-                            </div>
-                        </div>
+            <ExitConfirmationModal
+                show={showExitConfirmation}
+                onClose={() => setShowExitConfirmation(false)}
+                onExitWithoutSaving={confirmExitWithoutSaving}
+                onExitWithSaving={confirmExitWithSaving}
+                isSaving={isSaving}
+            />
 
-                        {/* Actions */}
-                        <div className="px-6 py-4 flex gap-2 justify-end">
-                            <button
-                                onClick={() => setShowExitConfirmation(false)}
-                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmExitWithoutSaving}
-                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
-                            >
-                                Don't Save
-                            </button>
-                            <button
-                                onClick={confirmExitWithSaving}
-                                disabled={isSaving}
-                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
-                            >
-                                {isSaving ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Save size={14} />
-                                        Save & Exit
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Workflow Templates Modal - Enhanced */}
-            {showTemplatesModal && !previewingTemplate && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => !isCopyingTemplate && setShowTemplatesModal(false)}>
-                    <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-light)] shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                        {/* Header */}
-                        <div className="px-6 py-5 border-b border-[var(--border-light)] shrink-0">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#256A65] to-[#84C4D1] flex items-center justify-center">
-                                        <BookOpen size={24} className="text-white" weight="light" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-medium text-[var(--text-primary)]">Template Gallery</h3>
-                                        <p className="text-sm text-[var(--text-secondary)] mt-0.5">Start with a pre-built workflow and customize it</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowTemplatesModal(false)}
-                                    disabled={isCopyingTemplate}
-                                    className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors disabled:opacity-50"
-                                >
-                                    <X size={20} weight="light" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Category Filter with Icons */}
-                        <div className="px-6 py-4 border-b border-[var(--border-light)] shrink-0 bg-[var(--bg-tertiary)]/30">
-                            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                                {[
-                                    { name: 'All', icon: <Workflow size={14} weight="light" />, color: 'from-slate-500 to-slate-600' },
-                                    { name: 'Compliance', icon: <Shield size={14} weight="light" />, color: 'from-blue-500 to-blue-600' },
-                                    { name: 'Process Optimization', icon: <Zap size={14} weight="light" />, color: 'from-amber-500 to-orange-500' },
-                                    { name: 'Planning', icon: <Calendar size={14} weight="light" />, color: 'from-purple-500 to-purple-600' },
-                                    { name: 'Reporting', icon: <BarChart3 size={14} weight="light" />, color: 'from-emerald-500 to-teal-500' },
-                                    { name: 'Quality Assurance', icon: <CheckCircle size={14} weight="light" />, color: 'from-rose-500 to-pink-500' }
-                                ].map(({ name, icon, color }) => (
-                                    <button
-                                        key={name}
-                                        onClick={() => setSelectedTemplateCategory(name)}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                                            selectedTemplateCategory === name
-                                                ? `bg-gradient-to-r ${color} text-white shadow-md`
-                                                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] hover:text-[var(--text-primary)]'
-                                        }`}
-                                    >
-                                        {icon}
-                                        {name}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Templates Grid */}
-                        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filteredTemplates.map(template => {
-                                    const categoryColors: { [key: string]: string } = {
-                                        'Compliance': 'from-blue-500/10 to-blue-600/5 border-blue-500/20',
-                                        'Process Optimization': 'from-amber-500/10 to-orange-500/5 border-amber-500/20',
-                                        'Planning': 'from-purple-500/10 to-purple-600/5 border-purple-500/20',
-                                        'Reporting': 'from-emerald-500/10 to-teal-500/5 border-emerald-500/20',
-                                        'Quality Assurance': 'from-rose-500/10 to-pink-500/5 border-rose-500/20'
-                                    };
-                                    const categoryTextColors: { [key: string]: string } = {
-                                        'Compliance': 'text-blue-600',
-                                        'Process Optimization': 'text-amber-600',
-                                        'Planning': 'text-purple-600',
-                                        'Reporting': 'text-emerald-600',
-                                        'Quality Assurance': 'text-rose-600'
-                                    };
-                                    return (
-                                        <div
-                                            key={template.id}
-                                            className={`bg-gradient-to-br ${categoryColors[template.category] || 'from-slate-500/10 to-slate-600/5 border-slate-500/20'} border rounded-xl p-4 group hover:shadow-lg hover:scale-[1.02] transition-all duration-200 cursor-pointer`}
-                                            onClick={() => setPreviewingTemplate(template)}
-                                        >
-                                            {/* Category badge */}
-                                            <div className="flex items-center justify-between mb-3">
-                                                <span className={`text-[10px] font-medium uppercase tracking-wider ${categoryTextColors[template.category] || 'text-slate-600'}`}>
-                                                    {template.category}
-                                                </span>
-                                                <div className="flex items-center gap-1 text-[10px] text-[var(--text-tertiary)]">
-                                                    <div className="w-1 h-1 bg-current rounded-full"></div>
-                                                    {template.nodes.length} nodes
-                                                </div>
-                                            </div>
-
-                                            {/* Title */}
-                                            <h4 className="text-sm font-medium text-[var(--text-primary)] mb-2 line-clamp-2 min-h-[40px]">
-                                                {template.name}
-                                            </h4>
-                                            
-                                            {/* Description */}
-                                            <p className="text-xs text-[var(--text-secondary)] mb-4 line-clamp-2 min-h-[32px]">
-                                                {template.description}
-                                            </p>
-
-                                            {/* Visual workflow preview */}
-                                            <div className="bg-[var(--bg-card)]/60 backdrop-blur-sm rounded-lg p-2.5 mb-3 border border-[var(--border-light)]">
-                                                <div className="flex items-center gap-1.5 overflow-hidden">
-                                                    {template.nodes.slice(0, 5).map((node, idx) => (
-                                                        <React.Fragment key={idx}>
-                                                            <div className="flex-shrink-0 w-6 h-6 rounded bg-[var(--bg-tertiary)] border border-[var(--border-light)] flex items-center justify-center" title={node.label}>
-                                                                <Workflow size={10} className="text-[var(--text-tertiary)]" weight="light" />
-                                                            </div>
-                                                            {idx < Math.min(template.nodes.length - 1, 4) && (
-                                                                <ArrowRight size={10} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
-                                                            )}
-                                                        </React.Fragment>
-                                                    ))}
-                                                    {template.nodes.length > 5 && (
-                                                        <span className="text-[10px] text-[var(--text-tertiary)] ml-1">+{template.nodes.length - 5}</span>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Action Buttons */}
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setPreviewingTemplate(template);
-                                                    }}
-                                                    className="flex-1 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <Eye size={14} weight="light" />
-                                                    Preview
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        copyTemplateToWorkflows(template);
-                                                    }}
-                                                    disabled={isCopyingTemplate}
-                                                    className="flex-1 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
-                                                >
-                                                    {isCopyingTemplate ? (
-                                                        <>
-                                                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                            Copying...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Copy size={14} weight="light" />
-                                                            Use Template
-                                                        </>
-                                                    )}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {filteredTemplates.length === 0 && (
-                                <div className="text-center py-16">
-                                    <div className="w-16 h-16 rounded-2xl bg-[var(--bg-tertiary)] flex items-center justify-center mx-auto mb-4">
-                                        <BookOpen size={32} className="text-[var(--text-tertiary)]" weight="light" />
-                                    </div>
-                                    <h3 className="text-base font-medium text-[var(--text-primary)] mb-2">No templates found</h3>
-                                    <p className="text-sm text-[var(--text-secondary)]">Try selecting a different category</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 border-t border-[var(--border-light)] shrink-0 bg-[var(--bg-tertiary)]/30">
-                            <div className="flex items-center justify-between">
-                                <p className="text-xs text-[var(--text-secondary)]">
-                                    Showing {filteredTemplates.length} of {WORKFLOW_TEMPLATES.length} templates
-                                </p>
-                                <button
-                                    onClick={() => setShowTemplatesModal(false)}
-                                    disabled={isCopyingTemplate}
-                                    className="px-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Workflow Templates Modal */}
+            <TemplatesGalleryInlineModal
+                show={showTemplatesModal && !previewingTemplate}
+                onClose={() => setShowTemplatesModal(false)}
+                filteredTemplates={filteredTemplates}
+                allTemplatesCount={WORKFLOW_TEMPLATES.length}
+                selectedTemplateCategory={selectedTemplateCategory}
+                setSelectedTemplateCategory={setSelectedTemplateCategory}
+                setPreviewingTemplate={setPreviewingTemplate}
+                copyTemplateToWorkflows={copyTemplateToWorkflows}
+                isCopyingTemplate={isCopyingTemplate}
+            />
 
             {/* Template Preview Modal */}
-            {previewingTemplate && (
-                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[60] p-4" onClick={() => setPreviewingTemplate(null)}>
-                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                        {/* Header */}
-                        <div className="px-6 py-5 border-b border-[var(--border-light)] shrink-0">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
-                                        <Eye size={20} className="text-[var(--text-secondary)]" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Template Preview</h3>
-                                        <p className="text-sm text-[var(--text-secondary)] mt-0.5">{previewingTemplate.name}</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setPreviewingTemplate(null)}
-                                    className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Preview Canvas */}
-                        <div className="overflow-hidden bg-[var(--bg-tertiary)] relative border-b border-[var(--border-light)]" style={{ height: '400px' }}>
-                            <div 
-                                className="absolute inset-0 overflow-auto pt-4 px-8 pb-8 custom-scrollbar"
-                                style={{
-                                    backgroundImage: `
-                                        linear-gradient(to right, #e2e8f0 1px, transparent 1px),
-                                        linear-gradient(to bottom, #e2e8f0 1px, transparent 1px)
-                                    `,
-                                    backgroundSize: '20px 20px'
-                                }}
-                            >
-                                {/* SVG Connections - offset by padding */}
-                                <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ minWidth: '900px', minHeight: '400px' }}>
-                                    {previewingTemplate.connections.map(conn => {
-                                        const fromNode = previewingTemplate.nodes.find(n => n.id === conn.fromNodeId);
-                                        const toNode = previewingTemplate.nodes.find(n => n.id === conn.toNodeId);
-                                        if (!fromNode || !toNode) return null;
-                                        
-                                        // Reduced padding for better node visibility
-                                        const padding = 16;
-                                        const nodeHeight = 52; // Approximate node height
-                                        const nodeWidth = 140;
-                                        
-                                        const startX = fromNode.x + nodeWidth + padding;
-                                        const startY = fromNode.y + (nodeHeight / 2) + padding;
-                                        const endX = toNode.x + padding;
-                                        const endY = toNode.y + (nodeHeight / 2) + padding;
-                                        const midX = (startX + endX) / 2;
-                                        
-                                        // Color based on connection type
-                                        let strokeColor = '#cbd5e1';
-                                        if (conn.outputType === 'true') strokeColor = '#22c55e';
-                                        if (conn.outputType === 'false') strokeColor = '#ef4444';
-                                        
-                                        return (
-                                            <g key={conn.id}>
-                                                <path
-                                                    d={`M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`}
-                                                    stroke={strokeColor}
-                                                    strokeWidth="2.5"
-                                                    fill="none"
-                                                    strokeDasharray="5 4"
-                                                />
-                                                <circle cx={endX} cy={endY} r="4" fill={strokeColor} />
-                                            </g>
-                                        );
-                                    })}
-                                </svg>
-
-                                {/* Nodes */}
-                                <div className="relative" style={{ minWidth: '900px', minHeight: '400px' }}>
-                                    {previewingTemplate.nodes.map(node => {
-                                        const IconComponent = getNodeIcon(node.type);
-                                        const iconBg = getNodeIconBg(node.type);
-                                        
-                                        return (
-                                            <div
-                                                key={node.id}
-                                                className="absolute bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-sm p-3 w-[140px] hover:shadow-md transition-shadow"
-                                                style={{ left: node.x, top: node.y }}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0">
-                                                        <IconComponent size={14} className={iconBg} />
-                                                    </div>
-                                                    <span className="text-xs font-normal text-[var(--text-primary)] truncate flex-1" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
-                                                        {node.label}
-                                                    </span>
-                                                </div>
-                                                {node.type === 'condition' && (
-                                                    <div className="flex gap-1 mt-2">
-                                                        <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[10px] font-medium">TRUE</span>
-                                                        <span className="px-1.5 py-0.5 bg-red-50 text-red-700 rounded text-[10px] font-medium">FALSE</span>
-                                                    </div>
-                                                )}
-                                                {node.type === 'comment' && node.config?.commentText && (
-                                                    <p className="text-[10px] text-[var(--text-secondary)] mt-2 line-clamp-2">
-                                                        {node.config.commentText}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Template Info */}
-                        <div className="px-6 py-4 border-t border-[var(--border-light)] shrink-0">
-                            <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1">
-                                    <h4 className="text-base font-normal text-[var(--text-primary)] mb-1" style={{ fontFamily: "'Berkeley Mono', monospace" }}>{previewingTemplate.name}</h4>
-                                    <p className="text-sm text-[var(--text-secondary)]">{previewingTemplate.description}</p>
-                                </div>
-                                <span className="px-3 py-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] text-xs rounded ml-4 flex-shrink-0">
-                                    {previewingTemplate.category}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs text-[var(--text-secondary)]">
-                                <span className="flex items-center gap-1.5">
-                                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div>
-                                    {previewingTemplate.nodes.length} nodes
-                                </span>
-                                <span className="text-[var(--text-tertiary)]">•</span>
-                                <span className="flex items-center gap-1.5">
-                                    <ArrowRight size={12} className="text-[var(--text-tertiary)]" weight="light" />
-                                    {previewingTemplate.connections.length} connections
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 border-t border-[var(--border-light)] shrink-0">
-                            <div className="flex items-center justify-end gap-2">
-                                <button
-                                    onClick={() => setPreviewingTemplate(null)}
-                                    className="px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg text-xs font-medium transition-colors"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        copyTemplateToWorkflows(previewingTemplate);
-                                        setPreviewingTemplate(null);
-                                    }}
-                                    disabled={isCopyingTemplate}
-                                    className="px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:shadow-md"
-                                >
-                                    {isCopyingTemplate ? (
-                                        <>
-                                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            Copying...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Copy size={14} weight="light" />
-                                            Use This Template
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <TemplatePreviewModal
+                template={previewingTemplate}
+                onClose={() => setPreviewingTemplate(null)}
+                copyTemplateToWorkflows={copyTemplateToWorkflows}
+                isCopyingTemplate={isCopyingTemplate}
+                getNodeIcon={getNodeIcon}
+                getNodeIconBg={getNodeIconBg}
+            />
 
             {/* Quick Connect Component Search Modal */}
-            {showComponentSearch && connectingFromNodeId && (
-                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none" onClick={() => {
+            <QuickConnectModal
+                show={showComponentSearch}
+                connectingFromNodeId={connectingFromNodeId}
+                componentSearchQuery={componentSearchQuery}
+                setComponentSearchQuery={setComponentSearchQuery}
+                onClose={() => {
                     setShowComponentSearch(false);
                     setConnectingFromNodeId(null);
                     setComponentSearchQuery('');
-                }}>
-                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                        {/* Header */}
-                        <div className="px-6 py-5 border-b border-[var(--border-light)] bg-gradient-to-r from-[#256A65]/5 to-transparent">
-                            <h3 className="text-base font-normal text-[var(--text-primary)]">Connect Component</h3>
-                            <p className="text-xs text-[var(--text-secondary)] mt-0.5">Search and select a component to connect</p>
-                        </div>
-                        
-                        {/* Search Input */}
-                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={16} weight="light" />
-                                <input
-                                    type="text"
-                                    value={componentSearchQuery}
-                                    onChange={(e) => setComponentSearchQuery(e.target.value)}
-                                    placeholder="Search components..."
-                                    className="w-full pl-10 pr-4 py-2 bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-medium)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-[var(--text-tertiary)]"
-                                    autoFocus
-                                />
-                            </div>
-                        </div>
-
-                        {/* Components List */}
-                        <div className="px-6 py-4 max-h-96 overflow-y-auto">
-                            {DRAGGABLE_ITEMS
-                                .filter(item => 
-                                    item.type !== 'trigger' && // Don't show triggers (can't connect after trigger)
-                                    item.type !== 'comment' && // Don't show comments
-                                    (componentSearchQuery === '' || 
-                                     item.label.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
-                                     item.description.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
-                                     item.category.toLowerCase().includes(componentSearchQuery.toLowerCase()))
-                                )
-                                .map((item) => {
-                                    const Icon = item.icon;
-                                    return (
-                                        <button
-                                            key={item.type}
-                                            onClick={() => handleQuickConnect(item.type)}
-                                            className="w-full flex items-start gap-3 p-3 rounded-lg border border-[var(--border-light)] hover:border-[#256A65] hover:bg-[#256A65]/5 transition-all text-left mb-2 group"
-                                        >
-                                            <div className="p-1.5 rounded-lg flex-shrink-0">
-                                                <Icon size={14} className={getNodeIconBg(item.type)} weight="light" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-normal text-sm text-[var(--text-primary)] group-hover:text-[#256A65] transition-colors">
-                                                    {item.label}
-                                                </div>
-                                                <div className="text-xs text-[var(--text-secondary)] mt-0.5">
-                                                    {item.description}
-                                                </div>
-                                                <div className="text-[10px] text-[var(--text-tertiary)] mt-1">
-                                                    {item.category}
-                                                </div>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            {DRAGGABLE_ITEMS.filter(item => 
-                                item.type !== 'trigger' && 
-                                item.type !== 'comment' &&
-                                (componentSearchQuery === '' || 
-                                 item.label.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
-                                 item.description.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
-                                 item.category.toLowerCase().includes(componentSearchQuery.toLowerCase()))
-                            ).length === 0 && (
-                                <div className="text-center py-8 text-[var(--text-tertiary)] text-sm">
-                                    No components found
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Footer */}
-                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex justify-end">
-                            <button
-                                onClick={() => {
-                                    setShowComponentSearch(false);
-                                    setConnectingFromNodeId(null);
-                                    setComponentSearchQuery('');
-                                }}
-                                className="px-4 py-2 border border-[var(--border-medium)] rounded-lg hover:bg-[var(--bg-tertiary)] text-sm font-medium text-[var(--text-primary)] transition-colors"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                }}
+                onSelect={handleQuickConnect}
+                draggableItems={DRAGGABLE_ITEMS}
+                getNodeIconBg={getNodeIconBg}
+            />
 
             {/* Tags Modal */}
-            {showTagsModal && (
-                <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => setShowTagsModal(false)}>
-                    <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                        <div className="px-6 py-4 border-b border-[var(--border-light)]">
-                            <h3 className="text-lg font-normal text-[var(--text-primary)] flex items-center gap-2">
-                                <Tag size={20} className="text-[var(--text-secondary)]" weight="light" />
-                                Manage Tags
-                            </h3>
-                        </div>
-                        <div className="px-6 py-4">
-                            {/* Current Tags */}
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Current Tags</label>
-                                {workflowTags.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2">
-                                        {workflowTags.map((tag, idx) => (
-                                            <span
-                                                key={idx}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-light)]"
-                                            >
-                                                {tag}
-                                                <button
-                                                    onClick={() => {
-                                                        setWorkflowTags(workflowTags.filter((_, i) => i !== idx));
-                                                    }}
-                                                    className="ml-1 hover:text-red-600 transition-colors"
-                                                >
-                                                    <X size={14} weight="light" />
-                                                </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-[var(--text-secondary)]">No tags added yet</p>
-                                )}
-                            </div>
-
-                            {/* Add New Tag */}
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Add Tag</label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={newTagInput}
-                                        onChange={(e) => setNewTagInput(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && newTagInput.trim()) {
-                                                e.preventDefault();
-                                                if (!workflowTags.includes(newTagInput.trim())) {
-                                                    setWorkflowTags([...workflowTags, newTagInput.trim()]);
-                                                    setNewTagInput('');
-                                                }
-                                            }
-                                        }}
-                                        placeholder="Enter tag name..."
-                                        className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)]"
-                                    />
-                                    <button
-                                        onClick={() => {
-                                            if (newTagInput.trim() && !workflowTags.includes(newTagInput.trim())) {
-                                                setWorkflowTags([...workflowTags, newTagInput.trim()]);
-                                                setNewTagInput('');
-                                            }
-                                        }}
-                                        className="px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-colors"
-                                    >
-                                        Add
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex justify-end gap-2">
-                            <button
-                                onClick={() => {
-                                    setShowTagsModal(false);
-                                    setNewTagInput('');
-                                }}
-                                className="px-4 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-tertiary)] rounded-lg text-sm font-medium"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    // Save tags when closing modal
-                                    if (currentWorkflowId) {
-                                        try {
-                                            const res = await fetch(`${API_BASE}/workflows/${currentWorkflowId}`, {
-                                                method: 'PUT',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ 
-                                                    name: workflowName, 
-                                                    data: { nodes, connections },
-                                                    tags: workflowTags,
-                                                    lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
-                                                }),
-                                                credentials: 'include'
-                                            });
-                                            if (res.ok) {
-                                                await fetchWorkflows();
-                                                showToast('Tags updated successfully!', 'success');
-                                            }
-                                        } catch (error) {
-                                            console.error('Error saving tags:', error);
-                                        }
-                                    }
-                                    setShowTagsModal(false);
-                                    setNewTagInput('');
-                                }}
-                                className="px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium"
-                            >
-                                Save
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <TagsManageModal
+                show={showTagsModal}
+                onClose={() => setShowTagsModal(false)}
+                workflowTags={workflowTags}
+                setWorkflowTags={setWorkflowTags}
+                newTagInput={newTagInput}
+                setNewTagInput={setNewTagInput}
+                currentWorkflowId={currentWorkflowId}
+                workflowName={workflowName}
+                nodes={nodes}
+                connections={connections}
+                userName={user?.name || user?.email?.split('@')[0] || 'Unknown'}
+                fetchWorkflows={fetchWorkflows}
+                showToast={showToast}
+            />
 
             {/* Schedule Config Modal */}
                         {configuringScheduleNodeId && (

@@ -13,8 +13,8 @@ interface DataPreviewModalProps {
   onClose: () => void;
   dataViewTab: 'input' | 'output';
   setDataViewTab: (tab: 'input' | 'output') => void;
-  splitViewTab: string;
-  setSplitViewTab: (tab: string) => void;
+  splitViewTab: 'input' | 'outputA' | 'outputB';
+  setSplitViewTab: (tab: 'input' | 'outputA' | 'outputB') => void;
 }
 
 // Helper function to normalize data to array format
