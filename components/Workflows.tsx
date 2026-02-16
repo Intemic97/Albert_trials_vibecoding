@@ -67,6 +67,12 @@ import {
   ScheduleConfigPanel,
 } from './Workflows/panels';
 
+// Import node execution hook
+import { useNodeExecution } from './Workflows/hooks/useNodeExecution';
+
+// Import extracted modal components
+import { DataPreviewModal } from './Workflows/modals/DataPreviewModal';
+
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
 
@@ -218,13 +224,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     const [conditionField, setConditionField] = useState<string>('');
     const [conditionOperator, setConditionOperator] = useState<string>('equals');
     const [conditionValue, setConditionValue] = useState<string>('');
-    const [conditionProcessingMode, setConditionProcessingMode] = useState<'batch' | 'perRow'>('batch');
-    const [additionalConditions, setAdditionalConditions] = useState<Array<{id: string; field: string; operator: string; value: string}>>([]);
-    const [conditionLogicalOperator, setConditionLogicalOperator] = useState<'AND' | 'OR'>('AND');
-    const [connectingFromType, setConnectingFromType] = useState<'true' | 'false' | 'A' | 'B' | null>(null);
     const [configuringAddFieldNodeId, setConfiguringAddFieldNodeId] = useState<string | null>(null);
-    const [addFieldName, setAddFieldName] = useState<string>('');
-    const [addFieldValue, setAddFieldValue] = useState<string>('');
     const [configuringSaveNodeId, setConfiguringSaveNodeId] = useState<string | null>(null);
     const [saveEntityId, setSaveEntityId] = useState<string>('');
     const [isCreatingNewEntity, setIsCreatingNewEntity] = useState(false);
@@ -241,10 +241,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     // LLM Node State
     const [configuringLLMNodeId, setConfiguringLLMNodeId] = useState<string | null>(null);
     const [llmPrompt, setLlmPrompt] = useState<string>('');
-    const [llmContextEntities, setLlmContextEntities] = useState<string[]>([]);
-    const [llmIncludeInput, setLlmIncludeInput] = useState<boolean>(true);
-    const [llmProcessingMode, setLlmProcessingMode] = useState<'batch' | 'perRow'>('batch');
-
     // Python Node State
     const [configuringPythonNodeId, setConfiguringPythonNodeId] = useState<string | null>(null);
     const [pythonCode, setPythonCode] = useState<string>('def process(data):\n    # Modify data here\n    return data');
@@ -261,11 +257,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     // Split Columns Node State
     const [configuringSplitColumnsNodeId, setConfiguringSplitColumnsNodeId] = useState<string | null>(null);
-    const [splitColumnsAvailable, setSplitColumnsAvailable] = useState<string[]>([]);
-    const [splitColumnsOutputA, setSplitColumnsOutputA] = useState<string[]>([]);
-    const [splitColumnsOutputB, setSplitColumnsOutputB] = useState<string[]>([]);
-    const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
-
     // Excel Input Node State
     const [configuringExcelNodeId, setConfiguringExcelNodeId] = useState<string | null>(null);
     const [excelFile, setExcelFile] = useState<File | null>(null);
@@ -280,9 +271,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     // Manual Input Node State
     const [configuringManualInputNodeId, setConfiguringManualInputNodeId] = useState<string | null>(null);
-    const [manualInputVarName, setManualInputVarName] = useState<string>('');
-    const [manualInputVarValue, setManualInputVarValue] = useState<string>('');
-
     // HTTP Node State
     const [configuringHttpNodeId, setConfiguringHttpNodeId] = useState<string | null>(null);
     const [httpUrl, setHttpUrl] = useState<string>('');
@@ -297,52 +285,19 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     // MySQL Node State
     const [configuringMySQLNodeId, setConfiguringMySQLNodeId] = useState<string | null>(null);
-    const [mysqlHost, setMysqlHost] = useState<string>('localhost');
-    const [mysqlPort, setMysqlPort] = useState<string>('3306');
-    const [mysqlDatabase, setMysqlDatabase] = useState<string>('');
-    const [mysqlUsername, setMysqlUsername] = useState<string>('');
-    const [mysqlPassword, setMysqlPassword] = useState<string>('');
     const [mysqlQuery, setMysqlQuery] = useState<string>('SELECT * FROM ');
 
     // SAP Fetch Node State
     const [configuringSAPNodeId, setConfiguringSAPNodeId] = useState<string | null>(null);
-    const [sapConnectionName, setSapConnectionName] = useState<string>('SAP_Production');
-    const [sapAuthType, setSapAuthType] = useState<string>('OAuth2_Client_Credentials');
-    const [sapClientId, setSapClientId] = useState<string>('');
-    const [sapClientSecret, setSapClientSecret] = useState<string>('');
-    const [sapTokenUrl, setSapTokenUrl] = useState<string>('');
-    const [sapBaseApiUrl, setSapBaseApiUrl] = useState<string>('');
-    const [sapServicePath, setSapServicePath] = useState<string>('/sap/opu/odata/sap/');
-    const [sapEntity, setSapEntity] = useState<string>('');
-
     // Send Email Node State
     const [configuringEmailNodeId, setConfiguringEmailNodeId] = useState<string | null>(null);
     const [emailTo, setEmailTo] = useState<string>('');
-    const [emailSubject, setEmailSubject] = useState<string>('');
-    const [emailBody, setEmailBody] = useState<string>('');
-    const [emailSmtpHost, setEmailSmtpHost] = useState<string>('smtp.gmail.com');
-    const [emailSmtpPort, setEmailSmtpPort] = useState<string>('587');
-    const [emailSmtpUser, setEmailSmtpUser] = useState<string>('');
-    const [emailSmtpPass, setEmailSmtpPass] = useState<string>('');
-
     // Send SMS Node State
     const [configuringSMSNodeId, setConfiguringSMSNodeId] = useState<string | null>(null);
     const [smsTo, setSmsTo] = useState<string>('');
-    const [smsBody, setSmsBody] = useState<string>('');
-    const [twilioAccountSid, setTwilioAccountSid] = useState<string>('');
-    const [twilioAuthToken, setTwilioAuthToken] = useState<string>('');
-    const [twilioFromNumber, setTwilioFromNumber] = useState<string>('');
-    const [showSMSTwilioSettings, setShowSMSTwilioSettings] = useState<boolean>(false);
-
     // Send WhatsApp Node State
     const [configuringWhatsAppNodeId, setConfiguringWhatsAppNodeId] = useState<string | null>(null);
     const [whatsappTo, setWhatsappTo] = useState<string>('');
-    const [whatsappBody, setWhatsappBody] = useState<string>('');
-    const [whatsappTwilioAccountSid, setWhatsappTwilioAccountSid] = useState<string>('');
-    const [whatsappTwilioAuthToken, setWhatsappTwilioAuthToken] = useState<string>('');
-    const [whatsappTwilioFromNumber, setWhatsappTwilioFromNumber] = useState<string>('');
-    const [showWhatsAppTwilioSettings, setShowWhatsAppTwilioSettings] = useState<boolean>(false);
-
     // Rename Columns Node State
     const [configuringRenameColumnsNodeId, setConfiguringRenameColumnsNodeId] = useState<string | null>(null);
     const [columnRenames, setColumnRenames] = useState<{ oldName: string; newName: string }[]>([{ oldName: '', newName: '' }]);
@@ -352,9 +307,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     const [visualizationPrompt, setVisualizationPrompt] = useState<string>('');
     const [generatedWidget, setGeneratedWidget] = useState<WidgetConfig | null>(null);
     const [isGeneratingWidget, setIsGeneratingWidget] = useState<boolean>(false);
-    const [showWidgetExplanation, setShowWidgetExplanation] = useState<boolean>(false);
-    const [showEmailSmtpSettings, setShowEmailSmtpSettings] = useState<boolean>(false);
-
     // Schedule Node State
     const [configuringScheduleNodeId, setConfiguringScheduleNodeId] = useState<string | null>(null);
     const [scheduleIntervalValue, setScheduleIntervalValue] = useState<string>('5');
@@ -366,53 +318,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     // OPC UA Node State
     const [configuringOpcuaNodeId, setConfiguringOpcuaNodeId] = useState<string | null>(null);
-    const [opcuaEndpointUrl, setOpcuaEndpointUrl] = useState<string>('opc.tcp://localhost:4840');
-    const [opcuaNodeId, setOpcuaNodeId] = useState<string>('ns=2;s=Temperature');
-    const [opcuaUsername, setOpcuaUsername] = useState<string>('');
-    const [opcuaPassword, setOpcuaPassword] = useState<string>('');
-    const [opcuaSecurityMode, setOpcuaSecurityMode] = useState<'None' | 'Sign' | 'SignAndEncrypt'>('None');
-    const [opcuaSecurityPolicy, setOpcuaSecurityPolicy] = useState<string>('None');
-    const [opcuaPollInterval, setOpcuaPollInterval] = useState<string>('5000');
-
     // MQTT Node State
     const [configuringMqttNodeId, setConfiguringMqttNodeId] = useState<string | null>(null);
-    const [mqttBrokerUrl, setMqttBrokerUrl] = useState<string>('mqtt://localhost');
-    const [mqttPort, setMqttPort] = useState<string>('1883');
-    const [mqttTopic, setMqttTopic] = useState<string>('sensors/#');
-    const [mqttUsername, setMqttUsername] = useState<string>('');
-    const [mqttPassword, setMqttPassword] = useState<string>('');
-    const [mqttClientId, setMqttClientId] = useState<string>('');
-    const [mqttQos, setMqttQos] = useState<'0' | '1' | '2'>('0');
-    const [mqttCleanSession, setMqttCleanSession] = useState<boolean>(true);
-
     // OSIsoft PI Node State
     const [configuringOsiPiNodeId, setConfiguringOsiPiNodeId] = useState<string | null>(null);
-    const [osiPiHost, setOsiPiHost] = useState<string>('');
-    const [osiPiApiKey, setOsiPiApiKey] = useState<string>('');
-    const [osiPiGranularityValue, setOsiPiGranularityValue] = useState<string>('5');
-    const [osiPiGranularityUnit, setOsiPiGranularityUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('seconds');
-    const [osiPiWebIds, setOsiPiWebIds] = useState<string[]>(['', '']);
-    const [showOsiPiApiKey, setShowOsiPiApiKey] = useState<boolean>(false);
-
     // FranMIT Node State
     const [configuringFranmitNodeId, setConfiguringFranmitNodeId] = useState<string | null>(null);
-    const [franmitApiSecretId, setFranmitApiSecretId] = useState<string>('');
-    const [franmitReactorVolume, setFranmitReactorVolume] = useState<string>('');
-    const [franmitReactionVolume, setFranmitReactionVolume] = useState<string>('');
-    const [franmitCatalystScaleFactor, setFranmitCatalystScaleFactor] = useState<string>('');
-    const [showFranmitApiSecret, setShowFranmitApiSecret] = useState<boolean>(false);
-
     // Conveyor Node State
     const [configuringConveyorNodeId, setConfiguringConveyorNodeId] = useState<string | null>(null);
     const [conveyorSpeed, setConveyorSpeed] = useState<string>('');
     const [conveyorLength, setConveyorLength] = useState<string>('');
-    const [conveyorWidth, setConveyorWidth] = useState<string>('');
-    const [conveyorInclination, setConveyorInclination] = useState<string>('');
-    const [conveyorLoadCapacity, setConveyorLoadCapacity] = useState<string>('');
-    const [conveyorBeltType, setConveyorBeltType] = useState<string>('flat');
-    const [conveyorMotorPower, setConveyorMotorPower] = useState<string>('');
-    const [conveyorFrictionCoeff, setConveyorFrictionCoeff] = useState<string>('');
-
     // Unsaved Changes Confirmation
     const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
@@ -420,8 +335,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     // ESIOS Node State
     const [configuringEsiosNodeId, setConfiguringEsiosNodeId] = useState<string | null>(null);
     const [esiosArchiveId, setEsiosArchiveId] = useState<string>('1001'); // PVPC indicator ID
-    const [esiosDate, setEsiosDate] = useState<string>(new Date().toISOString().split('T')[0]); // Today YYYY-MM-DD
-
     // Climatiq Node State
     const [configuringClimatiqNodeId, setConfiguringClimatiqNodeId] = useState<string | null>(null);
     const [climatiqQuery, setClimatiqQuery] = useState<string>('Passenger Car');
@@ -432,20 +345,14 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     // Human Approval Node State
     const [configuringHumanApprovalNodeId, setConfiguringHumanApprovalNodeId] = useState<string | null>(null);
     const [organizationUsers, setOrganizationUsers] = useState<any[]>([]);
-    const [selectedApproverUserId, setSelectedApproverUserId] = useState<string>('');
-    const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
-
     // LIMS Fetch Node State
     const [configuringLIMSNodeId, setConfiguringLIMSNodeId] = useState<string | null>(null);
     const [limsServerUrl, setLimsServerUrl] = useState<string>('');
     const [limsApiKey, setLimsApiKey] = useState<string>('');
     const [limsEndpoint, setLimsEndpoint] = useState<string>('materials');
-    const [limsQuery, setLimsQuery] = useState<string>('');
-
     // Statistical Analysis Node State
     const [configuringStatisticalNodeId, setConfiguringStatisticalNodeId] = useState<string | null>(null);
     const [statisticalMethod, setStatisticalMethod] = useState<'pca' | 'spc' | 'regression' | 'goldenBatch'>('goldenBatch');
-    const [statisticalParams, setStatisticalParams] = useState<string>('{}');
     const [goldenBatchId, setGoldenBatchId] = useState<string>('');
 
     // Alert Agent Node State
@@ -453,14 +360,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     const [alertConditions, setAlertConditions] = useState<string>('[]');
     const [alertSeverity, setAlertSeverity] = useState<'critical' | 'warning' | 'info'>('warning');
     const [alertActions, setAlertActions] = useState<string[]>(['email']);
-    const [alertRecipients, setAlertRecipients] = useState<string>('');
-
     // PDF Report Node State
     const [configuringPdfReportNodeId, setConfiguringPdfReportNodeId] = useState<string | null>(null);
     const [pdfTemplate, setPdfTemplate] = useState<string>('standard');
-    const [pdfReportData, setPdfReportData] = useState<string>('{}');
-    const [pdfOutputPath, setPdfOutputPath] = useState<string>('');
-
     const [dataViewTab, setDataViewTab] = useState<'input' | 'output'>('output');
     const [splitViewTab, setSplitViewTab] = useState<'input' | 'outputA' | 'outputB'>('outputA');
     const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -1183,208 +1085,40 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     const openConditionConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'condition') {
-            setConfiguringConditionNodeId(nodeId);
-            setConditionField(node.config?.conditionField || '');
-            setConditionOperator(node.config?.conditionOperator || 'equals');
-            setConditionValue(node.config?.conditionValue || '');
-            setConditionProcessingMode(node.config?.processingMode || 'batch');
-            setAdditionalConditions(node.config?.additionalConditions || []);
-            setConditionLogicalOperator(node.config?.logicalOperator || 'AND');
-            setNodeCustomTitle(node.config?.customName || '');
-        }
-    };
-
-    const saveConditionConfig = () => {
-        if (!configuringConditionNodeId || !conditionField) return;
-
-        const finalLabel = nodeCustomTitle.trim() || 'If / Else';
-        
-        setNodes(prev => prev.map(n =>
-            n.id === configuringConditionNodeId
-                ? {
-                    ...n,
-                    label: finalLabel,
-                    config: {
-                        ...n.config,
-                        conditionField,
-                        conditionOperator,
-                        conditionValue,
-                        processingMode: conditionProcessingMode,
-                        additionalConditions: additionalConditions,
-                        logicalOperator: conditionLogicalOperator,
-                        customName: nodeCustomTitle.trim() || undefined
-                    }
-                }
-                : n
-        ));
-        setConfiguringConditionNodeId(null);
-        setConditionField('');
-        setConditionOperator('equals');
-        setConditionValue('');
-        setConditionProcessingMode('batch');
-        setAdditionalConditions([]);
-        setConditionLogicalOperator('AND');
-        setNodeCustomTitle('');
+        if (node && node.type === 'condition') setConfiguringConditionNodeId(nodeId);
     };
 
     const openAddFieldConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'addField') {
-            setConfiguringAddFieldNodeId(nodeId);
-            setAddFieldName(node.config?.conditionField || '');
-            setAddFieldValue(node.config?.conditionValue || '');
-        }
-    };
-
-    const saveAddFieldConfig = () => {
-        if (!configuringAddFieldNodeId || !addFieldName) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringAddFieldNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        conditionField: addFieldName,
-                        conditionValue: addFieldValue
-                    }
-                }
-                : n
-        ));
-        setConfiguringAddFieldNodeId(null);
-        setAddFieldName('');
-        setAddFieldValue('');
+        if (node && node.type === 'addField') setConfiguringAddFieldNodeId(nodeId);
     };
 
     const openJoinConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'join') {
-            setConfiguringJoinNodeId(nodeId);
-            setJoinStrategy(node.config?.joinStrategy || 'concat');
-            setJoinType(node.config?.joinType || 'inner');
-            setJoinKey(node.config?.joinKey || '');
-        }
-    };
-
-    const saveJoinConfig = () => {
-        if (!configuringJoinNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringJoinNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        joinStrategy,
-                        joinType,
-                        joinKey
-                    }
-                }
-                : n
-        ));
-        setConfiguringJoinNodeId(null);
-        setJoinStrategy('concat');
-        setJoinType('inner');
-        setJoinKey('');
+        if (node && node.type === 'join') setConfiguringJoinNodeId(nodeId);
     };
 
     const openSplitColumnsConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'splitColumns') {
-            setConfiguringSplitColumnsNodeId(nodeId);
-            
-            // Get available columns from parent node's output data
-            const parentConnection = connections.find(c => c.toNodeId === nodeId);
-            const parentNode = parentConnection ? nodes.find(n => n.id === parentConnection.fromNodeId) : null;
-            
-            // Handle splitColumns parent node
-            let parentOutputData: any[] = [];
-            if (parentNode?.type === 'splitColumns' && parentNode.outputData) {
-                parentOutputData = parentConnection?.outputType === 'B' 
-                    ? parentNode.outputData.outputB || []
-                    : parentNode.outputData.outputA || [];
-            } else {
-                parentOutputData = parentNode?.outputData || parentNode?.data || [];
-            }
-            
-            const allColumns: string[] = [];
-            if (Array.isArray(parentOutputData) && parentOutputData.length > 0) {
-                const firstRecord = parentOutputData[0];
-                if (firstRecord && typeof firstRecord === 'object') {
-                    Object.keys(firstRecord).forEach(key => {
-                        if (!allColumns.includes(key)) {
-                            allColumns.push(key);
-                        }
-                    });
-                }
-            }
-            
-            // Initialize from existing config or default all to Output A
-            const existingOutputA = node.config?.columnsOutputA || [];
-            const existingOutputB = node.config?.columnsOutputB || [];
-            
-            if (existingOutputA.length > 0 || existingOutputB.length > 0) {
-                // Use existing configuration, but only include columns that still exist
-                setSplitColumnsOutputA(existingOutputA.filter((c: string) => allColumns.includes(c)));
-                setSplitColumnsOutputB(existingOutputB.filter((c: string) => allColumns.includes(c)));
-                // Any new columns go to available
-                const usedColumns = [...existingOutputA, ...existingOutputB];
-                setSplitColumnsAvailable(allColumns.filter(c => !usedColumns.includes(c)));
-            } else {
-                // Default: all columns go to Output A
-                setSplitColumnsOutputA(allColumns);
-                setSplitColumnsOutputB([]);
-                setSplitColumnsAvailable([]);
-            }
-        }
-    };
-
-    const saveSplitColumnsConfig = () => {
-        if (!configuringSplitColumnsNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringSplitColumnsNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        columnsOutputA: splitColumnsOutputA,
-                        columnsOutputB: splitColumnsOutputB
-                    }
-                }
-                : n
-        ));
-        setConfiguringSplitColumnsNodeId(null);
-        setSplitColumnsAvailable([]);
-        setSplitColumnsOutputA([]);
-        setSplitColumnsOutputB([]);
-        setDraggedColumn(null);
+        if (node && node.type === 'splitColumns') setConfiguringSplitColumnsNodeId(nodeId);
     };
 
     const openExcelConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'excelInput') {
             setConfiguringExcelNodeId(nodeId);
-            // If the node already has data (GCS or inline), show preview
-            if (node.config?.useGCS && node.config?.previewData) {
-                // GCS data - use preview
+            setExcelFile(null);
+            // Reconstruct preview data from node config
+            const rawData = node.config?.parsedData || node.config?.previewData || null;
+            if (rawData && Array.isArray(rawData) && rawData.length > 0) {
                 setExcelPreviewData({
-                    headers: node.config.headers || [],
-                    data: node.config.previewData.slice(0, 5),
-                    rowCount: node.config.rowCount || node.config.previewData.length
-                });
-            } else if (node.config?.parsedData) {
-                // Inline data
-                setExcelPreviewData({
-                    headers: node.config.headers || [],
-                    data: node.config.parsedData.slice(0, 5),
-                    rowCount: node.config.parsedData.length
+                    headers: Object.keys(rawData[0]),
+                    data: rawData,
+                    rowCount: node.config?.rowCount || rawData.length
                 });
             } else {
                 setExcelPreviewData(null);
             }
-            setExcelFile(null);
         }
     };
 
@@ -1524,25 +1258,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         const node = nodes.find(n => n.id === nodeId);
         if (node && node.type === 'pdfInput') {
             setConfiguringPdfNodeId(nodeId);
-            // If the node already has data (GCS or inline), show preview
-            if (node.config?.useGCS && node.config?.pdfTextPreview) {
-                // GCS data - show preview text
-                setPdfPreviewData({
-                    text: node.config.pdfTextPreview,
-                    pages: node.config.pages || 0,
-                    fileName: node.config.fileName || ''
-                });
-            } else if (node.config?.pdfText) {
-                // Inline data
-                setPdfPreviewData({
-                    text: node.config.pdfText,
-                    pages: node.config.pages || 0,
-                    fileName: node.config.fileName || ''
-                });
-            } else {
-                setPdfPreviewData(null);
-            }
             setPdfFile(null);
+            setPdfPreviewData(node.config?.pdfText ? { text: node.config.pdfText, pages: node.config.pages, fileName: node.config.fileName || 'document.pdf' } : null);
         }
     };
 
@@ -1651,13 +1368,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     const openSaveRecordsConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'saveRecords') {
-            setConfiguringSaveNodeId(nodeId);
-            setSaveEntityId(node.config?.entityId || '');
-            setNodeCustomTitle(node.config?.customName || '');
-            setIsCreatingNewEntity(false);
-            setNewEntityName('');
-        }
+        if (node && node.type === 'saveRecords') setConfiguringSaveNodeId(nodeId);
     };
 
     /** Infer property type from a JS value */
@@ -1800,89 +1511,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         return [...entities, ...extra];
     }, [entities, localCreatedEntities]);
 
-    const saveSaveRecordsConfig = () => {
-        if (!configuringSaveNodeId || !saveEntityId) return;
-
-        const entity = allEntities.find(e => e.id === saveEntityId);
-        const defaultLabel = `Save to ${entity?.name || 'Database'}`;
-        const finalLabel = nodeCustomTitle.trim() || defaultLabel;
-        
-        setNodes(prev => prev.map(n =>
-            n.id === configuringSaveNodeId
-                ? { 
-                    ...n, 
-                    label: finalLabel,
-                    config: { 
-                        entityId: saveEntityId, 
-                        entityName: entity?.name || '',
-                        customName: nodeCustomTitle.trim() || undefined
-                    } 
-                }
-                : n
-        ));
-        setConfiguringSaveNodeId(null);
-        setSaveEntityId('');
-        setNodeCustomTitle('');
-    };
-
-    const openEquipmentConfig = async (nodeId: string) => {
-        // Equipment node removed
-    };
-
-    const saveEquipmentConfig = () => {
-        // Equipment node removed
-    };
-
     const openLLMConfig = (nodeId: string) => {
         setConfiguringLLMNodeId(nodeId);
-        const node = nodes.find(n => n.id === nodeId);
-        if (node) {
-            setLlmPrompt(node.config?.llmPrompt || '');
-            setLlmContextEntities(node.config?.llmContextEntities || []);
-            setLlmIncludeInput(node.config?.llmIncludeInput !== undefined ? node.config.llmIncludeInput : true);
-            setLlmProcessingMode(node.config?.processingMode || 'batch');
-            setNodeCustomTitle(node.config?.customName || '');
-        }
-    };
-
-    const saveLLMConfig = () => {
-        if (!configuringLLMNodeId) return;
-
-        const finalLabel = nodeCustomTitle.trim() || 'AI Generation';
-        
-        setNodes(prev => prev.map(n =>
-            n.id === configuringLLMNodeId
-                ? {
-                    ...n,
-                    label: finalLabel,
-                    config: {
-                        ...n.config,
-                        llmPrompt,
-                        llmContextEntities,
-                        llmIncludeInput,
-                        processingMode: llmProcessingMode,
-                        customName: nodeCustomTitle.trim() || undefined
-                    }
-                }
-                : n
-        ));
-        setConfiguringLLMNodeId(null);
-        setLlmPrompt('');
-        setLlmContextEntities([]);
-        setLlmIncludeInput(true);
-        setLlmProcessingMode('batch');
-        setNodeCustomTitle('');
     };
 
     const openPythonConfig = (nodeId: string) => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (node) {
-            setPythonCode(node.config?.pythonCode || 'def process(data):\n    # Modify data here\n    return data');
-            setPythonAiPrompt(node.config?.pythonAiPrompt || '');
-            setNodeCustomTitle(node.config?.customName || '');
-            setConfiguringPythonNodeId(nodeId);
-            setDebugSuggestion(null); // Clear any previous debug suggestion
-        }
+        setConfiguringPythonNodeId(nodeId);
     };
 
     // Debug Python node with AI - analyzes error and suggests fix
@@ -1927,118 +1561,20 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         }
     };
 
-    const savePythonConfig = () => {
-        if (configuringPythonNodeId) {
-            const finalLabel = nodeCustomTitle.trim() || 'Python Code';
-            
-            setNodes(nodes.map(n => n.id === configuringPythonNodeId ? {
-                ...n,
-                label: finalLabel,
-                config: { 
-                    ...n.config, 
-                    pythonCode, 
-                    pythonAiPrompt,
-                    customName: nodeCustomTitle.trim() || undefined
-                }
-            } : n));
-            setConfiguringPythonNodeId(null);
-            setNodeCustomTitle('');
-        }
-    };
-
     const openManualInputConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'manualInput') {
-            setConfiguringManualInputNodeId(nodeId);
-            setManualInputVarName(node.config?.inputVarName || '');
-            setManualInputVarValue(node.config?.inputVarValue || '');
-        }
-    };
-
-    const saveManualInputConfig = () => {
-        if (!configuringManualInputNodeId || !manualInputVarName.trim()) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringManualInputNodeId
-                ? {
-                    ...n,
-                    label: `${manualInputVarName}: ${manualInputVarValue}`,
-                    config: {
-                        ...n.config,
-                        inputVarName: manualInputVarName,
-                        inputVarValue: manualInputVarValue
-                    }
-                }
-                : n
-        ));
-        setConfiguringManualInputNodeId(null);
-        setManualInputVarName('');
-        setManualInputVarValue('');
+        if (node && node.type === 'manualInput') setConfiguringManualInputNodeId(nodeId);
     };
 
     const openHttpConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'http') {
-            setConfiguringHttpNodeId(nodeId);
-            setHttpUrl(node.config?.httpUrl || '');
-        }
-    };
-
-    const saveHttpConfig = () => {
-        if (!configuringHttpNodeId || !httpUrl.trim()) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringHttpNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        httpUrl
-                    }
-                }
-                : n
-        ));
-        setConfiguringHttpNodeId(null);
+        if (node && node.type === 'http') setConfiguringHttpNodeId(nodeId);
     };
 
     // SAP Node Functions
     const openSAPConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'sapFetch') {
-            setConfiguringSAPNodeId(nodeId);
-            setSapConnectionName(node.config?.sapConnectionName || 'SAP_Production');
-            setSapAuthType(node.config?.sapAuthType || 'OAuth2_Client_Credentials');
-            setSapClientId(node.config?.sapClientId || '');
-            setSapClientSecret(node.config?.sapClientSecret || '');
-            setSapTokenUrl(node.config?.sapTokenUrl || '');
-            setSapBaseApiUrl(node.config?.sapBaseApiUrl || '');
-            setSapServicePath(node.config?.sapServicePath || '/sap/opu/odata/sap/');
-            setSapEntity(node.config?.sapEntity || '');
-        }
-    };
-
-    const saveSAPConfig = () => {
-        if (!configuringSAPNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringSAPNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        sapConnectionName,
-                        sapAuthType,
-                        sapClientId,
-                        sapClientSecret,
-                        sapTokenUrl,
-                        sapBaseApiUrl,
-                        sapServicePath,
-                        sapEntity
-                    }
-                }
-                : n
-        ));
-        setConfiguringSAPNodeId(null);
+        if (node && node.type === 'sapFetch') setConfiguringSAPNodeId(nodeId);
     };
 
     // Webhook Node Functions
@@ -2073,7 +1609,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     // Webhook Response Node Functions
     const openWebhookResponseConfig = (nodeId: string) => {
-        closeAllConfigs();
         setConfiguringWebhookResponseNodeId(nodeId);
     };
 
@@ -2093,380 +1628,50 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     const openMySQLConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'mysql') {
-            setConfiguringMySQLNodeId(nodeId);
-            setMysqlHost(node.config?.mysqlHost || 'localhost');
-            setMysqlPort(node.config?.mysqlPort || '3306');
-            setMysqlDatabase(node.config?.mysqlDatabase || '');
-            setMysqlUsername(node.config?.mysqlUsername || '');
-            setMysqlPassword(node.config?.mysqlPassword || '');
-            setMysqlQuery(node.config?.mysqlQuery || 'SELECT * FROM ');
-        }
-    };
-
-    const saveMySQLConfig = () => {
-        if (!configuringMySQLNodeId || !mysqlQuery.trim()) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringMySQLNodeId
-                ? {
-                    ...n,
-                    label: mysqlDatabase ? `MySQL: ${mysqlDatabase}` : 'MySQL',
-                    config: {
-                        ...n.config,
-                        mysqlHost: mysqlHost || undefined,
-                        mysqlPort: mysqlPort || undefined,
-                        mysqlDatabase: mysqlDatabase || undefined,
-                        mysqlUsername: mysqlUsername || undefined,
-                        mysqlPassword: mysqlPassword || undefined,
-                        mysqlQuery
-                    }
-                }
-                : n
-        ));
-        setConfiguringMySQLNodeId(null);
-    };
-
-    const openOpcuaConfig = (nodeId: string) => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'opcua') {
-            setConfiguringOpcuaNodeId(nodeId);
-            setOpcuaEndpointUrl(node.config?.opcuaEndpointUrl || 'opc.tcp://localhost:4840');
-            setOpcuaNodeId(node.config?.opcuaNodeId || 'ns=2;s=Temperature');
-            setOpcuaUsername(node.config?.opcuaUsername || '');
-            setOpcuaPassword(node.config?.opcuaPassword || '');
-            setOpcuaSecurityMode(node.config?.opcuaSecurityMode || 'None');
-            setOpcuaSecurityPolicy(node.config?.opcuaSecurityPolicy || 'None');
-            setOpcuaPollInterval(node.config?.opcuaPollInterval || '5000');
-        }
-    };
-
-    const saveOpcuaConfig = () => {
-        if (!configuringOpcuaNodeId || !opcuaEndpointUrl.trim() || !opcuaNodeId.trim()) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringOpcuaNodeId
-                ? {
-                    ...n,
-                    label: opcuaNodeId ? `OPC UA: ${opcuaNodeId}` : 'OPC UA',
-                    config: {
-                        ...n.config,
-                        opcuaEndpointUrl,
-                        opcuaNodeId,
-                        opcuaUsername: opcuaUsername || undefined,
-                        opcuaPassword: opcuaPassword || undefined,
-                        opcuaSecurityMode,
-                        opcuaSecurityPolicy,
-                        opcuaPollInterval
-                    }
-                }
-                : n
-        ));
-        setConfiguringOpcuaNodeId(null);
-    };
-
-    const openMqttConfig = (nodeId: string) => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'mqtt') {
-            setConfiguringMqttNodeId(nodeId);
-            setMqttBrokerUrl(node.config?.mqttBrokerUrl || 'mqtt://localhost');
-            setMqttPort(node.config?.mqttPort || '1883');
-            setMqttTopic(node.config?.mqttTopic || 'sensors/#');
-            setMqttUsername(node.config?.mqttUsername || '');
-            setMqttPassword(node.config?.mqttPassword || '');
-            setMqttClientId(node.config?.mqttClientId || '');
-            setMqttQos(node.config?.mqttQos || '0');
-            setMqttCleanSession(node.config?.mqttCleanSession !== undefined ? node.config.mqttCleanSession : true);
-        }
-    };
-
-    const saveMqttConfig = () => {
-        if (!configuringMqttNodeId || !mqttBrokerUrl.trim() || !mqttTopic.trim()) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringMqttNodeId
-                ? {
-                    ...n,
-                    label: mqttTopic ? `MQTT: ${mqttTopic}` : 'MQTT',
-                    config: {
-                        ...n.config,
-                        mqttBrokerUrl,
-                        mqttPort,
-                        mqttTopic,
-                        mqttUsername: mqttUsername || undefined,
-                        mqttPassword: mqttPassword || undefined,
-                        mqttClientId: mqttClientId || undefined,
-                        mqttQos,
-                        mqttCleanSession
-                    }
-                }
-                : n
-        ));
-        setConfiguringMqttNodeId(null);
+        if (node && node.type === 'mysql') setConfiguringMySQLNodeId(nodeId);
     };
 
     // OSIsoft PI Node Functions
     const openOsiPiConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'osiPi') {
-            setConfiguringOsiPiNodeId(nodeId);
-            setOsiPiHost(node.config?.osiPiHost || '');
-            setOsiPiApiKey(node.config?.osiPiApiKey || '');
-            setOsiPiGranularityValue(node.config?.osiPiGranularityValue || '5');
-            setOsiPiGranularityUnit(node.config?.osiPiGranularityUnit || 'seconds');
-            setOsiPiWebIds(node.config?.osiPiWebIds?.length ? [...node.config.osiPiWebIds] : ['', '']);
-            setShowOsiPiApiKey(false);
-        }
-    };
-
-    const saveOsiPiConfig = () => {
-        if (!configuringOsiPiNodeId || !osiPiHost.trim()) return;
-
-        const filteredWebIds = osiPiWebIds.filter(id => id.trim() !== '');
-        setNodes(prev => prev.map(n =>
-            n.id === configuringOsiPiNodeId
-                ? {
-                    ...n,
-                    label: osiPiHost ? `OSIsoft PI: ${new URL(osiPiHost).hostname || osiPiHost}` : 'OSIsoft PI',
-                    config: {
-                        ...n.config,
-                        osiPiHost,
-                        osiPiApiKey,
-                        osiPiGranularityValue,
-                        osiPiGranularityUnit,
-                        osiPiWebIds: filteredWebIds,
-                    }
-                }
-                : n
-        ));
-        setConfiguringOsiPiNodeId(null);
+        if (node && node.type === 'osiPi') setConfiguringOsiPiNodeId(nodeId);
     };
 
     // FranMIT Node Functions
     const openFranmitConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'franmit') {
-            setConfiguringFranmitNodeId(nodeId);
-            setFranmitApiSecretId(node.config?.franmitApiSecretId || '');
-            setFranmitReactorVolume(node.config?.franmitReactorVolume || '');
-            setFranmitReactionVolume(node.config?.franmitReactionVolume || '');
-            setFranmitCatalystScaleFactor(node.config?.franmitCatalystScaleFactor || '');
-            setShowFranmitApiSecret(false);
-        }
-    };
-
-    const saveFranmitConfig = () => {
-        if (!configuringFranmitNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringFranmitNodeId
-                ? {
-                    ...n,
-                    label: franmitApiSecretId ? `FranMIT Node` : 'FranMIT Node',
-                    config: {
-                        ...n.config,
-                        franmitApiSecretId,
-                        franmitReactorVolume,
-                        franmitReactionVolume,
-                        franmitCatalystScaleFactor,
-                    }
-                }
-                : n
-        ));
-        setConfiguringFranmitNodeId(null);
+        if (node && node.type === 'franmit') setConfiguringFranmitNodeId(nodeId);
     };
 
     // Conveyor Node Functions
     const openConveyorConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'conveyor') {
-            setConfiguringConveyorNodeId(nodeId);
-            setConveyorSpeed(node.config?.conveyorSpeed || '');
-            setConveyorLength(node.config?.conveyorLength || '');
-            setConveyorWidth(node.config?.conveyorWidth || '');
-            setConveyorInclination(node.config?.conveyorInclination || '');
-            setConveyorLoadCapacity(node.config?.conveyorLoadCapacity || '');
-            setConveyorBeltType(node.config?.conveyorBeltType || 'flat');
-            setConveyorMotorPower(node.config?.conveyorMotorPower || '');
-            setConveyorFrictionCoeff(node.config?.conveyorFrictionCoeff || '');
-        }
-    };
-
-    const saveConveyorConfig = () => {
-        if (!configuringConveyorNodeId) return;
-        if (!conveyorSpeed.trim() || !conveyorLength.trim()) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringConveyorNodeId
-                ? {
-                    ...n,
-                    label: `Conveyor: ${conveyorLength}m @ ${conveyorSpeed} m/s`,
-                    config: {
-                        ...n.config,
-                        conveyorSpeed,
-                        conveyorLength,
-                        conveyorWidth,
-                        conveyorInclination,
-                        conveyorLoadCapacity,
-                        conveyorBeltType,
-                        conveyorMotorPower,
-                        conveyorFrictionCoeff,
-                    }
-                }
-                : n
-        ));
-        setConfiguringConveyorNodeId(null);
+        if (node && node.type === 'conveyor') setConfiguringConveyorNodeId(nodeId);
     };
 
     const openEmailConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'sendEmail') {
-            setConfiguringEmailNodeId(nodeId);
-            setEmailTo(node.config?.emailTo || '');
-            setEmailSubject(node.config?.emailSubject || '');
-            setEmailBody(node.config?.emailBody || '');
-            setEmailSmtpHost(node.config?.emailSmtpHost || 'smtp.gmail.com');
-            setEmailSmtpPort(node.config?.emailSmtpPort || '587');
-            setEmailSmtpUser(node.config?.emailSmtpUser || '');
-            setEmailSmtpPass(node.config?.emailSmtpPass || '');
-            setShowEmailSmtpSettings(false);
-        }
-    };
-
-    const saveEmailConfig = () => {
-        if (!configuringEmailNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringEmailNodeId
-                ? {
-                    ...n,
-                    label: emailTo ? `Email to: ${emailTo.split('@')[0]}...` : 'Send Email',
-                    config: {
-                        ...n.config,
-                        emailTo,
-                        emailSubject,
-                        emailBody,
-                        emailSmtpHost: emailSmtpHost || undefined,
-                        emailSmtpPort: emailSmtpPort || undefined,
-                        emailSmtpUser: emailSmtpUser || undefined,
-                        emailSmtpPass: emailSmtpPass || undefined,
-                    }
-                }
-                : n
-        ));
-        setConfiguringEmailNodeId(null);
+        if (node && node.type === 'sendEmail') setConfiguringEmailNodeId(nodeId);
     };
 
     const openSMSConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'sendSMS') {
-            setConfiguringSMSNodeId(nodeId);
-            setSmsTo(node.config?.smsTo || '');
-            setSmsBody(node.config?.smsBody || '');
-            setTwilioAccountSid(node.config?.twilioAccountSid || '');
-            setTwilioAuthToken(node.config?.twilioAuthToken || '');
-            setTwilioFromNumber(node.config?.twilioFromNumber || '');
-        }
-    };
-
-    const saveSMSConfig = () => {
-        if (!configuringSMSNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringSMSNodeId
-                ? {
-                    ...n,
-                    label: smsTo ? `SMS to: ${smsTo.slice(-4)}...` : 'Send SMS',
-                    config: {
-                        ...n.config,
-                        smsTo,
-                        smsBody,
-                        twilioAccountSid: twilioAccountSid || undefined,
-                        twilioAuthToken: twilioAuthToken || undefined,
-                        twilioFromNumber: twilioFromNumber || undefined,
-                    }
-                }
-                : n
-        ));
-        setConfiguringSMSNodeId(null);
+        if (node && node.type === 'sendSMS') setConfiguringSMSNodeId(nodeId);
     };
 
     const openWhatsAppConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'sendWhatsApp') {
-            setConfiguringWhatsAppNodeId(nodeId);
-            setWhatsappTo(node.config?.whatsappTo || '');
-            setWhatsappBody(node.config?.whatsappBody || '');
-            setWhatsappTwilioAccountSid(node.config?.whatsappTwilioAccountSid || '');
-            setWhatsappTwilioAuthToken(node.config?.whatsappTwilioAuthToken || '');
-            setWhatsappTwilioFromNumber(node.config?.whatsappTwilioFromNumber || '');
-        }
-    };
-
-    const saveWhatsAppConfig = () => {
-        if (!configuringWhatsAppNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringWhatsAppNodeId
-                ? {
-                    ...n,
-                    label: whatsappTo ? `WhatsApp to: ${whatsappTo.slice(-4)}...` : 'Send WhatsApp',
-                    config: {
-                        ...n.config,
-                        whatsappTo,
-                        whatsappBody,
-                        whatsappTwilioAccountSid: whatsappTwilioAccountSid || undefined,
-                        whatsappTwilioAuthToken: whatsappTwilioAuthToken || undefined,
-                        whatsappTwilioFromNumber: whatsappTwilioFromNumber || undefined,
-                    }
-                }
-                : n
-        ));
-        setConfiguringWhatsAppNodeId(null);
+        if (node && node.type === 'sendWhatsApp') setConfiguringWhatsAppNodeId(nodeId);
     };
 
     const openRenameColumnsConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'action') {
-            setConfiguringRenameColumnsNodeId(nodeId);
-            const existing = node.config?.columnRenames;
-            if (existing && existing.length > 0) {
-                setColumnRenames(existing);
-            } else {
-                setColumnRenames([{ oldName: '', newName: '' }]);
-            }
-        }
-    };
-
-    const saveRenameColumnsConfig = () => {
-        if (!configuringRenameColumnsNodeId) return;
-
-        const validRenames = columnRenames.filter(r => r.oldName.trim() && r.newName.trim());
-        setNodes(prev => prev.map(n =>
-            n.id === configuringRenameColumnsNodeId
-                ? {
-                    ...n,
-                    label: validRenames.length > 0
-                        ? `Rename: ${validRenames.map(r => `${r.oldName} → ${r.newName}`).slice(0, 2).join(', ')}${validRenames.length > 2 ? '...' : ''}`
-                        : 'Rename Columns',
-                    config: {
-                        ...n.config,
-                        columnRenames: validRenames,
-                    }
-                }
-                : n
-        ));
-        setConfiguringRenameColumnsNodeId(null);
+        if (node && node.type === 'action') setConfiguringRenameColumnsNodeId(nodeId);
     };
 
     const openVisualizationConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'dataVisualization') {
-            setConfiguringVisualizationNodeId(nodeId);
-            setVisualizationPrompt(node.config?.visualizationPrompt || '');
-            setGeneratedWidget(node.config?.generatedWidget || null);
-            setShowWidgetExplanation(false);
-        }
+        if (node && node.type === 'dataVisualization') setConfiguringVisualizationNodeId(nodeId);
     };
 
     const generateWidgetFromPrompt = async () => {
@@ -2519,88 +1724,9 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         }
     };
 
-    const saveVisualizationConfig = () => {
-        if (!configuringVisualizationNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringVisualizationNodeId
-                ? {
-                    ...n,
-                    label: generatedWidget?.title || 'Data Visualization',
-                    config: {
-                        ...n.config,
-                        visualizationPrompt,
-                        generatedWidget
-                    }
-                }
-                : n
-        ));
-        setConfiguringVisualizationNodeId(null);
-        setGeneratedWidget(null);
-        setVisualizationPrompt('');
-    };
-
     const openScheduleConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'trigger' && (node.label === 'Schedule' || node.label.startsWith('Schedule:') || node.config?.scheduleInterval)) {
-            setConfiguringScheduleNodeId(nodeId);
-            setScheduleIntervalValue(node.config?.scheduleIntervalValue || String((node.config?.scheduleInterval || '5m').replace(/\D/g, '') || '5'));
-            setScheduleIntervalUnit(node.config?.scheduleIntervalUnit || ((node.config?.scheduleInterval || '').endsWith('h') ? 'hours' : (node.config?.scheduleInterval || '').endsWith('d') ? 'days' : 'minutes'));
-            setScheduleEnabled(node.config?.scheduleEnabled !== false);
-            setScheduleType(node.config?.scheduleType || 'interval');
-            setScheduleTime(node.config?.scheduleTime || '09:00');
-            setScheduleRepeat(node.config?.scheduleRepeat || 'daily');
-        }
-    };
-
-    const saveScheduleConfig = () => {
-        if (!configuringScheduleNodeId) return;
-
-        let defaultLabel = '';
-        
-        if (scheduleType === 'interval') {
-            const interval = `${scheduleIntervalValue}${scheduleIntervalUnit.charAt(0)}`;
-            defaultLabel = `Schedule: Every ${scheduleIntervalValue} ${scheduleIntervalUnit}`;
-            
-            setNodes(prev => prev.map(n =>
-                n.id === configuringScheduleNodeId
-                    ? {
-                        ...n,
-                        label: defaultLabel,
-                        config: {
-                            ...n.config,
-                            scheduleInterval: interval,
-                            scheduleIntervalValue,
-                            scheduleIntervalUnit,
-                            scheduleEnabled,
-                            scheduleType: 'interval'
-                        }
-                    }
-                    : n
-            ));
-        } else {
-            // Specific time schedule
-            const repeatText = scheduleRepeat === 'daily' ? 'Daily' : scheduleRepeat === 'weekly' ? 'Weekly' : '';
-            defaultLabel = `Schedule: ${repeatText} at ${scheduleTime}`;
-            
-            setNodes(prev => prev.map(n =>
-                n.id === configuringScheduleNodeId
-                    ? {
-                        ...n,
-                        label: defaultLabel,
-                        config: {
-                            ...n.config,
-                            scheduleType: 'specific',
-                            scheduleTime,
-                            scheduleRepeat,
-                            scheduleEnabled
-                        }
-                    }
-                    : n
-            ));
-        }
-        
-        closeScheduleConfig();
+        if (node && node.type === 'trigger') setConfiguringScheduleNodeId(nodeId);
     };
 
     const closeScheduleConfig = () => {
@@ -2615,41 +1741,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     const openEsiosConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'esios') {
-            setConfiguringEsiosNodeId(nodeId);
-            setEsiosArchiveId(node.config?.esiosArchiveId || '1001');
-            setEsiosDate(node.config?.esiosDate || new Date().toISOString().split('T')[0]);
-        }
-    };
-
-    const saveEsiosConfig = () => {
-        if (!configuringEsiosNodeId || !esiosArchiveId.trim()) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringEsiosNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        esiosArchiveId,
-                        esiosDate
-                    }
-                }
-                : n
-        ));
-        setConfiguringEsiosNodeId(null);
-        setEsiosArchiveId('1001');
-        setEsiosDate(new Date().toISOString().split('T')[0]);
+        if (node && node.type === 'esios') setConfiguringEsiosNodeId(nodeId);
     };
 
     const openClimatiqConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'climatiq') {
-            setConfiguringClimatiqNodeId(nodeId);
-            setClimatiqQuery(node.config?.climatiqQuery || 'Passenger Car');
-            setClimatiqSearchResults([]);
-            setClimatiqSelectedIndex(null);
-        }
+        if (node && node.type === 'climatiq') setConfiguringClimatiqNodeId(nodeId);
     };
 
     const searchClimatiq = async () => {
@@ -2689,38 +1786,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         } finally {
             setClimatiqSearching(false);
         }
-    };
-
-    const saveClimatiqConfig = () => {
-        if (!configuringClimatiqNodeId) return;
-
-        // Check if a factor is selected
-        if (climatiqSelectedIndex === null || !climatiqSearchResults[climatiqSelectedIndex]) {
-            alert('Please search and select an emission factor first');
-            return;
-        }
-
-        const selected = climatiqSearchResults[climatiqSelectedIndex];
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringClimatiqNodeId
-                ? {
-                    ...n,
-                    label: `${selected.name || 'Emission Factor'}`,
-                    config: {
-                        ...n.config,
-                        climatiqQuery,
-                        climatiqFactor: selected.factor,
-                        climatiqUnit: selected.unit,
-                        climatiqDescription: `${selected.name} (${selected.region_name || selected.region})`
-                    }
-                }
-                : n
-        ));
-        setConfiguringClimatiqNodeId(null);
-        setClimatiqQuery('Passenger Car');
-        setClimatiqSearchResults([]);
-        setClimatiqSelectedIndex(null);
     };
 
     const generatePythonCode = async () => {
@@ -2820,121 +1885,25 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     // LIMS Fetch Node Functions
     const openLIMSConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'limsFetch') {
-            setConfiguringLIMSNodeId(nodeId);
-            setLimsServerUrl(node.config?.limsServerUrl || '');
-            setLimsApiKey(node.config?.limsApiKey || '');
-            setLimsEndpoint(node.config?.limsEndpoint || 'materials');
-            setLimsQuery(node.config?.limsQuery || '');
-        }
-    };
-
-    const saveLIMSConfig = () => {
-        if (!configuringLIMSNodeId) return;
-        setNodes(prev => prev.map(n =>
-            n.id === configuringLIMSNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        limsServerUrl,
-                        limsApiKey,
-                        limsEndpoint,
-                        limsQuery
-                    }
-                }
-                : n
-        ));
-        setConfiguringLIMSNodeId(null);
+        if (node && node.type === 'limsFetch') setConfiguringLIMSNodeId(nodeId);
     };
 
     // Statistical Analysis Node Functions
     const openStatisticalConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'statisticalAnalysis') {
-            setConfiguringStatisticalNodeId(nodeId);
-            setStatisticalMethod(node.config?.statisticalMethod || 'goldenBatch');
-            setStatisticalParams(node.config?.statisticalParams || '{}');
-            setGoldenBatchId(node.config?.goldenBatchId || '');
-        }
-    };
-
-    const saveStatisticalConfig = () => {
-        if (!configuringStatisticalNodeId) return;
-        setNodes(prev => prev.map(n =>
-            n.id === configuringStatisticalNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        statisticalMethod,
-                        statisticalParams,
-                        goldenBatchId
-                    }
-                }
-                : n
-        ));
-        setConfiguringStatisticalNodeId(null);
+        if (node && node.type === 'statisticalAnalysis') setConfiguringStatisticalNodeId(nodeId);
     };
 
     // Alert Agent Node Functions
     const openAlertAgentConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'alertAgent') {
-            setConfiguringAlertAgentNodeId(nodeId);
-            setAlertConditions(node.config?.alertConditions || '[]');
-            setAlertSeverity(node.config?.alertSeverity || 'warning');
-            setAlertActions(node.config?.alertActions || ['email']);
-            setAlertRecipients(node.config?.alertRecipients || '');
-        }
-    };
-
-    const saveAlertAgentConfig = () => {
-        if (!configuringAlertAgentNodeId) return;
-        setNodes(prev => prev.map(n =>
-            n.id === configuringAlertAgentNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        alertConditions,
-                        alertSeverity,
-                        alertActions,
-                        alertRecipients
-                    }
-                }
-                : n
-        ));
-        setConfiguringAlertAgentNodeId(null);
+        if (node && node.type === 'alertAgent') setConfiguringAlertAgentNodeId(nodeId);
     };
 
     // PDF Report Node Functions
     const openPdfReportConfig = (nodeId: string) => {
         const node = nodes.find(n => n.id === nodeId);
-        if (node && node.type === 'pdfReport') {
-            setConfiguringPdfReportNodeId(nodeId);
-            setPdfTemplate(node.config?.pdfTemplate || 'standard');
-            setPdfReportData(node.config?.pdfReportData || '{}');
-            setPdfOutputPath(node.config?.pdfOutputPath || '');
-        }
-    };
-
-    const savePdfReportConfig = () => {
-        if (!configuringPdfReportNodeId) return;
-        setNodes(prev => prev.map(n =>
-            n.id === configuringPdfReportNodeId
-                ? {
-                    ...n,
-                    config: {
-                        ...n.config,
-                        pdfTemplate,
-                        pdfReportData,
-                        pdfOutputPath
-                    }
-                }
-                : n
-        ));
-        setConfiguringPdfReportNodeId(null);
+        if (node && node.type === 'pdfReport') setConfiguringPdfReportNodeId(nodeId);
     };
 
     const openHumanApprovalConfig = async (nodeId: string) => {
@@ -2943,27 +1912,6 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             setConfiguringHumanApprovalNodeId(nodeId);
             await fetchOrganizationUsers();
         }
-    };
-
-    const saveHumanApprovalConfig = (userId: string, userName: string, userProfilePhoto?: string) => {
-        if (!configuringHumanApprovalNodeId) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === configuringHumanApprovalNodeId
-                ? {
-                    ...n,
-                    label: `Approval: ${userName}`,
-                    config: {
-                        ...n.config,
-                        assignedUserId: userId,
-                        assignedUserName: userName,
-                        assignedUserPhoto: userProfilePhoto,
-                        approvalStatus: 'pending'
-                    }
-                }
-                : n
-        ));
-        setConfiguringHumanApprovalNodeId(null);
     };
 
     const handleApproval = (approved: boolean) => {
@@ -3168,1498 +2116,22 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         sendNodePropsUpdate(nodeId, updates);
     };
 
-    const executeNode = async (nodeId: string, inputData: any = null, recursive: boolean = true) => {
-        // Use a ref or get the latest node from the state setter to ensure we have the latest config?
-        // For now, using 'nodes' from closure is fine for config, but we must be careful about 'status' checks if we needed them.
-        const node = nodes.find(n => n.id === nodeId);
-        if (!node) return;
-
-        // Set to running and broadcast
-        updateNodeAndBroadcast(nodeId, { status: 'running' as const, inputData });
-
-        //Simulate work
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        // Set result based on type
-        let result = '';
-        let nodeData: any = null;
-        let conditionResult: boolean | undefined = undefined;
-
-        if (node.type === 'fetchData') {
-            if (!node.config?.entityId) {
-                result = 'Error: No entity configured';
-                updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
-                return;
-            }
-
-            try {
-                const res = await fetch(`${API_BASE}/entities/${node.config.entityId}/records`, { credentials: 'include' });
-                const records = await res.json();
-
-                // Flatten data using entity schema
-                const entity = entities.find(e => e.id === node.config?.entityId);
-                nodeData = records.map((record: any) => {
-                    const flattened: any = {
-                        id: record.id,
-                        createdAt: record.createdAt
-                    };
-
-                    if (record.values) {
-                        Object.entries(record.values).forEach(([propId, value]) => {
-                            if (entity) {
-                                const prop = entity.properties.find((p: any) => p.id === propId);
-                                flattened[prop ? prop.name : propId] = value;
-                            } else {
-                                flattened[propId] = value;
-                            }
-                        });
-                    }
-                    return flattened;
-                });
-
-                result = `Fetched ${records.length} records from ${node.config.entityName}`;
-            } catch (error) {
-                result = 'Error fetching data';
-                updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
-                return;
-            }
-        } else {
-            switch (node.type) {
-                case 'trigger':
-                    result = 'Triggered!';
-                    break;
-                case 'action':
-                    // Rename Columns logic
-                    if (node.config?.columnRenames && node.config.columnRenames.length > 0 && inputData && Array.isArray(inputData)) {
-                        const renames = node.config.columnRenames as { oldName: string; newName: string }[];
-                        nodeData = inputData.map((row: any) => {
-                            const newRow: any = {};
-                            for (const key of Object.keys(row)) {
-                                const rename = renames.find(r => r.oldName === key);
-                                newRow[rename ? rename.newName : key] = row[key];
-                            }
-                            return newRow;
-                        });
-                        result = `Renamed ${renames.length} column(s): ${renames.map(r => `${r.oldName} → ${r.newName}`).join(', ')}`;
-                    } else {
-                        nodeData = inputData;
-                        result = 'No column renames configured';
-                    }
-                    break;
-                case 'condition':
-                    // Evaluate condition (supports multiple conditions with AND/OR)
-                    if (node.config?.conditionField && node.config?.conditionOperator) {
-                        const dataToEval = inputData;
-                        const processingMode = node.config.processingMode || 'batch';
-                        const additionalConds = node.config.additionalConditions || [];
-                        const logicalOp = node.config.logicalOperator || 'AND';
-
-                        if (dataToEval && Array.isArray(dataToEval) && dataToEval.length > 0) {
-                            // Helper to evaluate a single condition
-                            const evaluateSingleCondition = (record: any, field: string, operator: string, value: string): boolean => {
-                                const fieldValue = record[field];
-                                switch (operator) {
-                                    case 'isText': return typeof fieldValue === 'string';
-                                    case 'isNumber': return !isNaN(Number(fieldValue));
-                                    case 'equals': return String(fieldValue) === value;
-                                    case 'not_equals':
-                                    case 'notEquals': return String(fieldValue) !== value;
-                                    case 'contains': return String(fieldValue).toLowerCase().includes((value || '').toLowerCase());
-                                    case 'not_contains': return !String(fieldValue).toLowerCase().includes((value || '').toLowerCase());
-                                    case 'greater_than':
-                                    case 'greaterThan': return Number(fieldValue) > Number(value);
-                                    case 'less_than':
-                                    case 'lessThan': return Number(fieldValue) < Number(value);
-                                    case 'greater_or_equal': return Number(fieldValue) >= Number(value);
-                                    case 'less_or_equal': return Number(fieldValue) <= Number(value);
-                                    case 'starts_with': return String(fieldValue).toLowerCase().startsWith((value || '').toLowerCase());
-                                    case 'ends_with': return String(fieldValue).toLowerCase().endsWith((value || '').toLowerCase());
-                                    case 'is_empty': return fieldValue === null || fieldValue === undefined || fieldValue === '';
-                                    case 'is_not_empty': return fieldValue !== null && fieldValue !== undefined && fieldValue !== '';
-                                    default: return false;
-                                }
-                            };
-
-                            // Evaluate all conditions for a record (with AND/OR logic)
-                            const evaluateRecord = (record: any): boolean => {
-                                // Primary condition
-                                const primaryResult = evaluateSingleCondition(
-                                    record, 
-                                    node.config!.conditionField!, 
-                                    node.config!.conditionOperator!, 
-                                    node.config!.conditionValue || ''
-                                );
-                                
-                                // If no additional conditions, return primary result
-                                if (!additionalConds || additionalConds.length === 0) {
-                                    return primaryResult;
-                                }
-                                
-                                // Evaluate additional conditions
-                                const allResults = [primaryResult];
-                                for (const cond of additionalConds) {
-                                    if (cond.field) {
-                                        allResults.push(evaluateSingleCondition(record, cond.field, cond.operator, cond.value));
-                                    }
-                                }
-                                
-                                // Combine with AND/OR
-                                if (logicalOp === 'AND') {
-                                    return allResults.every(r => r);
-                                } else {
-                                    return allResults.some(r => r);
-                                }
-                            };
-
-                            if (processingMode === 'perRow') {
-                                // Per-row mode: filter data into TRUE and FALSE outputs
-                                const trueRecords = dataToEval.filter(record => evaluateRecord(record));
-                                const falseRecords = dataToEval.filter(record => !evaluateRecord(record));
-                                
-                                // Store both filtered arrays for routing
-                                nodeData = { trueRecords, falseRecords };
-                                conditionResult = trueRecords.length > 0; // For visual indication
-                                const condCount = 1 + additionalConds.length;
-                                result = `${condCount} condition${condCount > 1 ? 's' : ''} (${logicalOp}): ${trueRecords.length} TRUE, ${falseRecords.length} FALSE`;
-                            } else {
-                                // Batch mode: evaluate first record, route ALL data
-                                const condResult = evaluateRecord(dataToEval[0]);
-                                nodeData = dataToEval;
-                                conditionResult = condResult;
-                                const condCount = 1 + additionalConds.length;
-                                result = `${condCount} condition${condCount > 1 ? 's' : ''} (${logicalOp}) → ${condResult ? '✓ All to TRUE' : '✗ All to FALSE'}`;
-                            }
-                        } else {
-                            result = 'No data to evaluate';
-                        }
-                    } else {
-                        result = 'Error: Condition not configured';
-                        updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
-                        return;
-                    }
-                    break;
-                case 'addField':
-                    // Add field to all records
-                    if (node.config?.conditionField && inputData && Array.isArray(inputData)) {
-                        const fieldName = node.config.conditionField;
-                        const fieldValue = node.config.conditionValue || '';
-
-                        nodeData = inputData.map(record => ({
-                            ...record,
-                            [fieldName]: fieldValue
-                        }));
-
-                        result = `Added field "${fieldName}" = "${fieldValue}" to ${nodeData.length} records`;
-                    } else {
-                        result = 'Not configured or no data';
-                    }
-                    break;
-                case 'saveRecords':
-                    // Save records to entity
-                    if (node.config?.entityId && inputData && Array.isArray(inputData)) {
-                        try {
-                            let savedCount = 0;
-                            let failedCount = 0;
-
-                            for (const record of inputData) {
-                                // Remove id to let database generate it
-                                const { id, ...recordWithoutId } = record;
-
-                                const response = await fetch(`${API_BASE}/entities/${node.config.entityId}/records`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(recordWithoutId),
-                                    credentials: 'include'
-                                });
-
-                                if (response.ok) {
-                                    savedCount++;
-                                } else {
-                                    failedCount++;
-                                    console.error(`Failed to save record:`, record, await response.text());
-                                }
-                            }
-
-                            nodeData = inputData;
-                            result = failedCount > 0
-                                ? `Saved ${savedCount}, Failed ${failedCount} to ${node.config.entityName}`
-                                : `Saved ${savedCount} records to ${node.config.entityName}`;
-                        } catch (error) {
-                            console.error('Save records error:', error);
-                            result = `Error: ${error.message || 'Failed to save'}`;
-                        }
-                    } else {
-                        result = 'Not configured or no data';
-                    }
-                    break;
-                case 'python':
-                    if (node.config?.pythonCode) {
-                        try {
-                            const response = await fetch(`${API_BASE}/python/execute`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    code: node.config.pythonCode,
-                                    inputData: Array.isArray(inputData) ? inputData : (inputData ? [inputData] : [])
-                                }),
-                                credentials: 'include'
-                            });
-
-                            if (response.ok) {
-                                const data = await response.json();
-                                
-                                // Check if Lambda returned success: false with error details
-                                if (data.success === false) {
-                                    const error: any = new Error(data.error || 'Python execution failed');
-                                    error.traceback = data.traceback;
-                                    throw error;
-                                }
-                                
-                                // Check if result contains an error from Python
-                                if (data.result && typeof data.result === 'object' && data.result.error) {
-                                    throw new Error(data.result.error);
-                                }
-                                
-                                // Validate that we got meaningful data
-                                if (data.result === null || data.result === undefined) {
-                                    console.warn('[Python] Execution returned null/undefined result');
-                                    nodeData = [];
-                                    result = 'Warning: Python returned no data (null). Make sure your process() function returns a value.';
-                                    // Mark as error since no data was produced
-                                    updateNodeAndBroadcast(nodeId, { 
-                                        status: 'error' as const, 
-                                        executionResult: result,
-                                        outputData: []
-                                    });
-                                    return;
-                                } else if (Array.isArray(data.result) && data.result.length === 0) {
-                                    nodeData = [];
-                                    result = 'Python executed - returned empty array';
-                                } else {
-                                    nodeData = data.result;
-                                    const recordCount = Array.isArray(data.result) ? data.result.length : 1;
-                                    result = `Python executed successfully (${recordCount} ${recordCount === 1 ? 'record' : 'records'})`;
-                                }
-                            } else {
-                                const errorData = await response.json();
-                                const error: any = new Error(errorData.error || 'Python execution failed');
-                                error.traceback = errorData.traceback;
-                                throw error;
-                            }
-                        } catch (error) {
-                            console.error('Python execution error:', error);
-                            const errorMessage = error.message || 'Failed to execute';
-                            // Extract traceback if available
-                            const traceback = error.traceback || '';
-                            result = `Error: ${errorMessage}${traceback ? '\n' + traceback : ''}`;
-                            updateNodeAndBroadcast(nodeId, { 
-                                status: 'error' as const, 
-                                executionResult: result,
-                                outputData: [{ error: errorMessage }]
-                            });
-                            return;
-                        }
-                    } else {
-                        result = 'Code not configured';
-                    }
-                    break;
-                case 'franmit':
-                    try {
-                        // Sanitize null/NaN values from integration output
-                        const sanitizeFranmitOutput = (obj: any, depth = 0): any => {
-                            if (depth > 50) return obj;
-                            if (obj === null || obj === undefined) return 0;
-                            if (typeof obj === 'number') {
-                                if (isNaN(obj) || !isFinite(obj)) return 0;
-                                return obj;
-                            }
-                            if (Array.isArray(obj)) {
-                                return obj.map(item => sanitizeFranmitOutput(item, depth + 1));
-                            }
-                            if (typeof obj === 'object') {
-                                const sanitized: any = {};
-                                for (const key of Object.keys(obj)) {
-                                    sanitized[key] = sanitizeFranmitOutput(obj[key], depth + 1);
-                                }
-                                return sanitized;
-                            }
-                            return obj;
-                        };
-                        
-                        // Build reactor configuration from node config
-                        const reactorConfiguration: any = {};
-                        if (node.config?.franmitReactorVolume) {
-                            reactorConfiguration.V_reb = parseFloat(node.config.franmitReactorVolume) || 53;
-                        } else {
-                            reactorConfiguration.V_reb = 53; // Default
-                        }
-                        if (node.config?.franmitCatalystScaleFactor) {
-                            reactorConfiguration.scale_cat = parseFloat(node.config.franmitCatalystScaleFactor) || 1;
-                        } else {
-                            reactorConfiguration.scale_cat = 1; // Default
-                        }
-
-                        // Determine if we have multiple rows (batch) or single receta
-                        const isBatch = Array.isArray(inputData) && inputData.length > 0;
-                        const requestBody = isBatch
-                            ? {
-                                mode: 'batch',
-                                recetas: inputData,
-                                reactorConfiguration: reactorConfiguration
-                            }
-                            : {
-                                mode: 'single',
-                                receta: (typeof inputData === 'object' && !Array.isArray(inputData)) ? inputData : {},
-                                reactorConfiguration: reactorConfiguration
-                            };
-
-                        const response = await fetch(`${API_BASE}/franmit/execute`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(requestBody),
-                            credentials: 'include'
-                        });
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            
-                            if (data.success === false) {
-                                const error: any = new Error(data.error || 'FranMIT execution failed');
-                                error.traceback = data.traceback;
-                                throw error;
-                            }
-                            
-                            // data.results is an array of output rows (one per input receta)
-                            const results = sanitizeFranmitOutput(data.results || []);
-                            
-                            // Convert to array format for node output
-                            nodeData = Array.isArray(results) ? results : [results];
-                            result = `FranMIT reactor model executed: ${nodeData.length} row(s)`;
-                        } else {
-                            const errorData = await response.json();
-                            const error: any = new Error(errorData.error || 'FranMIT execution failed');
-                            error.traceback = errorData.traceback;
-                            throw error;
-                        }
-                    } catch (error: any) {
-                        console.error('FranMIT execution error:', error);
-                        const errorMessage = error.message || 'Failed to execute';
-                        const traceback = error.traceback || '';
-                        result = `Error: ${errorMessage}${traceback ? '\n' + traceback : ''}`;
-                        updateNodeAndBroadcast(nodeId, { 
-                            status: 'error' as const, 
-                            executionResult: result,
-                            outputData: [{ error: errorMessage }]
-                        });
-                        return;
-                    }
-                    break;
-                case 'conveyor':
-                    try {
-                        const speed = parseFloat(node.config?.conveyorSpeed || '0');
-                        const length = parseFloat(node.config?.conveyorLength || '0');
-                        const width = parseFloat(node.config?.conveyorWidth || '0') || 0.8;
-                        const inclination = parseFloat(node.config?.conveyorInclination || '0');
-                        const loadCapacity = parseFloat(node.config?.conveyorLoadCapacity || '0') || 50;
-                        const motorPower = parseFloat(node.config?.conveyorMotorPower || '0') || 0;
-                        const frictionCoeff = parseFloat(node.config?.conveyorFrictionCoeff || '0') || 0.025;
-                        const beltType = node.config?.conveyorBeltType || 'flat';
-
-                        if (!speed || !length) {
-                            throw new Error('Speed and Length are required parameters');
-                        }
-
-                        const g = 9.81;
-                        const inclinationRad = (inclination * Math.PI) / 180;
-                        const transportTime = length / speed;
-                        const throughput = loadCapacity * speed * 3.6; // t/h
-                        const horizontalComponent = frictionCoeff * loadCapacity * length * g * Math.cos(inclinationRad);
-                        const verticalComponent = loadCapacity * length * g * Math.sin(inclinationRad);
-                        const beltTension = horizontalComponent + verticalComponent;
-                        const requiredPower = (beltTension * speed) / 1000; // kW
-                        const efficiency = motorPower > 0 ? Math.min((requiredPower / motorPower) * 100, 100) : 0;
-
-                        const conveyorOutput = {
-                            belt_speed_m_s: speed,
-                            belt_length_m: length,
-                            belt_width_m: width,
-                            belt_type: beltType,
-                            inclination_deg: inclination,
-                            load_capacity_kg_m: loadCapacity,
-                            friction_coefficient: frictionCoeff,
-                            transport_time_s: Math.round(transportTime * 100) / 100,
-                            throughput_t_h: Math.round(throughput * 100) / 100,
-                            belt_tension_N: Math.round(beltTension * 100) / 100,
-                            required_power_kW: Math.round(requiredPower * 100) / 100,
-                            motor_power_kW: motorPower || 'N/A',
-                            motor_efficiency_pct: motorPower > 0 ? Math.round(efficiency * 100) / 100 : 'N/A',
-                        };
-
-                        // If there's input data (rows), merge the conveyor output with each input row
-                        if (Array.isArray(inputData) && inputData.length > 0) {
-                            nodeData = inputData.map((row: any) => ({
-                                ...row,
-                                ...conveyorOutput,
-                            }));
-                        } else {
-                            nodeData = [conveyorOutput];
-                        }
-                        result = `Conveyor model calculated: transport ${transportTime.toFixed(1)}s, throughput ${throughput.toFixed(1)} t/h, power ${requiredPower.toFixed(2)} kW`;
-                    } catch (error: any) {
-                        console.error('Conveyor execution error:', error);
-                        result = `Error: ${error.message || 'Conveyor calculation failed'}`;
-                        updateNodeAndBroadcast(nodeId, {
-                            status: 'error' as const,
-                            executionResult: result,
-                            outputData: [{ error: error.message }]
-                        });
-                        return;
-                    }
-                    break;
-                case 'llm':
-                    if (node.config?.llmPrompt) {
-                        const llmProcessingMode = node.config.processingMode || 'batch';
-                        
-                        try {
-                            if (llmProcessingMode === 'perRow' && inputData && Array.isArray(inputData) && inputData.length > 0) {
-                                // Per-row mode: process each record individually
-                                const results: any[] = [];
-                                
-                                for (let i = 0; i < inputData.length; i++) {
-                                    const record = inputData[i];
-                                    // Replace placeholders in prompt with record values
-                                    let personalizedPrompt = node.config.llmPrompt;
-                                    Object.keys(record).forEach(key => {
-                                        personalizedPrompt = personalizedPrompt.replace(new RegExp(`\\{${key}\\}`, 'g'), String(record[key]));
-                                    });
-                                    
-                                    const response = await fetch(`${API_BASE}/generate`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            prompt: personalizedPrompt,
-                                            mentionedEntityIds: node.config.llmContextEntities || [],
-                                            additionalContext: node.config.llmIncludeInput ? [record] : undefined
-                                        }),
-                                        credentials: 'include'
-                                    });
-
-                                    if (response.ok) {
-                                        const data = await response.json();
-                                        results.push({
-                                            ...record,
-                                            ai_result: data.response
-                                        });
-                                    } else {
-                                        results.push({
-                                            ...record,
-                                            ai_result: 'Error generating',
-                                            ai_error: true
-                                        });
-                                    }
-                                }
-                                
-                                nodeData = results;
-                                result = `Generated for ${results.length} records`;
-                            } else {
-                                // Batch mode: single call with all data
-                                const response = await fetch(`${API_BASE}/generate`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        prompt: node.config.llmPrompt,
-                                        mentionedEntityIds: node.config.llmContextEntities || [],
-                                        additionalContext: node.config.llmIncludeInput ? inputData : undefined
-                                    }),
-                                    credentials: 'include'
-                                });
-
-                                if (response.ok) {
-                                    const data = await response.json();
-                                    nodeData = [{ result: data.response }];
-                                    result = 'Generated text successfully';
-                                } else {
-                                    const errorData = await response.json();
-                                    throw new Error(errorData.error || 'Failed to generate text');
-                                }
-                            }
-                        } catch (error) {
-                            console.error('LLM generation error:', error);
-                            result = `Error: ${error.message || 'Failed to generate'}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'Prompt not configured';
-                    }
-                    break;
-                case 'manualInput':
-                    // Create output data from the configured variable
-                    if (node.config?.inputVarName) {
-                        const varName = node.config.inputVarName;
-                        const varValue = node.config.inputVarValue || '';
-                        // Try to parse as number if possible
-                        const parsedValue = !isNaN(Number(varValue)) && varValue.trim() !== ''
-                            ? Number(varValue)
-                            : varValue;
-                        nodeData = [{ [varName]: parsedValue }];
-                        result = `Set ${varName} = ${parsedValue}`;
-                    } else {
-                        result = 'Not configured';
-                    }
-                    break;
-                case 'http':
-                    if (node.config?.httpUrl) {
-                        try {
-                            const response = await fetch(`${API_BASE}/proxy`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    url: node.config.httpUrl,
-                                    method: 'GET'
-                                }),
-                                credentials: 'include'
-                            });
-
-                            if (response.ok) {
-                                const data = await response.json();
-                                // Ensure output is an array of objects if possible, for compatibility
-                                if (Array.isArray(data)) {
-                                    nodeData = data;
-                                } else if (typeof data === 'object') {
-                                    nodeData = [data];
-                                } else {
-                                    nodeData = [{ result: data }];
-                                }
-                                result = `Fetched from ${node.config.httpUrl}`;
-                            } else {
-                                const errorData = await response.json();
-                                throw new Error(errorData.error || 'Request failed');
-                            }
-                        } catch (error) {
-                            console.error('HTTP request error:', error);
-                            result = `Error: ${error.message || 'Failed to fetch'}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'URL not configured';
-                    }
-                    break;
-                case 'mysql':
-                    if (node.config?.mysqlQuery) {
-                        try {
-                            const response = await fetch(`${API_BASE}/mysql/query`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    host: node.config.mysqlHost || 'localhost',
-                                    port: node.config.mysqlPort || '3306',
-                                    database: node.config.mysqlDatabase,
-                                    username: node.config.mysqlUsername,
-                                    password: node.config.mysqlPassword,
-                                    query: node.config.mysqlQuery
-                                }),
-                                credentials: 'include'
-                            });
-
-                            if (response.ok) {
-                                const data = await response.json();
-                                nodeData = data.results || [];
-                                result = `Fetched ${nodeData.length} rows from MySQL`;
-                            } else {
-                                const errorData = await response.json();
-                                throw new Error(errorData.error || 'MySQL query failed');
-                            }
-                        } catch (error) {
-                            console.error('MySQL query error:', error);
-                            result = `Error: ${error.message || 'Failed to query MySQL'}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'Query not configured';
-                    }
-                    break;
-                case 'sapFetch':
-                    if (node.config?.sapEntity && node.config?.sapBaseApiUrl) {
-                        try {
-                            // TODO: Implement SAP OData API call when backend endpoint is ready
-                            // For now, return a placeholder message
-                            result = `SAP S/4HANA configured: ${node.config.sapEntity}`;
-                            nodeData = [{
-                                _note: 'SAP S/4HANA integration pending backend implementation',
-                                connection: node.config.sapConnectionName,
-                                entity: node.config.sapEntity,
-                                servicePath: node.config.sapServicePath
-                            }];
-                        } catch (error) {
-                            console.error('SAP fetch error:', error);
-                            result = `Error: ${error.message || 'Failed to fetch from SAP'}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'SAP connection not configured';
-                    }
-                    break;
-                case 'limsFetch':
-                    if (node.config?.limsServerUrl && node.config?.limsApiKey) {
-                        try {
-                            const response = await fetch(`${API_BASE}/lims/fetch`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    serverUrl: node.config.limsServerUrl,
-                                    apiKey: node.config.limsApiKey,
-                                    endpoint: node.config.limsEndpoint || 'materials',
-                                    query: node.config.limsQuery || ''
-                                }),
-                                credentials: 'include'
-                            });
-                            if (response.ok) {
-                                const data = await response.json();
-                                nodeData = Array.isArray(data) ? data : [data];
-                                result = `Fetched ${nodeData.length} records from LIMS`;
-                            } else {
-                                const errorData = await response.json();
-                                result = `Error: ${errorData.error || 'Failed to fetch from LIMS'}`;
-                                nodeData = [{ error: errorData.error || 'Failed to fetch from LIMS' }];
-                            }
-                        } catch (error: any) {
-                            result = `Error: ${error.message}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'LIMS not configured';
-                    }
-                    break;
-                case 'statisticalAnalysis':
-                    if (node.config?.statisticalMethod) {
-                        try {
-                            const params = node.config.statisticalParams ? JSON.parse(node.config.statisticalParams) : {};
-                            const response = await fetch(`${API_BASE}/statistical/analyze`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    method: node.config.statisticalMethod,
-                                    inputData: inputData,
-                                    params: params,
-                                    goldenBatchId: node.config.goldenBatchId || null
-                                }),
-                                credentials: 'include'
-                            });
-                            if (response.ok) {
-                                const data = await response.json();
-                                nodeData = data.results || [data];
-                                result = `Analysis completed: ${node.config.statisticalMethod}`;
-                            } else {
-                                const errorData = await response.json();
-                                result = `Error: ${errorData.error || 'Statistical analysis failed'}`;
-                                nodeData = [{ error: errorData.error || 'Statistical analysis failed' }];
-                            }
-                        } catch (error: any) {
-                            result = `Error: ${error.message}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'Statistical analysis not configured';
-                    }
-                    break;
-                case 'alertAgent':
-                    if (node.config?.alertConditions) {
-                        try {
-                            const conditions = JSON.parse(node.config.alertConditions);
-                            let alertTriggered = false;
-                            let alertMessage = '';
-
-                            // Evaluate conditions
-                            if (inputData) {
-                                const data = Array.isArray(inputData) ? inputData : [inputData];
-                                for (const condition of conditions) {
-                                    const field = condition.field;
-                                    const operator = condition.operator;
-                                    const value = condition.value;
-                                    
-                                    for (const record of data) {
-                                        const fieldValue = record[field];
-                                        let matches = false;
-                                        
-                                        switch (operator) {
-                                            case '>':
-                                                matches = Number(fieldValue) > Number(value);
-                                                break;
-                                            case '<':
-                                                matches = Number(fieldValue) < Number(value);
-                                                break;
-                                            case '>=':
-                                                matches = Number(fieldValue) >= Number(value);
-                                                break;
-                                            case '<=':
-                                                matches = Number(fieldValue) <= Number(value);
-                                                break;
-                                            case '==':
-                                                matches = String(fieldValue) === String(value);
-                                                break;
-                                            case '!=':
-                                                matches = String(fieldValue) !== String(value);
-                                                break;
-                                        }
-                                        
-                                        if (matches) {
-                                            alertTriggered = true;
-                                            alertMessage = condition.message || `Alert: ${field} ${operator} ${value}`;
-                                            break;
-                                        }
-                                    }
-                                    if (alertTriggered) break;
-                                }
-                            }
-
-                            if (alertTriggered) {
-                                // Execute alert actions
-                                const actions = node.config.alertActions || ['email'];
-                                const recipients = node.config.alertRecipients?.split(',').map(r => r.trim()) || [];
-                                
-                                for (const action of actions) {
-                                    if (action === 'email' && recipients.length > 0) {
-                                        // Send email alert
-                                        await fetch(`${API_BASE}/send-email`, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                to: recipients.filter(r => r.includes('@')).join(','),
-                                                subject: `[${node.config.alertSeverity?.toUpperCase()}] ${alertMessage}`,
-                                                body: alertMessage
-                                            }),
-                                            credentials: 'include'
-                                        });
-                                    } else if (action === 'sms' && recipients.length > 0) {
-                                        // Send SMS alert
-                                        await fetch(`${API_BASE}/send-sms`, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                to: recipients.filter(r => !r.includes('@')).join(','),
-                                                body: alertMessage
-                                            }),
-                                            credentials: 'include'
-                                        });
-                                    }
-                                }
-                                
-                                result = `Alert triggered: ${alertMessage}`;
-                                nodeData = [{ alert: true, message: alertMessage, severity: node.config.alertSeverity }];
-                            } else {
-                                result = 'No alerts triggered';
-                                nodeData = [{ alert: false }];
-                            }
-                        } catch (error: any) {
-                            result = `Error: ${error.message}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'Alert agent not configured';
-                    }
-                    break;
-                case 'pdfReport':
-                    if (node.config?.pdfTemplate) {
-                        try {
-                            const reportData = node.config.pdfReportData ? JSON.parse(node.config.pdfReportData) : inputData;
-                            const response = await fetch(`${API_BASE}/pdf/generate`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    template: node.config.pdfTemplate,
-                                    data: reportData,
-                                    outputPath: node.config.pdfOutputPath || ''
-                                }),
-                                credentials: 'include'
-                            });
-                            if (response.ok) {
-                                const data = await response.json();
-                                nodeData = [{ pdfPath: data.path, pdfUrl: data.url }];
-                                result = `PDF report generated: ${data.path || data.url}`;
-                            } else {
-                                const errorData = await response.json();
-                                result = `Error: ${errorData.error || 'PDF generation failed'}`;
-                                nodeData = [{ error: errorData.error || 'PDF generation failed' }];
-                            }
-                        } catch (error: any) {
-                            result = `Error: ${error.message}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'PDF report not configured';
-                    }
-                    break;
-                case 'sendEmail':
-                    if (node.config?.emailTo) {
-                        try {
-                            // Replace variables in email fields
-                            const replaceVariables = (text: string, data: any) => {
-                                if (!text || !data) return text;
-                                let result = text;
-                                // If data is an array, use first record
-                                const record = Array.isArray(data) ? data[0] : data;
-                                if (record && typeof record === 'object') {
-                                    Object.keys(record).forEach(key => {
-                                        const regex = new RegExp(`\\{${key}\\}`, 'g');
-                                        result = result.replace(regex, String(record[key] ?? ''));
-                                    });
-                                }
-                                return result;
-                            };
-
-                            const emailData = {
-                                to: replaceVariables(node.config.emailTo, inputData),
-                                subject: replaceVariables(node.config.emailSubject || '', inputData),
-                                body: replaceVariables(node.config.emailBody || '', inputData),
-                                smtpHost: node.config.emailSmtpHost || 'smtp.gmail.com',
-                                smtpPort: node.config.emailSmtpPort || '587',
-                                smtpUser: node.config.emailSmtpUser,
-                                smtpPass: node.config.emailSmtpPass
-                            };
-
-                            const response = await fetch(`${API_BASE}/email/send`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(emailData),
-                                credentials: 'include'
-                            });
-
-                            if (response.ok) {
-                                const data = await response.json();
-                                nodeData = inputData || [{ emailSent: true, to: emailData.to }];
-                                result = `Email sent to ${emailData.to}`;
-                            } else {
-                                const errorData = await response.json();
-                                throw new Error(errorData.error || 'Failed to send email');
-                            }
-                        } catch (error) {
-                            console.error('Email send error:', error);
-                            result = `Error: ${error.message || 'Failed to send email'}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'Recipient not configured';
-                    }
-                    break;
-                case 'sendSMS':
-                    if (node.config?.smsTo) {
-                        try {
-                            // Replace variables in SMS fields
-                            const replaceVariables = (text: string, data: any) => {
-                                if (!text || !data) return text;
-                                let result = text;
-                                const record = Array.isArray(data) ? data[0] : data;
-                                if (record && typeof record === 'object') {
-                                    Object.keys(record).forEach(key => {
-                                        const regex = new RegExp(`\\{${key}\\}`, 'g');
-                                        result = result.replace(regex, String(record[key] ?? ''));
-                                    });
-                                }
-                                return result;
-                            };
-
-                            const smsData = {
-                                to: replaceVariables(node.config.smsTo, inputData),
-                                body: replaceVariables(node.config.smsBody || '', inputData),
-                                accountSid: node.config.twilioAccountSid,
-                                authToken: node.config.twilioAuthToken,
-                                fromNumber: node.config.twilioFromNumber
-                            };
-
-                            const response = await fetch(`${API_BASE}/sms/send`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(smsData),
-                                credentials: 'include'
-                            });
-
-                            if (response.ok) {
-                                const data = await response.json();
-                                nodeData = inputData || [{ smsSent: true, to: smsData.to }];
-                                result = `SMS sent to ${smsData.to}`;
-                            } else {
-                                const errorData = await response.json();
-                                throw new Error(errorData.error || 'Failed to send SMS');
-                            }
-                        } catch (error) {
-                            console.error('SMS send error:', error);
-                            result = `Error: ${error.message || 'Failed to send SMS'}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'Phone number not configured';
-                    }
-                    break;
-                case 'sendWhatsApp':
-                    if (node.config?.whatsappTo) {
-                        try {
-                            const replaceVariablesWA = (text: string, data: any) => {
-                                if (!text || !data) return text;
-                                let result = text;
-                                const record = Array.isArray(data) ? data[0] : data;
-                                if (record && typeof record === 'object') {
-                                    Object.keys(record).forEach(key => {
-                                        const regex = new RegExp(`\\{${key}\\}`, 'g');
-                                        result = result.replace(regex, String(record[key] ?? ''));
-                                    });
-                                }
-                                return result;
-                            };
-
-                            const waData = {
-                                to: replaceVariablesWA(node.config.whatsappTo, inputData),
-                                body: replaceVariablesWA(node.config.whatsappBody || '', inputData),
-                                accountSid: node.config.whatsappTwilioAccountSid,
-                                authToken: node.config.whatsappTwilioAuthToken,
-                                fromNumber: node.config.whatsappTwilioFromNumber
-                            };
-
-                            const response = await fetch(`${API_BASE}/whatsapp/send`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(waData),
-                                credentials: 'include'
-                            });
-
-                            if (response.ok) {
-                                const data = await response.json();
-                                nodeData = inputData || [{ whatsappSent: true, to: waData.to }];
-                                result = `WhatsApp sent to ${waData.to}`;
-                            } else {
-                                const errorData = await response.json();
-                                throw new Error(errorData.error || 'Failed to send WhatsApp');
-                            }
-                        } catch (error) {
-                            console.error('WhatsApp send error:', error);
-                            result = `Error: ${error.message || 'Failed to send WhatsApp'}`;
-                            nodeData = [{ error: error.message }];
-                        }
-                    } else {
-                        result = 'WhatsApp number not configured';
-                    }
-                    break;
-                case 'dataVisualization':
-                    if (node.config?.generatedWidget) {
-                        nodeData = inputData;
-                        result = `Chart: ${node.config.generatedWidget.title || 'Data Visualization'}`;
-                    } else {
-                        result = 'No visualization configured. Double-click to set up.';
-                    }
-                    break;
-                case 'esios':
-                    const indicatorId = node.config?.esiosArchiveId || '1001';
-                    const esiosDate = node.config?.esiosDate || new Date().toISOString().split('T')[0];
-                    // Use indicators endpoint with start_date and end_date
-                    const startDate = `${esiosDate}T00:00`;
-                    const endDate = `${esiosDate}T23:59`;
-                    const url = `https://api.esios.ree.es/indicators/${indicatorId}?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
-
-                    try {
-                        const response = await fetch(`${API_BASE}/proxy`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                url: url,
-                                method: 'GET',
-                                headers: {
-                                    'Accept': 'application/json; application/vnd.esios-api-v1+json',
-                                    'x-api-key': 'd668c991cd9fbd6873796a76b80bca256bf0f26db8d4c1de702546642fecda64'
-                                }
-                            }),
-                            credentials: 'include'
-                        });
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            nodeData = [data]; // Wrap the full response object
-                            result = `Fetched ESIOS Indicator ${indicatorId} for ${esiosDate}`;
-                        } else {
-                            const errorData = await response.json();
-                            throw new Error(errorData.error || `ESIOS Request failed: ${response.status}`);
-                        }
-                    } catch (error) {
-                        console.error('ESIOS request error:', error);
-                        result = `Error: ${error.message || 'Failed to fetch'}`;
-                        nodeData = [{ error: error.message }];
-                    }
-                    break;
-                case 'climatiq':
-                    // Check if factor is configured
-                    if (node.config?.climatiqFactor !== undefined) {
-                        // Return the stored emission factor
-                        const factor = node.config.climatiqFactor;
-                        const unit = node.config.climatiqUnit || 'kg CO2e';
-                        const description = node.config.climatiqDescription || 'Emission factor';
-
-                        nodeData = [{
-                            factor: factor,
-                            unit: unit,
-                            description: description,
-                            query: node.config.climatiqQuery
-                        }];
-                        result = `Using ${description}: ${factor} ${unit}`;
-                    } else {
-                        result = 'Not configured - please select an emission factor';
-                        nodeData = [{ error: 'No emission factor selected' }];
-                    }
-                    break;
-                case 'excelInput':
-                    // Excel/CSV Input node - output the parsed data
-                    if (node.config?.useGCS && node.config?.gcsPath) {
-                        // Data stored in GCS - use preview for visual display, full data loaded at execution
-                        nodeData = node.config.previewData || [];
-                        const totalRows = node.config.rowCount || nodeData.length;
-                        result = `Loaded ${totalRows} rows from ${node.config.fileName || 'cloud'} (cloud storage)`;
-                    } else if (node.config?.parsedData && Array.isArray(node.config.parsedData)) {
-                        nodeData = node.config.parsedData;
-                        result = `Loaded ${nodeData.length} rows from ${node.config.fileName || 'file'}`;
-                    } else {
-                        result = 'No file loaded - click to upload Excel/CSV file';
-                        nodeData = [];
-                    }
-                    break;
-                case 'pdfInput':
-                    // PDF Input node - output the parsed text
-                    if (node.config?.pdfText) {
-                        nodeData = [{
-                            text: node.config.pdfText,
-                            pages: node.config.pages,
-                            fileName: node.config.fileName,
-                            metadata: node.config.metadata
-                        }];
-                        result = `Loaded PDF: ${node.config.fileName} (${node.config.pages} pages)`;
-                    } else {
-                        result = 'No PDF loaded - click to upload PDF file';
-                        nodeData = [];
-                    }
-                    break;
-                case 'join':
-                    // Join node - merge data from two inputs
-                    if (inputData && inputData.A && inputData.B) {
-                        const dataA = Array.isArray(inputData.A) ? inputData.A : [inputData.A];
-                        const dataB = Array.isArray(inputData.B) ? inputData.B : [inputData.B];
-                        
-                        const strategy = node.config?.joinStrategy || 'concat';
-                        
-                        if (strategy === 'concat') {
-                            // Simple concatenation
-                            nodeData = [...dataA, ...dataB];
-                            result = `Concatenated ${dataA.length} + ${dataB.length} = ${nodeData.length} records`;
-                        } else if (strategy === 'mergeByKey' && node.config?.joinKey) {
-                            // Merge by common key
-                            const key = node.config.joinKey;
-                            const joinTypeConfig = node.config?.joinType || 'inner';
-                            const merged: any[] = [];
-                            
-                            // Get field names from A and B to detect conflicts and normalize
-                            const fieldsInA = dataA.length > 0 ? Object.keys(dataA[0]) : [];
-                            const fieldsInB = dataB.length > 0 ? Object.keys(dataB[0]) : [];
-                            
-                            // Build the complete set of output fields
-                            const allOutputFields = new Set<string>(fieldsInA);
-                            for (const field of fieldsInB) {
-                                if (field === key) continue; // Key field handled separately
-                                if (fieldsInA.includes(field)) {
-                                    allOutputFields.add(`B_${field}`);
-                                } else {
-                                    allOutputFields.add(field);
-                                }
-                            }
-                            
-                            // Process records from A
-                            for (const recordA of dataA) {
-                                const keyValue = recordA[key];
-                                const matchingB = dataB.find((b: any) => b[key] === keyValue);
-                                
-                                if (matchingB) {
-                                    // Merge fields from B, prefixing conflicting field names
-                                    const mergedRecord: any = { ...recordA };
-                                    for (const [fieldName, fieldValue] of Object.entries(matchingB)) {
-                                        if (fieldName === key) {
-                                            continue; // Skip the join key
-                                        } else if (fieldsInA.includes(fieldName)) {
-                                            mergedRecord[`B_${fieldName}`] = fieldValue;
-                                        } else {
-                                            mergedRecord[fieldName] = fieldValue;
-                                        }
-                                    }
-                                    merged.push(mergedRecord);
-                                } else if (joinTypeConfig === 'outer') {
-                                    // Outer join: include unmatched A records with empty B fields
-                                    merged.push(recordA);
-                                }
-                                // Inner join: skip unmatched A records
-                            }
-                            
-                            // For outer join, add unmatched B records
-                            if (joinTypeConfig === 'outer') {
-                                for (const recordB of dataB) {
-                                    const keyValue = recordB[key];
-                                    const existsInA = dataA.some((a: any) => a[key] === keyValue);
-                                    if (!existsInA) {
-                                        const prefixedRecord: any = {};
-                                        for (const [fieldName, fieldValue] of Object.entries(recordB)) {
-                                            if (fieldsInA.includes(fieldName) && fieldName !== key) {
-                                                prefixedRecord[`B_${fieldName}`] = fieldValue;
-                                            } else {
-                                                prefixedRecord[fieldName] = fieldValue;
-                                            }
-                                        }
-                                        merged.push(prefixedRecord);
-                                    }
-                                }
-                            }
-                            
-                            // Normalize all records to have the same columns
-                            const normalizedMerged = merged.map(record => {
-                                const normalized: any = {};
-                                for (const field of allOutputFields) {
-                                    normalized[field] = record[field] !== undefined ? record[field] : '';
-                                }
-                                return normalized;
-                            });
-                            
-                            nodeData = normalizedMerged;
-                            const joinTypeName = joinTypeConfig === 'inner' ? 'Inner' : 'Outer';
-                            result = `${joinTypeName} Join by "${key}": ${nodeData.length} records`;
-                        } else {
-                            nodeData = [...dataA, ...dataB];
-                            result = `Concatenated (no key configured): ${nodeData.length} records`;
-                        }
-                    } else {
-                        result = 'Waiting for both inputs...';
-                    }
-                    break;
-                case 'splitColumns':
-                    // Split columns node - split dataset into two outputs by column selection
-                    if (inputData && Array.isArray(inputData) && inputData.length > 0) {
-                        const columnsA = node.config?.columnsOutputA || [];
-                        const columnsB = node.config?.columnsOutputB || [];
-                        
-                        if (columnsA.length === 0 && columnsB.length === 0) {
-                            // Not configured - send all data to output A
-                            const allKeys = Object.keys(inputData[0] || {});
-                            nodeData = {
-                                outputA: inputData,
-                                outputB: inputData.map(() => ({}))
-                            };
-                            result = `Not configured - all ${allKeys.length} columns to Output A`;
-                        } else {
-                            // Split by configured columns
-                            const outputA = inputData.map((record: any) => {
-                                const filtered: any = {};
-                                columnsA.forEach((col: string) => {
-                                    if (col in record) filtered[col] = record[col];
-                                });
-                                return filtered;
-                            });
-                            
-                            const outputB = inputData.map((record: any) => {
-                                const filtered: any = {};
-                                columnsB.forEach((col: string) => {
-                                    if (col in record) filtered[col] = record[col];
-                                });
-                                return filtered;
-                            });
-                            
-                            nodeData = { outputA, outputB };
-                            result = `Split: ${columnsA.length} cols → A, ${columnsB.length} cols → B (${inputData.length} rows)`;
-                        }
-                    } else {
-                        result = 'No input data to split';
-                        nodeData = { outputA: [], outputB: [] };
-                    }
-                    break;
-                case 'output':
-                    // Output node just displays the input data
-                    if (inputData && Array.isArray(inputData) && inputData.length > 0) {
-                        nodeData = inputData;
-                        result = `Received ${inputData.length} record(s)`;
-                    } else if (inputData) {
-                        nodeData = [inputData];
-                        result = 'Received data';
-                    } else {
-                        result = 'No input data';
-                    }
-                    break;
-                case 'humanApproval':
-                    // Human approval node - wait for user acceptance
-                    if (!node.config?.assignedUserId) {
-                        result = 'Error: No user assigned';
-                        updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result });
-                        return;
-                    }
-
-                    // Set to waiting status and broadcast
-                    updateNodeAndBroadcast(nodeId, { status: 'waiting' as const, inputData });
-                    setWaitingApprovalNodeId(nodeId);
-
-                    // Wait for user approval
-                    await new Promise<void>((resolve) => {
-                        setPendingApprovalData({ inputData, resolve });
-                    });
-
-                    // After approval, continue
-                    nodeData = inputData;
-                    result = `Approved by ${node.config.assignedUserName}`;
-                    break;
-            }
-        }
-
-        // Set to completed
-        // Set to completed and broadcast
-        updateNodeAndBroadcast(nodeId, { 
-            status: 'completed' as const, 
-            executionResult: result, 
-            data: nodeData, 
-            outputData: nodeData,
-            conditionResult: conditionResult !== undefined ? conditionResult : undefined
-        });
-
-        if (recursive) {
-            // Find and execute connected nodes
-            const nextConnections = connections.filter(conn => conn.fromNodeId === nodeId);
-
-            // For condition nodes in perRow mode, send filtered data to each output
-            if (node.type === 'condition' && node.config?.processingMode === 'perRow' && nodeData?.trueRecords !== undefined) {
-                // Per-row mode: send trueRecords to TRUE connections, falseRecords to FALSE connections
-                for (const conn of nextConnections) {
-                    const targetNode = nodes.find(n => n.id === conn.toNodeId);
-                    const dataToSend = conn.outputType === 'false' ? nodeData.falseRecords : nodeData.trueRecords;
-                    
-                    if (targetNode?.type === 'join') {
-                        await executeJoinInput(conn.toNodeId, dataToSend, conn.inputPort || 'A');
-                    } else {
-                        await executeNode(conn.toNodeId, dataToSend);
-                    }
-                }
-            } else if (node.type === 'splitColumns' && nodeData?.outputA !== undefined) {
-                // Split columns node: send outputA to 'A' connections, outputB to 'B' connections
-                for (const conn of nextConnections) {
-                    const targetNode = nodes.find(n => n.id === conn.toNodeId);
-                    const dataToSend = conn.outputType === 'B' ? nodeData.outputB : nodeData.outputA;
-                    
-                    if (targetNode?.type === 'join') {
-                        await executeJoinInput(conn.toNodeId, dataToSend, conn.inputPort || 'A');
-                    } else {
-                        await executeNode(conn.toNodeId, dataToSend);
-                    }
-                }
-            } else {
-                // Batch mode or non-condition nodes
-                const toExecute = node.type === 'condition' && conditionResult !== undefined
-                    ? nextConnections.filter(c => {
-                        if (conditionResult) {
-                            return !c.outputType || c.outputType === 'true';
-                        } else {
-                            return c.outputType === 'false';
-                        }
-                    })
-                    : nextConnections;
-
-                for (const conn of toExecute) {
-                    const targetNode = nodes.find(n => n.id === conn.toNodeId);
-
-                    // For join nodes, we need to handle inputs differently
-                    if (targetNode?.type === 'join') {
-                        await executeJoinInput(conn.toNodeId, nodeData, conn.inputPort || 'A');
-                    } else {
-                        await executeNode(conn.toNodeId, nodeData);
-                    }
-                }
-            }
-        }
-    };
-
-    // Special handler for join node inputs
-    const executeJoinInput = async (nodeId: string, inputData: any, inputPort: 'A' | 'B') => {
-        const node = nodes.find(n => n.id === nodeId);
-        if (!node || node.type !== 'join') return;
-
-        // Store the input data for the appropriate port and broadcast
-        const updates = inputPort === 'A' 
-            ? { inputDataA: inputData } 
-            : { inputDataB: inputData };
-        updateNodeAndBroadcast(nodeId, updates);
-
-        // Wait for state to update
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Get the updated node to check if both inputs are available
-        // We need to read from the current state
-        const updatedNodes = await new Promise<WorkflowNode[]>(resolve => {
-            setNodes(prev => {
-                resolve(prev);
-                return prev;
-            });
-        });
-
-        const updatedNode = updatedNodes.find(n => n.id === nodeId);
-        
-        // Check if both inputs are now available
-        if (updatedNode?.inputDataA && updatedNode?.inputDataB) {
-            // Both inputs available, execute the join
-            await executeNode(nodeId, { A: updatedNode.inputDataA, B: updatedNode.inputDataB });
-        } else {
-            // Only one input available, mark as waiting
-            setNodes(prev => prev.map(n =>
-                n.id === nodeId ? { ...n, status: 'waiting' as const, executionResult: `Waiting for input ${inputPort === 'A' ? 'B' : 'A'}...` } : n
-            ));
-        }
-    };
-
-    const runWorkflow = async () => {
-        if (isRunning) return;
-        setIsRunning(true);
-
-        try {
-            // Save workflow before executing to ensure execution history has latest version
-            await saveWorkflow();
-
-            // Reset all nodes to idle (and clear join node inputs)
-            setNodes(prev => prev.map(n => ({ 
-                ...n, 
-                status: 'idle' as const, 
-                executionResult: undefined,
-                inputDataA: undefined,
-                inputDataB: undefined
-            })));
-
-            // Call backend to execute workflow and create execution record (in background)
-            fetch(`${API_BASE}/workflow/${currentWorkflowId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ inputs: {} })
-            }).catch(err => {
-                console.error('Background execution error:', err);
-            });
-
-            // Execute locally in frontend for visual feedback
-            // Find trigger nodes (nodes with no incoming connections)
-            const triggerNodes = nodes.filter(node =>
-                !connections.some(conn => conn.toNodeId === node.id)
-            );
-
-            if (triggerNodes.length === 0) {
-                showToast('No trigger nodes found! Add a node without incoming connections.', 'error');
-                setIsRunning(false);
-                return;
-            }
-
-            // Execute all trigger nodes
-            for (const trigger of triggerNodes) {
-                await executeNode(trigger.id);
-            }
-
-            // Check if any nodes failed after execution
-            // Wait a bit for state to update
-            setTimeout(() => {
-                setNodes(currentNodes => {
-                    const hasErrors = currentNodes.some(n => n.status === 'error');
-                    const hasCompleted = currentNodes.some(n => n.status === 'completed');
-                    
-                    if (hasErrors) {
-                        showToast('There are configuration errors in some nodes, check the execution history for details', 'error');
-                    } else if (hasCompleted) {
-                        showToast('Workflow executed successfully!', 'success');
-                    }
-                    
-                    return currentNodes; // Return unchanged
-                });
-            }, 500);
-
-        } catch (error) {
-            console.error('Error executing workflow:', error);
-            showToast(`Failed to execute workflow: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-        } finally {
-            setIsRunning(false);
-        }
-    };
-
-    const handleRunNode = async (nodeId: string) => {
-        if (isRunning) return;
-
-        const node = nodes.find(n => n.id === nodeId);
-        
-        // Reset node status to ensure 'running' state is visible
-        // This forces React to re-render and show the running indicator
-        setNodes(prev => prev.map(n => 
-            n.id === nodeId ? { ...n, status: undefined, executionResult: undefined } : n
-        ));
-        // Small delay to ensure the reset is rendered before setting to 'running'
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        // Special handling for join nodes
-        if (node?.type === 'join') {
-            // Use the stored inputDataA and inputDataB
-            if (node.inputDataA && node.inputDataB) {
-                await executeNode(nodeId, { A: node.inputDataA, B: node.inputDataB }, false);
-            } else {
-                // Try to get data from parent nodes
-                const incomingConnections = connections.filter(c => c.toNodeId === nodeId);
-                let dataA = node.inputDataA;
-                let dataB = node.inputDataB;
-                
-                for (const conn of incomingConnections) {
-                    const parentNode = nodes.find(n => n.id === conn.fromNodeId);
-                    if (parentNode?.outputData) {
-                        // Handle splitColumns parent node
-                        let parentData;
-                        if (parentNode.type === 'splitColumns') {
-                            parentData = conn.outputType === 'B' 
-                                ? parentNode.outputData.outputB 
-                                : parentNode.outputData.outputA;
-                        } else {
-                            parentData = parentNode.outputData;
-                        }
-                        
-                        if (conn.inputPort === 'A') {
-                            dataA = parentData;
-                        } else if (conn.inputPort === 'B') {
-                            dataB = parentData;
-                        }
-                    }
-                }
-                
-                // Update the node with the new data
-                setNodes(prev => prev.map(n => 
-                    n.id === nodeId ? { ...n, inputDataA: dataA, inputDataB: dataB } : n
-                ));
-                
-                if (dataA && dataB) {
-                    await executeNode(nodeId, { A: dataA, B: dataB }, false);
-                } else {
-                    alert(`Join node needs both inputs. Missing: ${!dataA ? 'A' : ''} ${!dataB ? 'B' : ''}`);
-                }
-            }
-            return;
-        }
-
-        // Find input data from parent nodes if available
-        const incomingConnections = connections.filter(c => c.toNodeId === nodeId);
-        let inputData = null;
-
-        if (incomingConnections.length > 0) {
-            // Use the data from the first connected parent that has output data
-            for (const conn of incomingConnections) {
-                const parentNode = nodes.find(n => n.id === conn.fromNodeId);
-                if (parentNode && parentNode.outputData) {
-                    // Handle splitColumns parent node
-                    if (parentNode.type === 'splitColumns') {
-                        inputData = conn.outputType === 'B' 
-                            ? parentNode.outputData.outputB 
-                            : parentNode.outputData.outputA;
-                    } else {
-                        inputData = parentNode.outputData;
-                    }
-                    break;
-                }
-            }
-        }
-
-        await executeNode(nodeId, inputData, false);
-    };
+    // Node execution logic (extracted to hook)
+    const { executeNode, executeJoinInput, handleRunNode, runWorkflow } = useNodeExecution({
+        nodes,
+        connections,
+        entities,
+        setNodes,
+        setConnections,
+        updateNodeAndBroadcast,
+        showToast,
+        isRunning,
+        setIsRunning,
+        currentWorkflowId,
+        saveWorkflow,
+        setWaitingApprovalNodeId,
+        setPendingApprovalData,
+    });
 
     // AI Workflow Assistant Functions
     const handleGenerateWorkflow = async () => {
@@ -7743,393 +5215,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                         )}
 
                         {/* Data Preview Modal */}
-                        {viewingDataNodeId && (() => {
-                            const node = nodes.find(n => n.id === viewingDataNodeId);
-                            if (!node) return null;
-
-                            // Helper function to normalize data to array format
-                            const normalizeToArray = (data: any): any[] => {
-                                if (!data) return [];
-                                if (Array.isArray(data)) {
-                                    // If array is empty or contains objects, return as is
-                                    return data;
-                                }
-                                if (typeof data === 'object') {
-                                    // Check if it's splitColumns format (has outputA or outputB)
-                                    if (data.outputA !== undefined || data.outputB !== undefined) {
-                                        // This is splitColumns format, return as is (not an array)
-                                        return data as any;
-                                    }
-                                    // Single object, wrap it in array
-                                    return [data];
-                                }
-                                // Primitive value, wrap it
-                                return [{ value: data }];
-                            };
-
-                            // Special handling for splitColumns node
-                            const isSplitColumnsNode = node.type === 'splitColumns';
-                            
-                            // Special handling for condition node with trueRecords/falseRecords
-                            const isConditionWithBranches = node.type === 'condition' && 
-                                node.outputData && 
-                                typeof node.outputData === 'object' &&
-                                (node.outputData.trueRecords !== undefined || node.outputData.falseRecords !== undefined);
-                            
-                            // Get data from various possible locations
-                            // Input data should only come from explicit inputData (from previous nodes)
-                            // Output data can come from outputData or fallback to node.data
-                            let rawInputData = node.inputData; // Only use explicit inputData
-                            let rawOutputData = node.outputData || node.data; // Use outputData or fallback to node.data
-                            
-                            // Don't use node.data as fallback for input - input should come from previous nodes
-                            // If inputData doesn't exist, it means there's no input (e.g., trigger nodes)
-                            
-                            const nodeInputData = normalizeToArray(rawInputData);
-                            const nodeOutputData = normalizeToArray(rawOutputData);
-                            
-                            const hasInput = rawInputData !== undefined && rawInputData !== null && Array.isArray(nodeInputData) && nodeInputData.length > 0;
-                            const hasOutput = !isSplitColumnsNode && !isConditionWithBranches && rawOutputData !== undefined && rawOutputData !== null && Array.isArray(nodeOutputData) && nodeOutputData.length > 0;
-                            const hasOutputA = isSplitColumnsNode && nodeOutputData?.outputA?.length > 0;
-                            const hasOutputB = isSplitColumnsNode && nodeOutputData?.outputB?.length > 0;
-                            
-                            // For condition nodes with branches
-                            const hasTrueRecords = isConditionWithBranches && Array.isArray(rawOutputData?.trueRecords) && rawOutputData.trueRecords.length > 0;
-                            const hasFalseRecords = isConditionWithBranches && Array.isArray(rawOutputData?.falseRecords) && rawOutputData.falseRecords.length > 0;
-
-                            if (!hasInput && !hasOutput && !hasOutputA && !hasOutputB && !hasTrueRecords && !hasFalseRecords) return null;
-                            
-                            // Determine the correct active tab based on available data
-                            // Use output if available and selected, otherwise use input if available
-                            // If current tab is invalid, use the available one
-                            const effectiveTab = !isSplitColumnsNode 
-                                ? ((dataViewTab === 'input' && hasInput) || (dataViewTab === 'output' && hasOutput) 
-                                    ? dataViewTab 
-                                    : (hasOutput ? 'output' : (hasInput ? 'input' : 'output')))
-                                : dataViewTab;
-
-                            return (
-                                <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black/40 backdrop-blur-sm pointer-events-none" onClick={() => setViewingDataNodeId(null)}>
-                                    <div className="bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-[95vw] h-[90vh] overflow-hidden flex flex-col pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                                        {/* Header */}
-                                        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-light)] bg-[var(--bg-card)] shrink-0">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
-                                                    <Database className="text-[var(--text-secondary)]" size={18} />
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-lg font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
-                                                        {node.label} - Data Preview
-                                                    </h3>
-                                                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">View node data</p>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => setViewingDataNodeId(null)}
-                                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                                                aria-label="Close"
-                                            >
-                                                <X size={18} />
-                                            </button>
-                                        </div>
-
-                                        {/* Content with tabs */}
-                                        <div className="flex-1 overflow-hidden flex flex-col px-6 py-4">
-                                            {/* Tabs - different for splitColumns and condition nodes */}
-                                            {isSplitColumnsNode ? (
-                                                <div className="flex gap-1 bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-light)] mb-4 shrink-0">
-                                                    {hasInput && (
-                                                        <button
-                                                            onClick={() => setSplitViewTab('input')}
-                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'input'
-                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                                                }`}
-                                                        >
-                                                            Input ({Array.isArray(nodeInputData) ? nodeInputData.length : 0})
-                                                        </button>
-                                                    )}
-                                                    {hasOutputA && (
-                                                        <button
-                                                            onClick={() => setSplitViewTab('outputA')}
-                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputA'
-                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                                                }`}
-                                                        >
-                                                            <span className="flex items-center justify-center gap-1.5">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                                                Output A ({nodeOutputData?.outputA?.length || 0})
-                                                            </span>
-                                                        </button>
-                                                    )}
-                                                    {hasOutputB && (
-                                                        <button
-                                                            onClick={() => setSplitViewTab('outputB')}
-                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputB'
-                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                                                }`}
-                                                        >
-                                                            <span className="flex items-center justify-center gap-1.5">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                                                                Output B ({nodeOutputData?.outputB?.length || 0})
-                                                            </span>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : isConditionWithBranches ? (
-                                                // Condition node with trueRecords/falseRecords
-                                                <div className="flex gap-1 bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-light)] mb-4 shrink-0">
-                                                    {hasInput && (
-                                                        <button
-                                                            onClick={() => setSplitViewTab('input')}
-                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'input'
-                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                                                }`}
-                                                        >
-                                                            Input ({Array.isArray(nodeInputData) ? nodeInputData.length : 0})
-                                                        </button>
-                                                    )}
-                                                    {hasTrueRecords && (
-                                                        <button
-                                                            onClick={() => setSplitViewTab('outputA')}
-                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputA'
-                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                                                }`}
-                                                        >
-                                                            <span className="flex items-center justify-center gap-1.5">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                                                                True ({rawOutputData?.trueRecords?.length || 0})
-                                                            </span>
-                                                        </button>
-                                                    )}
-                                                    {hasFalseRecords && (
-                                                        <button
-                                                            onClick={() => setSplitViewTab('outputB')}
-                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${splitViewTab === 'outputB'
-                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                                                }`}
-                                                        >
-                                                            <span className="flex items-center justify-center gap-1.5">
-                                                                <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                                                                False ({rawOutputData?.falseRecords?.length || 0})
-                                                            </span>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                // Only show tabs if both exist, or show single tab without tab styling
-                                                (hasInput && hasOutput) ? (
-                                                    <div className="flex gap-1 bg-[var(--bg-tertiary)] p-1 rounded-lg border border-[var(--border-light)] mb-4 shrink-0">
-                                                        <button
-                                                            onClick={() => setDataViewTab('input')}
-                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${effectiveTab === 'input'
-                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                                                }`}
-                                                        >
-                                                            Input ({Array.isArray(nodeInputData) ? nodeInputData.length : 0})
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setDataViewTab('output')}
-                                                            className={`flex-1 px-3 py-2 text-sm font-medium rounded transition-all ${effectiveTab === 'output'
-                                                                ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                                                                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                                                                }`}
-                                                        >
-                                                            Output ({Array.isArray(nodeOutputData) ? nodeOutputData.length : 0})
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    // Single tab - show label without tab styling
-                                                    <div className="mb-4 shrink-0">
-                                                        <div className="text-sm font-medium text-[var(--text-primary)]">
-                                                            {hasInput ? `Input (${Array.isArray(nodeInputData) ? nodeInputData.length : 0})` : `Output (${Array.isArray(nodeOutputData) ? nodeOutputData.length : 0})`}
-                                                        </div>
-                                                    </div>
-                                                )
-                                            )}
-
-                                            {/* Table Container */}
-                                            <div className="flex-1 overflow-auto -mx-6 px-6">
-                                                {(() => {
-                                                    let displayData: any[];
-                                                    if (isSplitColumnsNode) {
-                                                        displayData = splitViewTab === 'input' 
-                                                            ? nodeInputData 
-                                                            : splitViewTab === 'outputA' 
-                                                                ? nodeOutputData?.outputA 
-                                                                : nodeOutputData?.outputB;
-                                                    } else if (isConditionWithBranches) {
-                                                        // Condition node with trueRecords/falseRecords
-                                                        displayData = splitViewTab === 'input' 
-                                                            ? nodeInputData 
-                                                            : splitViewTab === 'outputA' 
-                                                                ? rawOutputData?.trueRecords 
-                                                                : rawOutputData?.falseRecords;
-                                                    } else {
-                                                        // Use effectiveTab to determine which data to display
-                                                        displayData = effectiveTab === 'input' ? nodeInputData : nodeOutputData;
-                                                    }
-                                                    
-                                                    // Ensure displayData is an array
-                                                    if (!Array.isArray(displayData)) {
-                                                        if (displayData && typeof displayData === 'object') {
-                                                            displayData = [displayData];
-                                                        } else {
-                                                            displayData = [];
-                                                        }
-                                                    }
-                                                    
-                                                    const MAX_PREVIEW_ROWS = 500;
-                                                    const totalRows = displayData?.length || 0;
-                                                    const limitedData = displayData?.slice(0, MAX_PREVIEW_ROWS) || [];
-                                                    const isLimited = totalRows > MAX_PREVIEW_ROWS;
-                                                    
-                                                    // Flatten nested objects into flat key-value pairs
-                                                    const flattenObject = (obj: any, prefix: string = ''): Record<string, any> => {
-                                                        const flattened: Record<string, any> = {};
-                                                        
-                                                        if (obj === null || obj === undefined) {
-                                                            return { [prefix || 'value']: null };
-                                                        }
-                                                        
-                                                        if (Array.isArray(obj)) {
-                                                            // For arrays, show as JSON string or count
-                                                            flattened[prefix || 'value'] = `[${obj.length} items]`;
-                                                            // Optionally, expand first few items
-                                                            if (obj.length > 0 && obj.length <= 5) {
-                                                                obj.forEach((item, idx) => {
-                                                                    if (typeof item === 'object' && item !== null) {
-                                                                        Object.assign(flattened, flattenObject(item, `${prefix || 'item'}[${idx}].`));
-                                                                    } else {
-                                                                        flattened[`${prefix || 'item'}[${idx}]`] = item;
-                                                                    }
-                                                                });
-                                                            }
-                                                            return flattened;
-                                                        }
-                                                        
-                                                        if (typeof obj !== 'object') {
-                                                            return { [prefix || 'value']: obj };
-                                                        }
-                                                        
-                                                        // Recursively flatten object
-                                                        for (const key in obj) {
-                                                            if (obj.hasOwnProperty(key)) {
-                                                                const newKey = prefix ? `${prefix}${key}` : key;
-                                                                const value = obj[key];
-                                                                
-                                                                if (value === null || value === undefined) {
-                                                                    flattened[newKey] = null;
-                                                                } else if (Array.isArray(value)) {
-                                                                    // Arrays: show count and optionally expand
-                                                                    if (value.length === 0) {
-                                                                        flattened[newKey] = '[]';
-                                                                    } else if (value.length <= 3 && value.every(v => typeof v !== 'object' || v === null)) {
-                                                                        // Small array of primitives: show values
-                                                                        flattened[newKey] = `[${value.join(', ')}]`;
-                                                                    } else {
-                                                                        flattened[newKey] = `[${value.length} items]`;
-                                                                    }
-                                                                } else if (typeof value === 'object') {
-                                                                    // Nested object: flatten recursively
-                                                                    Object.assign(flattened, flattenObject(value, `${newKey}.`));
-                                                                } else {
-                                                                    flattened[newKey] = value;
-                                                                }
-                                                            }
-                                                        }
-                                                        
-                                                        return flattened;
-                                                    };
-                                                    
-                                                    // Flatten all records
-                                                    const flattenedData = limitedData.map(record => flattenObject(record));
-                                                    
-                                                    // Get all unique keys from flattened records
-                                                    const getAllKeys = (data: any[]): string[] => {
-                                                        const keysSet = new Set<string>();
-                                                        data.forEach(record => {
-                                                            if (record && typeof record === 'object') {
-                                                                Object.keys(record).forEach(key => keysSet.add(key));
-                                                            }
-                                                        });
-                                                        return Array.from(keysSet).sort();
-                                                    };
-                                                    
-                                                    const allKeys = getAllKeys(flattenedData);
-                                                    
-                                                    return displayData && displayData.length > 0 && allKeys.length > 0 ? (
-                                                        <>
-                                                            {isLimited && (
-                                                                <div className="bg-[var(--bg-tertiary)] border border-[var(--border-light)] text-[var(--text-secondary)] px-4 py-2.5 rounded-lg mb-4 text-sm flex items-center gap-2 shrink-0">
-                                                                    <AlertCircle size={16} />
-                                                                    <span>Showing first {MAX_PREVIEW_ROWS.toLocaleString()} of {totalRows.toLocaleString()} rows</span>
-                                                                </div>
-                                                            )}
-                                                            <div className="border border-[var(--border-light)] rounded-lg overflow-hidden bg-[var(--bg-card)] shadow-sm">
-                                                                <div className="overflow-auto max-h-full">
-                                                                    <table className="w-full text-sm">
-                                                                        <thead className="bg-[var(--bg-tertiary)] border-b border-[var(--border-light)] sticky top-0 z-10">
-                                                                            <tr>
-                                                                                {allKeys.map(key => (
-                                                                                    <th key={key} className="px-4 py-3 text-left font-medium text-[var(--text-primary)] whitespace-nowrap">
-                                                                                        {key}
-                                                                                    </th>
-                                                                                ))}
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-slate-100">
-                                                                            {flattenedData.map((record: any, idx: number) => (
-                                                                                <tr key={idx} className="hover:bg-[var(--bg-tertiary)] transition-colors">
-                                                                                    {allKeys.map((key, vidx) => {
-                                                                                        const value = record?.[key];
-                                                                                        const displayValue = value === null || value === undefined 
-                                                                                            ? '—' 
-                                                                                            : typeof value === 'object' 
-                                                                                                ? JSON.stringify(value) 
-                                                                                                : String(value);
-                                                                                        
-                                                                                        return (
-                                                                                            <td key={`${idx}-${vidx}`} className="px-4 py-3 text-[var(--text-secondary)]">
-                                                                                                <div className="max-w-[400px] break-words" title={displayValue}>
-                                                                                                    <span className={value === null || value === undefined ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]'}>
-                                                                                                        {displayValue}
-                                                                                                    </span>
-                                                                                                </div>
-                                                                                            </td>
-                                                                                        );
-                                                                                    })}
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            </div>
-                                                            {totalRows > 0 && (
-                                                                <div className="mt-4 text-sm text-[var(--text-secondary)] text-center shrink-0">
-                                                                    <span className="font-medium">{totalRows.toLocaleString()}</span> {totalRows === 1 ? 'row' : 'rows'} total
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    ) : (
-                                                        <div className="text-center py-12">
-                                                            <Database size={32} className="mx-auto text-[var(--text-tertiary)] mb-2" />
-                                                            <p className="text-sm text-[var(--text-secondary)]">No data available</p>
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })()}
+                        <DataPreviewModal
+                            nodes={nodes}
+                            viewingDataNodeId={viewingDataNodeId}
+                            onClose={() => setViewingDataNodeId(null)}
+                            dataViewTab={dataViewTab}
+                            setDataViewTab={setDataViewTab}
+                            splitViewTab={splitViewTab}
+                            setSplitViewTab={setSplitViewTab}
+                        />
 
                         {/* Condition Configuration Modal */}
                         {configuringConditionNodeId && (
