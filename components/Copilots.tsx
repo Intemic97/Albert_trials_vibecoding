@@ -1488,7 +1488,7 @@ export const Copilots: React.FC = () => {
                     </div>
 
                     {/* Chats list */}
-                    <div className="px-3 pt-3">
+                    <div className="px-3 pt-3 flex-1 overflow-hidden flex flex-col min-h-0">
                                 <button
                                     onClick={handleCreateCopilot}
                                     className="w-full mb-3 px-4 py-2.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
@@ -1544,7 +1544,7 @@ export const Copilots: React.FC = () => {
                                 </div>
 
                             {/* Chat List */}
-                            <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1 custom-scrollbar">
+                            <div className="flex-1 overflow-y-auto pb-3 space-y-1 custom-scrollbar min-h-0">
                                 {filteredChats.map((chat, idx) => {
                                     const chatAgent = chat.agentId ? agents.find(a => a.id === chat.agentId) : null;
                                     const getIcon = (iconName: string) => {
@@ -1585,7 +1585,7 @@ export const Copilots: React.FC = () => {
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all bg-[var(--bg-card)] rounded-md pl-1">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
