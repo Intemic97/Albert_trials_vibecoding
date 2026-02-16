@@ -34,6 +34,8 @@ database.sqlite
 server/database.sqlite
 *.sqlite
 *.sqlite3
+*.sqlite-shm
+*.sqlite-wal
 
 # Mock data (local only - not for repo)
 mock-data/
