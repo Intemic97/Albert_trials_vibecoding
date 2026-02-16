@@ -79,6 +79,9 @@ import { QuickConnectModal } from './Workflows/modals/QuickConnectModal';
 import { TagsManageModal } from './Workflows/modals/TagsManageModal';
 import { TemplatesGalleryInlineModal } from './Workflows/modals/TemplatesGalleryInlineModal';
 import { TemplatePreviewModal } from './Workflows/modals/TemplatePreviewModal';
+import { AIAssistantSidePanel } from './Workflows/modals/AIAssistantSidePanel';
+import { WorkflowEditorToolbar } from './Workflows/modals/WorkflowEditorToolbar';
+import { NodePaletteSidebar } from './Workflows/modals/NodePaletteSidebar';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
@@ -3235,256 +3238,40 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                 /* Canvas View */
                 <div data-tutorial="workflow-editor" className="flex flex-col min-h-0 overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
                     {/* Top Bar */}
-                    <div className="bg-[var(--bg-card)] border-b border-[var(--border-light)] px-6 py-2 flex items-center justify-between shadow-sm z-20 shrink-0">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <button
-                                onClick={backToList}
-                                className="flex items-center gap-2 px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm font-medium text-[var(--text-secondary)] flex-shrink-0"
-                            >
-                                <ArrowLeft size={18} weight="light" />
-                                Back
-                            </button>
-                            <div className="h-6 w-px bg-[var(--border-medium)] flex-shrink-0"></div>
-                            <input
-                                type="text"
-                                value={workflowName}
-                                onChange={(e) => setWorkflowName(e.target.value)}
-                                className="text-lg font-normal text-[var(--text-primary)] bg-transparent border-none focus:outline-none flex-1 min-w-0"
-                                placeholder="Workflow Name"
-                            />
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                            <button
-                                onClick={() => setShowTagsModal(true)}
-                                disabled={!currentWorkflowId}
-                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
-                                title="Manage Tags"
-                            >
-                                <Tag size={18} className="text-[var(--text-secondary)]" weight="light" />
-                            </button>
-                            {/* Auto-save indicator */}
-                            {autoSaveStatus && (
-                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all">
-                                    {autoSaveStatus === 'saving' ? (
-                                        <>
-                                            <span className="animate-spin">⟳</span>
-                                            <span className="text-[var(--text-secondary)]">Saving...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle size={14} className="text-emerald-600" weight="light" />
-                                            <span className="text-emerald-600">Saved</span>
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                            <button
-                                onClick={saveWorkflow}
-                                disabled={isSaving}
-                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
-                                title="Save (Ctrl+S)"
-                            >
-                                {isSaving ? <span className="animate-spin">⟳</span> : <Save size={18} className="text-[var(--text-secondary)]" weight="light" />}
-                            </button>
-                            <button
-                                onClick={openExecutionHistory}
-                                disabled={!currentWorkflowId}
-                                className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
-                                title="History"
-                            >
-                                <History size={18} className="text-[var(--text-secondary)]" weight="light" />
-                            </button>
-                            <button
-                                onClick={runWorkflow}
-                                disabled={isRunning || nodes.length === 0}
-                                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
-                            >
-                                <Play size={16} weight="light" />
-                                {isRunning ? 'Running...' : 'Run'}
-                            </button>
-                            <button
-                                onClick={openWorkflowRunner}
-                                disabled={nodes.length === 0}
-                                className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed gap-2"
-                            >
-                                <Share2 size={16} weight="light" />
-                                Export
-                            </button>
-                        </div>
-                    </div>
+                    <WorkflowEditorToolbar
+                        workflowName={workflowName}
+                        setWorkflowName={setWorkflowName}
+                        currentWorkflowId={currentWorkflowId}
+                        autoSaveStatus={autoSaveStatus}
+                        isSaving={isSaving}
+                        isRunning={isRunning}
+                        nodesCount={nodes.length}
+                        backToList={backToList}
+                        saveWorkflow={saveWorkflow}
+                        openExecutionHistory={openExecutionHistory}
+                        runWorkflow={runWorkflow}
+                        openWorkflowRunner={openWorkflowRunner}
+                        setShowTagsModal={setShowTagsModal}
+                    />
 
                     {/* Content Area (Sidebar + Canvas) */}
                     <div ref={contentAreaRef} className="flex flex-1 min-h-0 overflow-hidden" style={{ height: '100%', maxHeight: '100%' }}>
                     {/* Sidebar */}
-                    <div ref={sidebarRef} data-tutorial="node-palette" className={`${isSidebarCollapsed ? 'w-14' : 'w-64'} bg-[var(--bg-tertiary)] border-r border-[var(--border-light)] flex flex-col shadow-sm z-10 transition-all duration-300 overflow-hidden`} style={{ height: '100%', maxHeight: '100%' }}>
-
-                        {!isSidebarCollapsed ? (
-                            <>
-                                <div className="p-4 border-b border-[var(--border-light)] bg-[var(--bg-card)] shrink-0">
-                                    {/* Header */}
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h2 className="text-sm font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Components</h2>
-                                        <button
-                                            onClick={() => setIsSidebarCollapsed(true)}
-                                            className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors"
-                                            title="Collapse panel"
-                                        >
-                                            <ChevronsLeft size={16} weight="light" />
-                                        </button>
-                                    </div>
-
-                                    {/* Search */}
-                                    <div className="relative mb-3">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} weight="light" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            autoComplete="off"
-                                            name="component-search-nofill"
-                                            className="w-full pl-9 pr-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-[var(--text-tertiary)]"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div ref={sidebarScrollRef} className="flex-1 overflow-y-auto bg-[var(--bg-card)] custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
-                                    {/* Folder Structure */}
-                                    {(() => {
-                                        // Organize items into folders - reorganized for better clarity
-                                        const folderStructure: { [key: string]: { icon: React.ElementType, items: DraggableItem[] } } = {
-                                            'Recents': { icon: Clock, items: [] },
-                                            'Triggers': { icon: Play, items: DRAGGABLE_ITEMS.filter(i => ['trigger', 'webhook'].includes(i.type)) },
-                                            'Data Sources': { icon: Database, items: DRAGGABLE_ITEMS.filter(i => ['fetchData', 'excelInput', 'pdfInput', 'http', 'mysql', 'sapFetch', 'limsFetch', 'opcua', 'mqtt', 'osiPi', 'esios', 'climatiq', 'manualInput'].includes(i.type)) },
-                                            'Data Operations': { icon: GitMerge, items: DRAGGABLE_ITEMS.filter(i => ['join', 'splitColumns', 'addField', 'action'].includes(i.type)) },
-                                            'Control Flow': { icon: AlertCircle, items: DRAGGABLE_ITEMS.filter(i => ['condition', 'humanApproval', 'alertAgent', 'dataVisualization'].includes(i.type)) },
-                                            'Models': { icon: Sparkles, items: DRAGGABLE_ITEMS.filter(i => ['llm', 'statisticalAnalysis', 'franmit', 'conveyor'].includes(i.type)) },
-                                            'Code': { icon: Code, items: DRAGGABLE_ITEMS.filter(i => ['python'].includes(i.type)) },
-                                            'Output & Logging': { icon: LogOut, items: DRAGGABLE_ITEMS.filter(i => ['output', 'webhookResponse', 'saveRecords'].includes(i.type)) },
-                                            'Notifications': { icon: Mail, items: DRAGGABLE_ITEMS.filter(i => ['sendEmail', 'sendSMS', 'sendWhatsApp', 'pdfReport'].includes(i.type)) },
-                                            'Utils': { icon: Wrench, items: DRAGGABLE_ITEMS.filter(i => ['comment'].includes(i.type)) },
-                                        };
-
-                                        // Add recently used items to Recents (empty for now, can be populated dynamically)
-                                        folderStructure['Recents'].items = [];
-                                        
-                                        // Filter folders based on search and remove empty folders
-                                        const visibleFolders = Object.entries(folderStructure).filter(([folderName, folder]) => {
-                                            // Always show Recents even if empty
-                                            if (folderName === 'Recents') return true;
-                                            
-                                            // Remove empty folders when not searching
-                                            if (searchQuery === '' && folder.items.length === 0) return false;
-                                            
-                                            // When searching, show if folder name or items match
-                                            if (searchQuery !== '') {
-                                                const folderMatches = folderName.toLowerCase().includes(searchQuery.toLowerCase());
-                                                const itemsMatch = folder.items.some(item => 
-                                                    item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                    item.description.toLowerCase().includes(searchQuery.toLowerCase())
-                                                );
-                                                return folderMatches || itemsMatch;
-                                            }
-                                            
-                                            return true;
-                                        });
-
-                                        return visibleFolders.map(([folderName, folder]) => {
-                                            const filteredFolderItems = folder.items.filter(item => {
-                                                if (searchQuery === '') return true;
-                                                return item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                    item.description.toLowerCase().includes(searchQuery.toLowerCase());
-                                            });
-                                            
-                                            // Auto-expand folders when searching and they have matching items
-                                            const isExpanded = expandedFolders.has(folderName) || (searchQuery !== '' && filteredFolderItems.length > 0);
-
-                                            // Don't show folder if it has no items (except Recents)
-                                            if (folderName !== 'Recents' && filteredFolderItems.length === 0 && searchQuery === '') return null;
-                                            if (filteredFolderItems.length === 0 && searchQuery !== '') return null;
-
-                                            return (
-                                                <div key={folderName} className="border-b border-[var(--border-light)]">
-                                                    {/* Folder Header */}
-                                                    <button
-                                                        onClick={() => {
-                                                            const newExpanded = new Set(expandedFolders);
-                                                            if (isExpanded) {
-                                                                newExpanded.delete(folderName);
-                                                            } else {
-                                                                newExpanded.add(folderName);
-                                                            }
-                                                            setExpandedFolders(newExpanded);
-                                                        }}
-                                                        className={`w-full flex items-center justify-between px-4 py-2 ${getCategoryColors(folderName).bg} ${getCategoryColors(folderName).hover} transition-colors text-left`}
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            {React.createElement(folder.icon, { size: 14, className: "text-[var(--text-secondary)] flex-shrink-0", weight: "light" })}
-                                                            <span className="text-xs font-medium text-[var(--text-primary)]">{folderName}</span>
-                                                        </div>
-                                                        {isExpanded ? (
-                                                            <ChevronDown size={12} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
-                                                        ) : (
-                                                            <ChevronRight size={12} className="text-[var(--text-tertiary)] flex-shrink-0" weight="light" />
-                                                        )}
-                                                    </button>
-
-                                                    {/* Folder Items */}
-                                                    {isExpanded && filteredFolderItems.length > 0 && (
-                                                        <div className="pb-1">
-                                                            {filteredFolderItems.map((item) => (
-                                                                <div
-                                                                    key={item.label}
-                                                                    draggable
-                                                                    onDragStart={(e) => handleDragStart(e, item)}
-                                                                    className="flex items-center gap-2.5 px-4 py-1.5 pl-8 hover:bg-[var(--bg-tertiary)] cursor-grab transition-colors group"
-                                                                >
-                                                                    {React.createElement(item.icon, { size: 13, className: `${getNodeIconColor(item.type)} flex-shrink-0`, weight: "light" })}
-                                                                    <span className="text-xs text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors">{item.label}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        });
-                                    })()}
-                                </div>
-                            </>
-                        ) : (
-                            /* Collapsed view - icons only */
-                            <>
-                                <div className="p-2 border-b border-[var(--border-light)] bg-[var(--bg-card)] flex justify-center">
-                                    <button
-                                        onClick={() => setIsSidebarCollapsed(false)}
-                                        className="p-1.5 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-md transition-colors"
-                                        title="Expand panel"
-                                    >
-                                        <ChevronsRight size={18} weight="light" />
-                                    </button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto py-2 space-y-1.5 custom-scrollbar" style={{ minHeight: 0, height: 0, flex: '1 1 0%' }}>
-                                    {filteredItems.map((item) => (
-                                        <div
-                                            key={item.label}
-                                            draggable
-                                            onDragStart={(e) => handleDragStart(e, item)}
-                                            className="mx-2 p-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-md shadow-sm cursor-grab group flex items-center justify-center"
-                                            title={item.label}
-                                        >
-                                            <div className={`p-1 rounded ${item.category === 'Triggers' ? 'bg-cyan-100 text-cyan-700' :
-                                                item.category === 'Data' ? 'bg-[#256A65]/10 text-[#256A65]' :
-                                                    item.category === 'Logic' ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' :
-                                                        'bg-[#84C4D1]/20 text-[#256A65]'
-                                                }`}>
-                                                {React.createElement(item.icon, { size: 16, weight: "light" })}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
+                    <NodePaletteSidebar
+                        sidebarRef={sidebarRef}
+                        sidebarScrollRef={sidebarScrollRef}
+                        isSidebarCollapsed={isSidebarCollapsed}
+                        setIsSidebarCollapsed={setIsSidebarCollapsed}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        expandedFolders={expandedFolders}
+                        setExpandedFolders={setExpandedFolders}
+                        DRAGGABLE_ITEMS={DRAGGABLE_ITEMS}
+                        filteredItems={filteredItems}
+                        handleDragStart={handleDragStart}
+                        getCategoryColors={getCategoryColors}
+                        getNodeIconColor={getNodeIconColor}
+                    />
 
                     {/* Canvas */}
                     <div data-tutorial="workflow-canvas" className="flex-1 flex flex-col relative overflow-hidden bg-[var(--bg-primary)]">
@@ -4795,139 +4582,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                     </div> {/* Close Content Area (Sidebar + Canvas) */}
 
                         {/* AI Assistant Panel (Right Side) */}
-                        {showAiAssistant && (
-                            <div className="fixed top-0 right-0 w-[450px] h-screen bg-[var(--bg-card)] border-l border-[var(--border-light)] flex flex-col shadow-2xl z-50">
-                                {/* Header */}
-                            <div className="bg-[var(--bg-secondary)] border-b border-[var(--border-light)] px-6 py-4 text-[var(--text-primary)] flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <Sparkles size={24} />
-                                    <div>
-                                        <h3 className="font-normal text-lg">AI Workflow Assistant</h3>
-                                        <p className="text-sm text-[var(--text-tertiary)]">Ask me about your workflow</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setShowAiAssistant(false)}
-                                    className="p-1 hover:bg-[var(--bg-card)]/20 rounded-lg transition-colors"
-                                    title="Close"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-
-                            {/* Chat Messages */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--bg-tertiary)]">
-                                {aiChatMessages.length === 0 ? (
-                                    <div className="text-center py-12 text-[var(--text-tertiary)]">
-                                        <Sparkles size={48} className="mx-auto mb-4 opacity-50" />
-                                        <p className="text-sm font-medium text-[var(--text-secondary)]">AI Workflow Assistant</p>
-                                        <p className="text-xs mt-2 px-6">
-                                            I can help you build workflows, suggest nodes, and answer questions about your automation.
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <>
-                                        {aiChatMessages.map(message => (
-                                            <div
-                                                key={message.id}
-                                                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                                            >
-                                                <div className={`max-w-[85%] rounded-lg p-3 ${
-                                                    message.role === 'user'
-                                                        ? 'bg-slate-700 text-white'
-                                                        : 'bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-light)]'
-                                                }`}>
-                                                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                                                    
-                                                    {/* Workflow Suggestion Card */}
-                                                    {message.workflowSuggestion && (
-                                                        <div className="mt-3 p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-medium)]">
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <Workflow size={16} className="text-[var(--text-secondary)]" />
-                                                                <span className="text-xs font-normal text-[var(--text-primary)] uppercase tracking-wide">
-                                                                    Workflow Suggestion
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-xs text-[var(--text-secondary)] mb-3">
-                                                                {message.workflowSuggestion.description}
-                                                            </p>
-                                                            
-                                                            {message.workflowSuggestion.status === 'pending' && (
-                                                                <div className="flex gap-2">
-                                                                    <button
-                                                                        onClick={handleAcceptWorkflowSuggestion}
-                                                                        className="flex-1 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded text-xs font-medium transition-colors flex items-center justify-center gap-1"
-                                                                    >
-                                                                        <Check size={14} />
-                                                                        Accept
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={handleRejectWorkflowSuggestion}
-                                                                        className="flex-1 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-xs font-medium hover:bg-[var(--border-medium)] transition-colors flex items-center justify-center gap-1"
-                                                                    >
-                                                                        <XCircle size={14} />
-                                                                        Reject
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {message.workflowSuggestion.status === 'accepted' && (
-                                                                <div className="flex items-center gap-2 text-[#256A65] text-xs font-medium">
-                                                                    <CheckCircle size={14} />
-                                                                    <span>Applied to workflow</span>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {message.workflowSuggestion.status === 'rejected' && (
-                                                                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-xs font-medium">
-                                                                    <XCircle size={14} />
-                                                                    <span>Rejected</span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                        <div ref={aiChatMessagesEndRef} />
-                                    </>
-                                )}
-                            </div>
-
-                            {/* Input Area */}
-                            <div className="p-4 border-t border-[var(--border-light)] bg-[var(--bg-card)]">
-                                {isAiChatLoading && (
-                                    <div className="mb-3 flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                                        <div className="w-4 h-4 border-2 border-[var(--border-medium)] border-t-slate-600 rounded-full animate-spin" />
-                                        <span>Thinking...</span>
-                                    </div>
-                                )}
-                                <div className="flex gap-2">
-                                    <textarea
-                                        value={aiChatInput}
-                                        onChange={(e) => setAiChatInput(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                handleSendWorkflowAiMessage();
-                                            }
-                                        }}
-                                        placeholder="Ask me to add nodes, modify connections, or explain your workflow..."
-                                        className="flex-1 px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm resize-none focus:ring-2 focus:ring-slate-500 focus:border-transparent outline-none"
-                                        rows={2}
-                                        disabled={isAiChatLoading}
-                                    />
-                                    <button
-                                        onClick={handleSendWorkflowAiMessage}
-                                        disabled={!aiChatInput.trim() || isAiChatLoading}
-                                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-[#555555] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                                    >
-                                        <Sparkles size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        )}
+                        <AIAssistantSidePanel
+                            show={showAiAssistant}
+                            onClose={() => setShowAiAssistant(false)}
+                            messages={aiChatMessages}
+                            chatInput={aiChatInput}
+                            setChatInput={setAiChatInput}
+                            isLoading={isAiChatLoading}
+                            onSend={handleSendWorkflowAiMessage}
+                            onAcceptSuggestion={handleAcceptWorkflowSuggestion}
+                            onRejectSuggestion={handleRejectWorkflowSuggestion}
+                            messagesEndRef={aiChatMessagesEndRef}
+                        />
 
                         {/* Configuration Modal */}
                         {configuringNodeId && (
