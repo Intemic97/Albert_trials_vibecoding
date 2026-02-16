@@ -45,15 +45,15 @@
   --sidebar-text-hover: #505050;
   --sidebar-text-active: #F8F8F8;
   --sidebar-bg-hover: rgba(112, 112, 112, 0.1);
-  --sidebar-bg-active: #616365;
+  --sidebar-bg-active: rgba(91, 116, 118, 1);
   --sidebar-border: #E0E0E0;
   --sidebar-icon: #707070;
   --sidebar-icon-active: #F8F8F8;
   --sidebar-section-label: #707070;
   
   /* Accents - Primary teal (Login/CTA buttons) */
-  --accent-primary: #256A65;
-  --accent-primary-hover: #1e5a55;
+  --accent-primary: rgba(47, 107, 111, 1);
+  --accent-primary-hover: #2a6266;
   --accent-success: #0F766E;
   --accent-warning: #D97706;
   --accent-error: #DC2626;
@@ -105,15 +105,15 @@
   --sidebar-text-hover: #E8E8E8;
   --sidebar-text-active: #E8E8E8;
   --sidebar-bg-hover: rgba(255, 255, 255, 0.05);
-  --sidebar-bg-active: #37352F;
+  --sidebar-bg-active: rgba(91, 116, 118, 1);
   --sidebar-border: #333333;
   --sidebar-icon: #9B9B9B;
   --sidebar-icon-active: #E8E8E8;
   --sidebar-section-label: #6B6B6B;
   
   /* Accents - Primary teal (Login/CTA buttons) */
-  --accent-primary: #256A65;
-  --accent-primary-hover: #1e5a55;
+  --accent-primary: rgba(47, 107, 111, 1);
+  --accent-primary-hover: #2a6266;
   --accent-success: #2DD4BF;
   --accent-warning: #FBBF24;
   --accent-error: #F87171;

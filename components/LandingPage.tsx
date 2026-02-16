@@ -293,7 +293,7 @@ export function LandingPage() {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full bg-[var(--bg-selected)] hover:bg-[#555555] text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                         >
                             {isLoading ? (
                                 <SpinnerGap className="w-5 h-5 animate-spin" weight="light" />

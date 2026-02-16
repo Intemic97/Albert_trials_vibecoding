@@ -123,7 +123,7 @@ export const ExcelConfigPanel: React.FC<ExcelConfigPanelProps> = ({
                                 onRun?.(nodeId);
                                 onClose();
                             }}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-[#256A65] hover:bg-[#1d5450] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                            className="flex items-center gap-1.5 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                         >
                             <Play size={14} weight="fill" />
                             Run

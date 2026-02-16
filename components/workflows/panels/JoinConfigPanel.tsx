@@ -73,7 +73,7 @@ export const JoinConfigPanel: React.FC<JoinConfigPanelProps> = ({
                 </button>
                 <button
                     onClick={handleSave}
-                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                    className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                 >
                     Save
                 </button>
@@ -167,7 +167,7 @@ export const JoinConfigPanel: React.FC<JoinConfigPanelProps> = ({
                                     </optgroup>
                                 </select>
                                 {commonFields.length > 0 && (
-                                    <p className="text-xs text-[#256A65] mt-1.5">
+                                    <p className="text-xs text-[var(--accent-primary)] mt-1.5">
                                         ✓ {commonFields.length} common field(s) found
                                     </p>
                                 )}

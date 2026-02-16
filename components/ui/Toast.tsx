@@ -36,8 +36,8 @@ const styleMap: Record<NotificationType, { bg: string; border: string; icon: str
   info: {
     bg: 'bg-[#84C4D1]/20 dark:bg-[#84C4D1]/10',
     border: 'border-[#84C4D1]/40 dark:border-[#84C4D1]/30',
-    icon: 'text-[#256A65]',
-    title: 'text-[#256A65] dark:text-[#84C4D1]',
+    icon: 'text-[var(--accent-primary)]',
+    title: 'text-[var(--accent-primary)] dark:text-[#84C4D1]',
   },
 };
 

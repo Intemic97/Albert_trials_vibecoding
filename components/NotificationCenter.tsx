@@ -66,7 +66,7 @@ export const NotificationBell = React.forwardRef<HTMLButtonElement, Notification
             >
                 <Bell size={16} className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]" weight="light" />
                 {hasUnread && (
-                    <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#256A65] rounded-full" />
+                    <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full" />
                 )}
             </button>
         );
@@ -244,10 +244,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
             {/* Header */}
             <div className="px-4 py-3 border-b border-[var(--border-light)] flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <Bell size={16} className="text-[#256A65]" weight="light" />
+                    <Bell size={16} className="text-[var(--accent-primary)]" weight="light" />
                     <h3 className="text-sm font-medium text-[var(--text-primary)]">Notifications</h3>
                     {unreadCount > 0 && (
-                        <span className="px-1.5 py-0.5 bg-[#256A65] text-white text-[10px] font-bold rounded-full">
+                        <span className="px-1.5 py-0.5 bg-[var(--accent-primary)] text-white text-[10px] font-bold rounded-full">
                             {unreadCount}
                         </span>
                     )}
@@ -256,7 +256,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                     {unreadCount > 0 && (
                         <button
                             onClick={markAllAsRead}
-                            className="p-1.5 text-xs text-[#256A65] hover:bg-[#256A65]/10 rounded-lg transition-colors"
+                            className="p-1.5 text-xs text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded-lg transition-colors"
                         >
                             Mark all read
                         </button>
@@ -278,7 +278,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                         onClick={() => setActiveTab(tab)}
                         className={`flex-1 px-4 py-2 text-xs font-medium transition-colors ${
                             activeTab === tab
-                                ? 'text-[#256A65] border-b-2 border-[#256A65] -mb-px'
+                                ? 'text-[var(--accent-primary)] border-b-2 border-[var(--accent-primary)] -mb-px'
                                 : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                         }`}
                     >
@@ -306,7 +306,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                                 >
                                     <div className="flex items-center gap-3">
                                         <div className={`p-1.5 rounded-lg ${
-                                            config.source === 'workflow' ? 'bg-[#84C4D1]/20 text-[#256A65]' :
+                                            config.source === 'workflow' ? 'bg-[#84C4D1]/20 text-[var(--accent-primary)]' :
                                             config.source === 'data' ? 'bg-amber-100 text-amber-600' :
                                             'bg-[var(--bg-card)] text-[var(--text-secondary)]'
                                         }`}>
@@ -322,7 +322,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                                     <button
                                         onClick={() => toggleAlertConfig(config.id)}
                                         className={`relative w-10 h-5 rounded-full transition-colors ${
-                                            config.enabled ? 'bg-[#256A65]' : 'bg-[var(--border-medium)]'
+                                            config.enabled ? 'bg-[var(--accent-primary)]' : 'bg-[var(--border-medium)]'
                                         }`}
                                     >
                                         <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
@@ -401,7 +401,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
             case 'success': return <CheckCircle size={16} className="text-emerald-500" weight="fill" />;
             case 'warning': return <WarningCircle size={16} className="text-amber-500" weight="fill" />;
             case 'error': return <XCircle size={16} className="text-red-500" weight="fill" />;
-            default: return <Info size={16} className="text-[#256A65]" weight="fill" />;
+            default: return <Info size={16} className="text-[var(--accent-primary)]" weight="fill" />;
         }
     };
 
@@ -425,12 +425,12 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
     return (
         <div
             className={`relative p-4 hover:bg-[var(--bg-tertiary)] transition-colors group ${
-                !notification.read ? 'bg-[#256A65]/5' : ''
+                !notification.read ? 'bg-[var(--accent-primary)]/5' : ''
             }`}
         >
             {/* Unread indicator */}
             {!notification.read && (
-                <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-[#256A65] rounded-full" />
+                <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-[var(--accent-primary)] rounded-full" />
             )}
             
             <div className="flex gap-3">
@@ -444,7 +444,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
                             {!notification.read && (
                                 <button
                                     onClick={onMarkAsRead}
-                                    className="p-1 text-[var(--text-tertiary)] hover:text-[#256A65] hover:bg-[#256A65]/10 rounded transition-colors"
+                                    className="p-1 text-[var(--text-tertiary)] hover:text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded transition-colors"
                                     title="Mark as read"
                                 >
                                     <Check size={12} weight="bold" />

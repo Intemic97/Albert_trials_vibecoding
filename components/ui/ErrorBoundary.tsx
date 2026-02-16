@@ -143,7 +143,7 @@ export const ErrorFallback: React.FC<ErrorFallbackProps> = ({
                     {onReset && (
                         <button
                             onClick={onReset}
-                            className="flex items-center gap-2 px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-sm font-medium transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
                         >
                             <ArrowClockwise size={16} weight="light" />
                             Try Again

@@ -209,7 +209,7 @@ export const LogsAndAlerts: React.FC = () => {
             case 'completed':
                 return <CheckCircle size={16} weight="light" className="text-emerald-600" />;
             case 'running':
-                return <Loader2 size={16} weight="light" className="text-[#256A65] animate-spin" />;
+                return <Loader2 size={16} weight="light" className="text-[var(--accent-primary)] animate-spin" />;
             case 'failed':
                 return <XCircle size={16} weight="light" className="text-red-600" />;
             case 'pending':
@@ -222,7 +222,7 @@ export const LogsAndAlerts: React.FC = () => {
     const getStatusBadge = (status: string) => {
         const styles = {
             completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-            running: 'bg-[#84C4D1]/20 text-[#256A65] border-[#84C4D1]/40',
+            running: 'bg-[#84C4D1]/20 text-[var(--accent-primary)] border-[#84C4D1]/40',
             failed: 'bg-red-50 text-red-700 border-red-200',
             pending: 'bg-amber-500/15 text-amber-500 border-amber-500/30'
         };
@@ -570,7 +570,7 @@ export const LogsAndAlerts: React.FC = () => {
                                         const alertIcons = {
                                             error: <XCircle size={16} weight="light" className="text-red-600" />,
                                             warning: <AlertTriangle size={16} weight="light" className="text-amber-600" />,
-                                            info: <Info size={16} weight="light" className="text-[#256A65]" />,
+                                            info: <Info size={16} weight="light" className="text-[var(--accent-primary)]" />,
                                             success: <CheckCircle size={16} weight="light" className="text-emerald-600" />
                                         };
                                         const alertStyles = {

@@ -43,11 +43,11 @@ export const ExecutionStatusIndicator: React.FC<ExecutionStatusIndicatorProps> =
                 <div className="flex items-center gap-1.5">
                     <SpinnerGap 
                         size={iconSize} 
-                        className="text-[#256A65] animate-spin" 
+                        className="text-[var(--accent-primary)] animate-spin" 
                         weight="light" 
                     />
                     {showLabel && (
-                        <span className={`${textSize} text-[#256A65] font-medium`}>
+                        <span className={`${textSize} text-[var(--accent-primary)] font-medium`}>
                             {execution?.progress?.percentage 
                                 ? `${execution.progress.percentage}%`
                                 : 'Running...'}
@@ -122,7 +122,7 @@ export const ExecutionProgressBar: React.FC<{ workflowId: string }> = ({ workflo
     return (
         <div className="w-full bg-[var(--bg-tertiary)] rounded-full h-1 overflow-hidden">
             <div 
-                className="bg-[#256A65] h-1 rounded-full transition-all duration-300 ease-out"
+                className="bg-[var(--accent-primary)] h-1 rounded-full transition-all duration-300 ease-out"
                 style={{ width: `${percentage}%` }}
             />
         </div>

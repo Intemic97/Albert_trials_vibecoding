@@ -59,7 +59,7 @@ export const SkipLink: React.FC<SkipLinkProps> = ({
     return (
         <a
             href={href}
-            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-[#256A65] focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-[var(--accent-primary)] focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none"
         >
             {children}
         </a>

@@ -167,7 +167,7 @@ const VersionItem: React.FC<VersionItemProps> = ({
         <div 
             className={`relative border rounded-lg transition-all duration-200 ${
                 isSelected 
-                    ? 'border-[#256A65] bg-[#256A65]/5' 
+                    ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5' 
                     : isCompareSource || isCompareTarget
                         ? 'border-amber-500/50 bg-amber-500/5'
                         : 'border-[var(--border-light)] hover:border-[var(--border-medium)] bg-[var(--bg-card)]'
@@ -177,7 +177,7 @@ const VersionItem: React.FC<VersionItemProps> = ({
             <div className="absolute left-4 top-0 bottom-0 w-px bg-[var(--border-light)]" />
             <div className={`absolute left-3 top-6 w-2.5 h-2.5 rounded-full border-2 ${
                 version.isCurrentVersion 
-                    ? 'bg-[#256A65] border-[#256A65]' 
+                    ? 'bg-[var(--accent-primary)] border-[var(--accent-primary)]' 
                     : 'bg-[var(--bg-card)] border-[var(--border-medium)]'
             }`} />
 
@@ -193,7 +193,7 @@ const VersionItem: React.FC<VersionItemProps> = ({
                                 v{version.versionNumber}
                             </span>
                             {version.isCurrentVersion && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[#256A65]/20 text-[#256A65] rounded">
+                                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] rounded">
                                     Current
                                 </span>
                             )}
@@ -268,7 +268,7 @@ const VersionItem: React.FC<VersionItemProps> = ({
                         {!version.isCurrentVersion && (
                             <button
                                 onClick={onRestore}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-[#256A65] hover:bg-[#256A65]/10 rounded-md transition-colors ml-auto"
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded-md transition-colors ml-auto"
                             >
                                 <ArrowCounterClockwise size={14} weight="light" />
                                 Restore
@@ -294,7 +294,7 @@ const CompareView: React.FC<CompareViewProps> = ({ sourceVersion, targetVersion,
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)]">
                 <div className="flex items-center gap-2">
-                    <ArrowsLeftRight size={16} className="text-[#256A65]" weight="light" />
+                    <ArrowsLeftRight size={16} className="text-[var(--accent-primary)]" weight="light" />
                     <span className="text-sm font-medium text-[var(--text-primary)]">
                         Comparing v{sourceVersion.versionNumber} → v{targetVersion.versionNumber}
                     </span>
@@ -456,8 +456,8 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)]">
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-[#256A65]/10 flex items-center justify-center">
-                            <ClockCounterClockwise size={18} className="text-[#256A65]" weight="light" />
+                        <div className="w-9 h-9 rounded-lg bg-[var(--accent-primary)]/10 flex items-center justify-center">
+                            <ClockCounterClockwise size={18} className="text-[var(--accent-primary)]" weight="light" />
                         </div>
                         <div>
                             <h2 className="text-sm font-medium text-[var(--text-primary)]">Version History</h2>
@@ -533,7 +533,7 @@ export const VersionHistory: React.FC<VersionHistoryProps> = ({
                 {isRestoring && (
                     <div className="px-5 py-4 border-t border-[var(--border-light)] bg-[var(--bg-tertiary)]">
                         <div className="flex items-center gap-3">
-                            <SpinnerGap size={16} className="animate-spin text-[#256A65]" weight="light" />
+                            <SpinnerGap size={16} className="animate-spin text-[var(--accent-primary)]" weight="light" />
                             <span className="text-sm text-[var(--text-secondary)]">Restoring version...</span>
                         </div>
                     </div>

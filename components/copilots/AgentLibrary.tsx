@@ -92,7 +92,7 @@ export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAge
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowCreateWorkflow(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
             >
               <Plus size={16} weight="bold" />
               Nuevo Agente
@@ -113,7 +113,7 @@ export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAge
               <p className="text-[var(--text-secondary)] mb-4">No hay agentes configurados</p>
               <button
                 onClick={() => setShowCreateWorkflow(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium shadow-sm"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium shadow-sm"
               >
                 <Plus size={16} />
                 Crear primer agente
@@ -171,7 +171,7 @@ export const AgentLibrary: React.FC<AgentLibraryProps> = ({ onClose, onSelectAge
                     className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       selectedAgentId === agent.id
                         ? 'bg-[var(--bg-selected)] text-white ring-2 ring-[var(--bg-selected)]/30'
-                        : 'bg-[var(--bg-selected)] hover:bg-[#555555] text-white'
+                        : 'bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white'
                     }`}
                   >
                     {selectedAgentId === agent.id ? 'Seleccionado' : 'Usar'}

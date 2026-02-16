@@ -781,7 +781,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     <div className="flex items-center gap-2">
                         <button
                             onClick={() => setShowKnowledgeGraph(true)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-[#419CAF]/10 hover:bg-[#419CAF]/20 text-[#419CAF] rounded-lg text-xs font-medium transition-colors"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)]/10 hover:bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] rounded-lg text-xs font-medium transition-colors"
                             title="View knowledge graph"
                         >
                             <TreeStructure size={14} weight="light" />
@@ -806,7 +806,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         </button>
                         <button
                             onClick={() => openCreateFolderModal(currentFolderId)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-colors"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-colors"
                             title={currentFolder ? `Create subfolder in "${currentFolder.name}"` : 'Create new folder'}
                         >
                             <FolderPlus size={14} weight="light" />
@@ -913,7 +913,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         </button>
                                         <button
                                             onClick={() => openCreateFolderModal(currentFolderId)}
-                                            className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-colors"
+                                            className="flex items-center gap-2 px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-colors"
                                         >
                                             <FolderPlus size={14} weight="light" />
                                             New Folder
@@ -1234,7 +1234,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             <button
                                 onClick={handleCreateFolder}
                                 disabled={!newFolderName.trim()}
-                                className="px-4 py-2 text-sm bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-4 py-2 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Create
                             </button>
@@ -1367,7 +1367,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         <button
                                             onClick={handleCreateEntity}
                                             disabled={!newEntityName.trim()}
-                                            className="px-4 py-2 text-sm bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="px-4 py-2 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Create
                                         </button>
@@ -1514,7 +1514,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         <button
                                             onClick={executeImport}
                                             disabled={importColumns.filter(c => c.include).length === 0}
-                                            className="px-4 py-2 text-sm bg-[#419CAF] hover:bg-[#3a8a9d] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="px-4 py-2 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Import {importPreviewData.length} Records
                                         </button>
@@ -1594,7 +1594,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             </button>
                             <button
                                 onClick={() => handleUpdateFolder(editingFolder)}
-                                className="px-4 py-2 text-sm bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-colors"
+                                className="px-4 py-2 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors"
                             >
                                 Save
                             </button>

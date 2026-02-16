@@ -51,15 +51,15 @@ export const lightTheme = {
   sidebarTextHover: '#505050',
   sidebarTextActive: '#F8F8F8',
   sidebarBgHover: 'rgba(112, 112, 112, 0.1)',
-  sidebarBgActive: '#464545',
+  sidebarBgActive: '#667475',
   sidebarBorder: '#E0E0E0',
   sidebarIcon: '#707070',
   sidebarIconActive: '#F8F8F8',
   sidebarSectionLabel: '#707070',
   
   // Accents - Primary teal (Login/CTA buttons)
-  accentPrimary: '#256A65',
-  accentPrimaryHover: '#1e5a55',
+  accentPrimary: '#5B7476',
+  accentPrimaryHover: '#526a6c',
   accentSuccess: '#0F766E',
   accentWarning: '#D97706',
   accentError: '#DC2626',
@@ -114,8 +114,8 @@ export const darkTheme = {
   sidebarSectionLabel: '#6B6B6B',
   
   // Accents - Primary teal (same as Login)
-  accentPrimary: '#256A65',
-  accentPrimaryHover: '#1e5a55',
+  accentPrimary: '#5B7476',
+  accentPrimaryHover: '#526a6c',
   accentSuccess: '#2DD4BF',
   accentWarning: '#FBBF24',
   accentError: '#F87171',

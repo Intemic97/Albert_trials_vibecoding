@@ -639,7 +639,7 @@ O escríbelas manualmente si prefieres.`}
             }}
             disabled={(step > 0 && !canAdvance()) || loading}
             style={{ visibility: step === 0 ? 'hidden' : 'visible' }}
-            className="flex items-center gap-2 px-6 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none active:scale-95"
+            className="flex items-center gap-2 px-6 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none active:scale-95"
           >
             {step === (hasGuidedStart ? totalSteps - 1 : totalSteps) ? (
               <>

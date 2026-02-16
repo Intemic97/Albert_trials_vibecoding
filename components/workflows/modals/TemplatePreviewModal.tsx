@@ -161,7 +161,7 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
             <button
               onClick={() => { copyTemplateToWorkflows(template); onClose(); }}
               disabled={isCopyingTemplate}
-              className="px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:shadow-md"
+              className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:shadow-md"
             >
               {isCopyingTemplate ? (
                 <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Copying...</>

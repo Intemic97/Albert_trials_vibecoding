@@ -231,8 +231,8 @@ const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({ onClose }
                 {/* Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-light)]">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#256A65]/10 flex items-center justify-center">
-                            <Keyboard size={20} className="text-[#256A65]" weight="light" />
+                        <div className="w-10 h-10 rounded-lg bg-[var(--accent-primary)]/10 flex items-center justify-center">
+                            <Keyboard size={20} className="text-[var(--accent-primary)]" weight="light" />
                         </div>
                         <div>
                             <h2 className="text-base font-medium text-[var(--text-primary)]">Keyboard Shortcuts</h2>

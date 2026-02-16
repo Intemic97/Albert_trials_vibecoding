@@ -37,13 +37,13 @@ export const AIPromptSection: React.FC<AIPromptSectionProps> = ({
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={placeholder}
                     onKeyDown={(e) => e.key === 'Enter' && !isGenerating && onGenerate()}
-                    className="flex-1 px-3 py-2 bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
+                    className="flex-1 px-3 py-2 bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
                     disabled={isGenerating}
                 />
                 <button
                     onClick={onGenerate}
                     disabled={isGenerating || !value.trim()}
-                    className="flex items-center px-3 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2 whitespace-nowrap"
+                    className="flex items-center px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2 whitespace-nowrap"
                 >
                     {isGenerating ? (
                         <>

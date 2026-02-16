@@ -290,7 +290,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)]">
         <div className="flex items-center gap-2">
-          <Sparkles size={20} className="text-[#256A65]" weight="fill" />
+          <Sparkles size={20} className="text-[var(--accent-primary)]" weight="fill" />
           <span className="font-medium text-[var(--text-primary)]">AI Assistant</span>
         </div>
         <button
@@ -307,7 +307,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
           onClick={() => setMode('generate')}
           className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
             mode === 'generate'
-              ? 'text-[#256A65] border-b-2 border-[#256A65] bg-[#256A65]/5'
+              ? 'text-[var(--accent-primary)] border-b-2 border-[var(--accent-primary)] bg-[var(--accent-primary)]/5'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -317,7 +317,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
           onClick={() => setMode('chat')}
           className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
             mode === 'chat'
-              ? 'text-[#256A65] border-b-2 border-[#256A65] bg-[#256A65]/5'
+              ? 'text-[var(--accent-primary)] border-b-2 border-[var(--accent-primary)] bg-[var(--accent-primary)]/5'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -370,7 +370,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
                   <p className="text-xs font-medium text-[var(--text-tertiary)]">Nodos:</p>
                   {generatedWorkflow.nodes.map((node: any, i: number) => (
                     <div key={i} className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-secondary)] rounded-lg text-sm">
-                      <span className="w-5 h-5 rounded bg-[#256A65]/20 flex items-center justify-center text-xs text-[#256A65]">
+                      <span className="w-5 h-5 rounded bg-[var(--accent-primary)]/20 flex items-center justify-center text-xs text-[var(--accent-primary)]">
                         {i + 1}
                       </span>
                       <span className="text-[var(--text-primary)]">{node.label}</span>
@@ -382,7 +382,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
                 <div className="flex gap-2">
                   <button
                     onClick={() => applyWorkflow('replace')}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-colors text-sm font-medium"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[var(--accent-primary)] text-white rounded-lg hover:bg-[var(--accent-primary-hover)] transition-colors text-sm font-medium"
                   >
                     <ArrowsClockwise size={16} />
                     Reemplazar
@@ -422,15 +422,15 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
                   className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : ''}`}
                 >
                   {msg.role === 'assistant' && (
-                    <div className="w-7 h-7 rounded-full bg-[#256A65]/10 flex items-center justify-center flex-shrink-0">
-                      <Robot size={16} className="text-[#256A65]" />
+                    <div className="w-7 h-7 rounded-full bg-[var(--accent-primary)]/10 flex items-center justify-center flex-shrink-0">
+                      <Robot size={16} className="text-[var(--accent-primary)]" />
                     </div>
                   )}
                   
                   <div
                     className={`max-w-[80%] rounded-lg px-3 py-2 ${
                       msg.role === 'user'
-                        ? 'bg-[#256A65] text-white'
+                        ? 'bg-[var(--accent-primary)] text-white'
                         : 'bg-[var(--bg-secondary)] text-[var(--text-primary)]'
                     }`}
                   >
@@ -458,8 +458,8 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
             
             {isLoading && (
               <div className="flex gap-3">
-                <div className="w-7 h-7 rounded-full bg-[#256A65]/10 flex items-center justify-center">
-                  <SpinnerGap size={16} className="text-[#256A65] animate-spin" />
+                <div className="w-7 h-7 rounded-full bg-[var(--accent-primary)]/10 flex items-center justify-center">
+                  <SpinnerGap size={16} className="text-[var(--accent-primary)] animate-spin" />
                 </div>
                 <div className="bg-[var(--bg-secondary)] rounded-lg px-3 py-2">
                   <div className="flex gap-1">
@@ -488,14 +488,14 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
               ? 'Describe el workflow que quieres crear...'
               : 'Escribe tu mensaje...'
             }
-            className="w-full px-4 py-3 pr-12 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] resize-none focus:outline-none focus:border-[#256A65]"
+            className="w-full px-4 py-3 pr-12 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] resize-none focus:outline-none focus:border-[var(--accent-primary)]"
             rows={3}
             disabled={isLoading}
           />
           <button
             onClick={mode === 'generate' ? handleGenerateWorkflow : handleSendMessage}
             disabled={!prompt.trim() || isLoading}
-            className="absolute right-3 bottom-3 p-2 bg-[#256A65] text-white rounded-lg hover:bg-[#1e554f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="absolute right-3 bottom-3 p-2 bg-[var(--accent-primary)] text-white rounded-lg hover:bg-[var(--accent-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <SpinnerGap size={18} className="animate-spin" />

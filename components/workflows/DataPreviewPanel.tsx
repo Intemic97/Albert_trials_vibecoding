@@ -163,7 +163,7 @@ export const DataPreviewPanel: React.FC<DataPreviewPanelProps> = ({
             >
                 <div className="flex items-center gap-2">
                     {isExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
-                    <Eye size={14} className="text-[#256A65]" weight="light" />
+                    <Eye size={14} className="text-[var(--accent-primary)]" weight="light" />
                     <span className="text-xs font-medium text-[var(--text-primary)]">Data Preview</span>
                     {previewData && (
                         <span className="text-xs text-[var(--text-tertiary)]">
@@ -222,7 +222,7 @@ export const DataPreviewPanel: React.FC<DataPreviewPanelProps> = ({
                                                 onClick={() => toggleColumn(col)}
                                                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                                                     selectedColumns.has(col)
-                                                        ? 'bg-[#256A65]/10 text-[#256A65] border border-[#256A65]/30'
+                                                        ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30'
                                                         : 'bg-[var(--bg-card)] text-[var(--text-tertiary)] border border-[var(--border-light)]'
                                                 }`}
                                             >

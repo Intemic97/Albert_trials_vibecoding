@@ -62,7 +62,7 @@ const AGGREGATIONS = [
 ];
 
 const CHART_COLORS = [
-    ['#256A65', '#84C4D1', '#3d8a84', '#5ba9a3'],
+    ['#5B7476', '#84C4D1', '#3d8a84', '#5ba9a3'],
     ['#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE'],
     ['#10B981', '#34D399', '#6EE7B7', '#A7F3D0'],
     ['#F59E0B', '#FBBF24', '#FCD34D', '#FDE68A'],
@@ -700,7 +700,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-[#256A65] rounded-lg text-white">
+                            <div className="p-2 bg-[var(--accent-primary)] rounded-lg text-white">
                                 <Sparkle size={20} weight="light" />
                             </div>
                             <div>
@@ -777,7 +777,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                     type="text"
                                     value={title}
                                     onChange={e => setTitle(e.target.value)}
-                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                 />
                             </div>
 
@@ -787,7 +787,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                 <select
                                     value={selectedEntityId}
                                     onChange={e => setSelectedEntityId(e.target.value)}
-                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                 >
                                     <option value="">Select entity...</option>
                                     {entities.map(entity => (
@@ -806,7 +806,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                         <select
                                             value={xAxisColumn}
                                             onChange={e => setXAxisColumn(e.target.value)}
-                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                         >
                                             <option value="">Select column...</option>
                                             {allColumns.map(col => (
@@ -823,7 +823,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                         <select
                                             value={yAxisColumn}
                                             onChange={e => setYAxisColumn(e.target.value)}
-                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                         >
                                             <option value="">Select column...</option>
                                             {numericColumns.map(col => (
@@ -840,7 +840,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                         <select
                                             value={aggregation}
                                             onChange={e => setAggregation(e.target.value)}
-                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                         >
                                             {AGGREGATIONS.map(agg => (
                                                 <option key={agg.value} value={agg.value}>{agg.label}</option>
@@ -857,7 +857,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                             <select
                                                 value={groupBy}
                                                 onChange={e => setGroupBy(e.target.value)}
-                                                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                             >
                                                 <option value="">Select column...</option>
                                                 {allColumns.map(col => (
@@ -875,7 +875,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                             <select
                                                 value={sizeColumn}
                                                 onChange={e => setSizeColumn(e.target.value)}
-                                                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                             >
                                                 <option value="">Use Y value as size</option>
                                                 {numericColumns.map(col => (
@@ -894,7 +894,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                                 <select
                                                     value={sourceColumn}
                                                     onChange={e => setSourceColumn(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                                 >
                                                     <option value="">Select column...</option>
                                                     {allColumns.map(col => (
@@ -909,7 +909,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                                 <select
                                                     value={targetColumn}
                                                     onChange={e => setTargetColumn(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                                 >
                                                     <option value="">Select column...</option>
                                                     {allColumns.map(col => (
@@ -929,7 +929,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                                 <select
                                                     value={dateColumn}
                                                     onChange={e => setDateColumn(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                                 >
                                                     <option value="">Select column...</option>
                                                     {allColumns.map(col => (
@@ -945,7 +945,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                                     <select
                                                         value={trackColumn}
                                                         onChange={e => setTrackColumn(e.target.value)}
-                                                        className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                        className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                                     >
                                                         <option value="">Select column...</option>
                                                         {allColumns.map(col => (
@@ -961,7 +961,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                                 <select
                                                     value={severityColumn}
                                                     onChange={e => setSeverityColumn(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                                 >
                                                     <option value="">Default medium</option>
                                                     {allColumns.map(col => (
@@ -976,7 +976,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                                 <select
                                                     value={labelColumn}
                                                     onChange={e => setLabelColumn(e.target.value)}
-                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                                 >
                                                     <option value="">Use record id</option>
                                                     {allColumns.map(col => (
@@ -998,7 +998,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                             onChange={e => setLimit(parseInt(e.target.value) || 10)}
                                             min={1}
                                             max={100}
-                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
                                         />
                                     </div>
 
@@ -1014,7 +1014,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                                     onClick={() => setSelectedColorIndex(index)}
                                                     className={`flex gap-0.5 p-1.5 rounded-lg border-2 transition-colors ${
                                                         selectedColorIndex === index
-                                                            ? 'border-[#256A65]'
+                                                            ? 'border-[var(--accent-primary)]'
                                                             : 'border-transparent hover:border-[var(--border-medium)]'
                                                     }`}
                                                 >
@@ -1110,7 +1110,7 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                     <button
                         onClick={handleSave}
                         disabled={!isValid}
-                        className="px-4 py-2 bg-[#256A65] hover:bg-[#1e5a55] disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-tertiary)] text-white rounded-lg text-sm font-medium transition-colors"
+                        className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-tertiary)] text-white rounded-lg text-sm font-medium transition-colors"
                     >
                         {submitLabel || 'Add Widget'}
                     </button>

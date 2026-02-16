@@ -182,9 +182,9 @@ const PaletteItem: React.FC<PaletteItemProps> = ({ item, onDragStart, onDragEnd 
     >
       <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
         item.category === 'Triggers' ? 'bg-amber-100 text-amber-700' :
-        item.category === 'Data' ? 'bg-[#256A65]/10 text-[#256A65]' :
+        item.category === 'Data' ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]' :
         item.category === 'Logic' ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' :
-        'bg-[#84C4D1]/20 text-[#256A65]'
+        'bg-[#84C4D1]/20 text-[var(--accent-primary)]'
       }`}>
         <Icon size={16} weight="light" />
       </div>

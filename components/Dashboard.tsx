@@ -3005,7 +3005,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             {selectedDashboard && (
                                 <button
                                     onClick={() => setShowWidgetGallery(true)}
-                                    className="fixed bottom-8 right-8 bg-[#256A65] text-white rounded-2xl px-5 py-3.5 shadow-xl hover:shadow-2xl hover:bg-[#1e5a55] transition-all duration-300 z-50 flex items-center gap-3 group hover:scale-105 active:scale-95"
+                                    className="fixed bottom-8 right-8 bg-[var(--accent-primary)] text-white rounded-2xl px-5 py-3.5 shadow-xl hover:shadow-2xl hover:bg-[var(--accent-primary-hover)] transition-all duration-300 z-50 flex items-center gap-3 group hover:scale-105 active:scale-95"
                                     title="Add Widget"
                                 >
                                     <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center group-hover:bg-white/30 transition-colors">
@@ -3253,7 +3253,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                                         className={`px-4 py-2.5 rounded-lg flex items-center gap-2 text-sm font-medium transition-all shrink-0 ${
                                             copied 
                                                 ? 'bg-green-50 text-green-700 border border-green-200' 
-                                                : 'bg-[var(--bg-selected)] text-white hover:bg-[#555555] shadow-sm hover:shadow-md'
+                                                : 'bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)] shadow-sm hover:shadow-md'
                                         }`}
                                     >
                                         {copied ? <Check size={16} weight="light" /> : <Copy size={16} weight="light" />}
@@ -3287,7 +3287,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                             )}
                             <button
                                 onClick={() => setShowShareModal(false)}
-                                className="px-4 py-2.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+                                className="px-4 py-2.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 Done
                             </button>

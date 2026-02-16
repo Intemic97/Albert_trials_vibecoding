@@ -266,7 +266,7 @@ export const WidgetGallery: React.FC<WidgetGalleryProps> = ({ onSelect, onClose 
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             placeholder="Search widgets..."
-                            className="w-full pl-9 pr-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[#256A65] placeholder:text-[var(--text-tertiary)]"
+                            className="w-full pl-9 pr-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
                         />
                     </div>
                     
@@ -277,7 +277,7 @@ export const WidgetGallery: React.FC<WidgetGalleryProps> = ({ onSelect, onClose 
                                 onClick={() => setSelectedCategory(cat.id)}
                                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                                     selectedCategory === cat.id
-                                        ? 'bg-[#256A65] text-white'
+                                        ? 'bg-[var(--accent-primary)] text-white'
                                         : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                                 }`}
                             >
@@ -297,14 +297,14 @@ export const WidgetGallery: React.FC<WidgetGalleryProps> = ({ onSelect, onClose 
                                 onClick={() => onSelect(template)}
                                 className={`group relative p-4 rounded-xl border transition-all text-left hover:shadow-md ${
                                     template.category === 'ai'
-                                        ? 'bg-gradient-to-br from-[#256A65]/10 to-[#84C4D1]/10 border-[#256A65]/30 hover:border-[#256A65]'
-                                        : 'bg-[var(--bg-card)] border-[var(--border-light)] hover:border-[#256A65]/50'
+                                        ? 'bg-gradient-to-br from-[var(--accent-primary)]/10 to-[#84C4D1]/10 border-[var(--accent-primary)]/30 hover:border-[var(--accent-primary)]'
+                                        : 'bg-[var(--bg-card)] border-[var(--border-light)] hover:border-[var(--accent-primary)]/50'
                                 }`}
                             >
                                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-3 ${
                                     template.category === 'ai'
-                                        ? 'bg-[#256A65] text-white'
-                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] group-hover:bg-[#256A65]/10 group-hover:text-[#256A65]'
+                                        ? 'bg-[var(--accent-primary)] text-white'
+                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] group-hover:bg-[var(--accent-primary)]/10 group-hover:text-[var(--accent-primary)]'
                                 } transition-colors`}>
                                     {template.icon}
                                 </div>
@@ -312,7 +312,7 @@ export const WidgetGallery: React.FC<WidgetGalleryProps> = ({ onSelect, onClose 
                                 <p className="text-xs text-[var(--text-secondary)] line-clamp-2">{template.description}</p>
                                 
                                 <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <ArrowRight size={16} className="text-[#256A65]" weight="light" />
+                                    <ArrowRight size={16} className="text-[var(--accent-primary)]" weight="light" />
                                 </div>
                             </button>
                         ))}

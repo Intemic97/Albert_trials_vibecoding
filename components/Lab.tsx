@@ -145,7 +145,7 @@ type LabPresetId = 'hdpe_transition_monitoring' | 'hdpe_transition_economics';
 // CONSTANTS
 // ============================================================================
 
-const CHART_COLORS = ['#256A65', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#10B981', '#EC4899'];
+const CHART_COLORS = ['#5B7476', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#10B981', '#EC4899'];
 
 const VISUALIZATION_TYPES = [
     { type: 'kpi', label: 'KPI', icon: NumberSquareOne, description: 'Single value metric' },
@@ -967,7 +967,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     title: 'Monthly Revenue',
                     dataMapping: { source: 'revenue', format: 'currency' },
                     position: { x: 0, y: 0, w: 1, h: 1 },
-                    color: '#256A65'
+                    color: '#5B7476'
                 },
                 {
                     id: 'viz-profit',

@@ -109,7 +109,7 @@ export const AIAssistantSidePanel: React.FC<AIAssistantSidePanelProps> = ({
                       )}
 
                       {message.workflowSuggestion.status === 'accepted' && (
-                        <div className="flex items-center gap-2 text-[#256A65] text-xs font-medium">
+                        <div className="flex items-center gap-2 text-[var(--accent-primary)] text-xs font-medium">
                           <CheckCircle size={14} />
                           <span>Applied to workflow</span>
                         </div>
@@ -157,7 +157,7 @@ export const AIAssistantSidePanel: React.FC<AIAssistantSidePanelProps> = ({
           <button
             onClick={onSend}
             disabled={!chatInput.trim() || isLoading}
-            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-[#555555] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-[var(--accent-primary-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <Sparkles size={16} />
           </button>

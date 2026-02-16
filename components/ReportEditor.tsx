@@ -1350,7 +1350,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             printWindow.document.close();
                                             printWindow.print();
                                         }}
-                                        className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-selected)] text-white rounded-lg hover:bg-[#555555] transition-colors text-sm font-medium"
+                                        className="flex items-center gap-2 px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg hover:bg-[var(--accent-primary-hover)] transition-colors text-sm font-medium"
                                     >
                                         <DownloadSimple size={16} weight="light" />
                                         Export as PDF
@@ -1654,7 +1654,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                             <button
                                                                 onClick={handleSendAiMessage}
                                                                 disabled={!aiInput.trim() || isAiLoading || !selectedSectionId}
-                                                                className="p-2 bg-[#256A65] hover:bg-[#1e5a55] disabled:bg-slate-300 text-white rounded-lg transition-colors"
+                                                                className="p-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] disabled:bg-slate-300 text-white rounded-lg transition-colors"
                                                             >
                                                                 {isAiLoading ? (
                                                                     <SpinnerGap size={18} weight="light" className="animate-spin" />
@@ -1794,21 +1794,21 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                                 {/* AI Suggestion Preview */}
                                 {pendingSuggestion && pendingSuggestion.sectionId === selectedSectionId && (
-                                    <div ref={generatedContentRef} className="bg-gradient-to-r from-[#84C4D1]/20 to-[#256A65]/10 rounded-xl shadow-sm border-2 border-[#256A65]/30 overflow-hidden">
-                                        <div className="px-6 py-4 bg-gradient-to-r from-[#84C4D1]/30 to-[#256A65]/20 border-b border-[#256A65]/20 flex items-center justify-between">
+                                    <div ref={generatedContentRef} className="bg-gradient-to-r from-[#84C4D1]/20 to-[var(--accent-primary)]/10 rounded-xl shadow-sm border-2 border-[var(--accent-primary)]/30 overflow-hidden">
+                                        <div className="px-6 py-4 bg-gradient-to-r from-[#84C4D1]/30 to-[var(--accent-primary)]/20 border-b border-[var(--accent-primary)]/20 flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-[#256A65] rounded-lg">
+                                                <div className="p-2 bg-[var(--accent-primary)] rounded-lg">
                                                     <Robot size={20} weight="light" className="text-white" />
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-normal text-[#256A65]">AI Suggestion</h3>
-                                                    <p className="text-xs text-[#256A65]/70">Review the suggested changes below</p>
+                                                    <h3 className="font-normal text-[var(--accent-primary)]">AI Suggestion</h3>
+                                                    <p className="text-xs text-[var(--accent-primary)]/70">Review the suggested changes below</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => handleAcceptSuggestion(pendingSuggestion.messageId)}
-                                                    className="px-3 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium"
+                                                    className="px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all shadow-sm hover:shadow-md flex items-center gap-2 text-sm font-medium"
                                                 >
                                                     <Check size={16} weight="light" />
                                                     Accept
@@ -1824,7 +1824,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                         </div>
                                         
                                         <div className="p-6">
-                                            <div className="min-h-[200px] p-4 bg-[var(--bg-card)] border border-[#256A65]/20 rounded-lg text-sm whitespace-pre-wrap leading-relaxed">
+                                            <div className="min-h-[200px] p-4 bg-[var(--bg-card)] border border-[var(--accent-primary)]/20 rounded-lg text-sm whitespace-pre-wrap leading-relaxed">
                                                 {pendingSuggestion.suggestedContent}
                                             </div>
                                         </div>
@@ -1849,7 +1849,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                     onClick={() => setIsEditMode(!isEditMode)}
                                                     className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${
                                                         isEditMode 
-                                                            ? 'bg-[#256A65]/10 text-[#256A65]' 
+                                                            ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]' 
                                                             : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                                                     }`}
                                                 >
@@ -1989,7 +1989,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                     <div className="flex items-start justify-between mb-2">
                                                                         <div className="flex items-center gap-2">
                                                                             <div className="w-6 h-6 rounded-full bg-[var(--accent-primary)]/20 flex items-center justify-center">
-                                                                                <User size={12} weight="light" className="text-[#256A65]" />
+                                                                                <User size={12} weight="light" className="text-[var(--accent-primary)]" />
                                                                             </div>
                                                                             <div>
                                                                                 <p className="text-sm font-medium text-[var(--text-primary)]">{comment.userName}</p>
@@ -2248,7 +2248,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     {showCommentInput && selectedText && (
                                         <div className="px-6 py-4 border-t border-[var(--border-light)] bg-[var(--accent-primary)]/10">
                                             <div className="flex items-start gap-3">
-                                                <ChatCircle className="text-[#256A65] mt-1 shrink-0" size={18} weight="light" />
+                                                <ChatCircle className="text-[var(--accent-primary)] mt-1 shrink-0" size={18} weight="light" />
                                                 <div className="flex-1 space-y-2">
                                                     <p className="text-sm text-[var(--text-secondary)]">
                                                         <span className="font-medium">Selected:</span> "{selectedText.text.slice(0, 80)}{selectedText.text.length > 80 ? '...' : ''}"
@@ -2257,7 +2257,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                         value={newCommentText}
                                                         onChange={(e) => setNewCommentText(e.target.value)}
                                                         placeholder="Add your comment..."
-                                                        className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:ring-2 focus:ring-[#256A65] focus:border-[#256A65] outline-none resize-none"
+                                                        className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] outline-none resize-none"
                                                         rows={2}
                                                         autoFocus
                                                     />
@@ -2265,7 +2265,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                         <button
                                                             onClick={handleAddComment}
                                                             disabled={!newCommentText.trim()}
-                                                            className="px-3 py-1.5 bg-[#256A65] hover:bg-[#1e5a55] disabled:bg-[#256A65]/50 text-white rounded-lg text-sm font-medium transition-colors"
+                                                            className="px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] disabled:bg-[var(--accent-primary)]/50 text-white rounded-lg text-sm font-medium transition-colors"
                                                         >
                                                             Add Comment
                                                         </button>
@@ -2382,7 +2382,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                     <div className="flex items-start justify-between mb-2">
                                                                         <div className="flex items-center gap-2">
                                                                             <div className="w-6 h-6 rounded-full bg-[var(--accent-primary)]/20 flex items-center justify-center">
-                                                                                <User size={12} weight="light" className="text-[#256A65]" />
+                                                                                <User size={12} weight="light" className="text-[var(--accent-primary)]" />
                                                                             </div>
                                                                             <div>
                                                                                 <p className="text-sm font-medium text-[var(--text-primary)]">{comment.userName}</p>
@@ -2403,7 +2403,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                                     </button>
                                                                                     <button
                                                                                         onClick={(e) => { e.stopPropagation(); setEditingCommentId(comment.id); setEditCommentText(comment.commentText); }}
-                                                                                        className="p-1 text-[var(--text-tertiary)] hover:text-[#256A65] hover:bg-[#256A65]/10 rounded"
+                                                                                        className="p-1 text-[var(--text-tertiary)] hover:text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded"
                                                                                         title="Edit"
                                                                                     >
                                                                                         <PencilSimple size={14} weight="light" />
@@ -2440,7 +2440,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                                 autoFocus
                                                                             />
                                                                             <div className="flex gap-2">
-                                                                                <button onClick={() => handleUpdateComment(comment.id)} className="px-2 py-1 bg-[#256A65] text-white rounded text-xs">Save</button>
+                                                                                <button onClick={() => handleUpdateComment(comment.id)} className="px-2 py-1 bg-[var(--accent-primary)] text-white rounded text-xs">Save</button>
                                                                                 <button onClick={() => { setEditingCommentId(null); setEditCommentText(''); }} className="px-2 py-1 text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded text-xs">Cancel</button>
                                                                             </div>
                                                                         </div>
@@ -3156,7 +3156,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     <button
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="px-3 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2"
+                        className="px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 flex items-center gap-2"
                     >
                         {isSaving ? <SpinnerGap size={16} weight="light" className="animate-spin" /> : <FloppyDisk size={16} weight="light" />}
                         Save Changes

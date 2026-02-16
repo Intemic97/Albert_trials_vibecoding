@@ -138,7 +138,7 @@ export const ConfigTextarea: React.FC<ConfigTextareaProps> = ({
             text-[var(--text-primary)]
             bg-[var(--bg-secondary)]
             border border-[var(--border-light)] rounded-lg
-            focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65]
+            focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]
             resize-none
             placeholder:text-[var(--text-tertiary)]
             transition-colors
@@ -172,7 +172,7 @@ export const ConfigInput: React.FC<ConfigInputProps> = ({
             text-[var(--text-primary)]
             bg-[var(--bg-secondary)]
             border border-[var(--border-light)] rounded-lg
-            focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65]
+            focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]
             placeholder:text-[var(--text-tertiary)]
             transition-colors
             ${className}
@@ -203,7 +203,7 @@ export const ConfigSelect: React.FC<ConfigSelectProps> = ({
             text-[var(--text-primary)]
             bg-[var(--bg-secondary)]
             border border-[var(--border-light)] rounded-lg
-            focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65]
+            focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]
             transition-colors
             ${className}
         `}
@@ -241,7 +241,7 @@ export const ConfigButton: React.FC<ConfigButtonProps> = ({
     const baseClasses = 'px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
     
     const variantClasses = {
-        primary: 'bg-[#256A65] hover:bg-[#1e5a55] text-white',
+        primary: 'bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white',
         secondary: 'bg-[var(--bg-tertiary)] hover:bg-[var(--bg-selected)] text-[var(--text-primary)] border border-[var(--border-light)]',
         ghost: 'hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
     };

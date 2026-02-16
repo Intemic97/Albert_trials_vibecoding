@@ -90,7 +90,7 @@ export const WorkflowEditorToolbar: React.FC<WorkflowEditorToolbarProps> = ({
         <button
           onClick={runWorkflow}
           disabled={isRunning || nodesCount === 0}
-          className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
+          className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
         >
           <Play size={16} weight="light" />
           {isRunning ? 'Running...' : 'Run'}

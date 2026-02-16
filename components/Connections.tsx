@@ -644,7 +644,7 @@ export const Connections: React.FC = () => {
                                         onClick={() => setCategoryFilter(cat.id)}
                                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                                             categoryFilter === cat.id
-                                                ? 'bg-[#419CAF] text-white shadow-sm'
+                                                ? 'bg-[var(--accent-primary)] text-white shadow-sm'
                                                 : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
                                         }`}
                                     >

@@ -50,10 +50,10 @@ export const ExecutionHistoryInlineModal: React.FC<ExecutionHistoryInlineModalPr
             <div className="p-3 border-b border-[var(--border-light)] bg-[var(--bg-tertiary)]">
               <button
                 onClick={loadExecutionHistory}
-                className="w-full px-3 py-2 bg-teal-100 text-[#1e554f] rounded-lg text-sm font-medium hover:bg-teal-200 transition-colors flex items-center justify-center gap-2"
+                className="w-full px-3 py-2 bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] rounded-lg text-sm font-medium hover:bg-[var(--accent-primary)]/20 transition-colors flex items-center justify-center gap-2"
               >
                 {loadingExecutions ? (
-                  <div className="w-4 h-4 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <History size={14} />
                 )}
@@ -62,7 +62,7 @@ export const ExecutionHistoryInlineModal: React.FC<ExecutionHistoryInlineModalPr
             </div>
             {loadingExecutions ? (
               <div className="p-8 text-center text-[var(--text-secondary)]">
-                <div className="w-8 h-8 border-2 border-[#256A65] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <div className="w-8 h-8 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                 Loading...
               </div>
             ) : executionHistory.length === 0 ? (
@@ -77,11 +77,11 @@ export const ExecutionHistoryInlineModal: React.FC<ExecutionHistoryInlineModalPr
                   <button
                     key={exec.id}
                     onClick={() => setSelectedExecution(exec)}
-                    className={`w-full p-3 text-left hover:bg-[var(--bg-tertiary)] transition-colors ${selectedExecution?.id === exec.id ? 'bg-[#256A65]/5 border-l-2 border-[#256A65]' : ''}`}
+                    className={`w-full p-3 text-left hover:bg-[var(--bg-tertiary)] transition-colors ${selectedExecution?.id === exec.id ? 'bg-[var(--accent-primary)]/5 border-l-2 border-[var(--accent-primary)]' : ''}`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        exec.status === 'completed' ? 'bg-[#256A65]/10 text-[#1e554f]' :
+                        exec.status === 'completed' ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]' :
                         exec.status === 'failed' ? 'bg-red-100 text-red-700' :
                         exec.status === 'running' ? 'bg-yellow-100 text-yellow-700' :
                         'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
@@ -110,7 +110,7 @@ export const ExecutionHistoryInlineModal: React.FC<ExecutionHistoryInlineModalPr
                     <div>
                       <span className="text-[var(--text-secondary)]">Status:</span>
                       <span className={`ml-2 font-medium ${
-                        selectedExecution.status === 'completed' ? 'text-[#256A65]' :
+                        selectedExecution.status === 'completed' ? 'text-[var(--accent-primary)]' :
                         selectedExecution.status === 'failed' ? 'text-red-600' :
                         'text-[var(--text-secondary)]'
                       }`}>{selectedExecution.status}</span>
@@ -143,8 +143,8 @@ export const ExecutionHistoryInlineModal: React.FC<ExecutionHistoryInlineModalPr
                 )}
 
                 {selectedExecution.nodeResults && Object.keys(selectedExecution.nodeResults).length > 0 && (
-                  <div className="bg-[#256A65]/5 rounded-lg p-4">
-                    <h4 className="font-normal text-[#1e554f] mb-2 flex items-center gap-2">
+                  <div className="bg-[var(--accent-primary)]/5 rounded-lg p-4">
+                    <h4 className="font-normal text-[var(--accent-primary)] mb-2 flex items-center gap-2">
                       <CheckCircle size={16} />
                       Node Results
                     </h4>
@@ -155,11 +155,11 @@ export const ExecutionHistoryInlineModal: React.FC<ExecutionHistoryInlineModalPr
                         const nodeType = node?.type || result.nodeType || '';
                         
                         return (
-                          <div key={nodeId} className="bg-[var(--bg-card)] p-3 rounded border border-[#256A65]/20">
+                          <div key={nodeId} className="bg-[var(--bg-card)] p-3 rounded border border-[var(--accent-primary)]/20">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="font-medium text-[var(--text-primary)]">{nodeLabel}</span>
                               {nodeType && <span className="text-xs text-[var(--text-tertiary)]">({nodeType})</span>}
-                              {result.success && <Check size={14} className="text-[#256A65]" />}
+                              {result.success && <Check size={14} className="text-[var(--accent-primary)]" />}
                             </div>
                             {result.message && (
                               <p className="text-xs text-[var(--text-secondary)] mb-1">{result.message}</p>

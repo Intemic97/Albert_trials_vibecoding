@@ -60,8 +60,8 @@ export function VerifyEmail() {
                 <div className="w-full max-w-sm text-center">
                     {status === 'loading' && (
                         <>
-                            <div className="w-16 h-16 bg-[#256A65]/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <SpinnerGap weight="bold" className="w-8 h-8 text-[#256A65] animate-spin" />
+                            <div className="w-16 h-16 bg-[var(--accent-primary)]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                                <SpinnerGap weight="bold" className="w-8 h-8 text-[var(--accent-primary)] animate-spin" />
                             </div>
                             <h1 className="text-xl font-medium text-[#e8e8e8] mb-3" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                                 Verifying your email...
@@ -89,7 +89,7 @@ export function VerifyEmail() {
                             </p>
                             <button
                                 onClick={() => navigate('/login')}
-                                className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                                className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
                             >
                                 Continue to sign in
                                 <ArrowRight weight="bold" className="w-4 h-4" />

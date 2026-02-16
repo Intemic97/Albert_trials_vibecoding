@@ -129,7 +129,7 @@ const TemplateCard: React.FC<TemplateCardProps> = ({ template, onPreview, onCopy
                         onCopy();
                     }}
                     disabled={isCopying}
-                    className="flex-1 py-2 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+                    className="flex-1 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
                 >
                     {isCopying ? (
                         <>
@@ -302,7 +302,7 @@ const TemplatePreview: React.FC<TemplatePreviewProps> = ({ template, onClose, on
                         <button
                             onClick={onCopy}
                             disabled={isCopying}
-                            className="px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:shadow-md"
+                            className="px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:shadow-md"
                         >
                             {isCopying ? (
                                 <>
@@ -381,7 +381,7 @@ export const TemplatesGalleryModal: React.FC<TemplatesGalleryModalProps> = ({
                     <div className="px-6 py-5 border-b border-[var(--border-light)] shrink-0">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#256A65] to-[#84C4D1] flex items-center justify-center">
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--accent-primary)] to-[#84C4D1] flex items-center justify-center">
                                     <BookOpen size={24} className="text-white" weight="light" />
                                 </div>
                                 <div>

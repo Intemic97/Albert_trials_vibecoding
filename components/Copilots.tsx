@@ -152,7 +152,7 @@ const TAG_COLORS: Record<string, string> = {
     'archive': '#6B7280',
     'project': '#F59E0B',
     'ideas': '#EC4899',
-    'default': '#256A65'
+    'default': '#5B7476'
 };
 
 export const Copilots: React.FC = () => {
@@ -1491,7 +1491,7 @@ export const Copilots: React.FC = () => {
                     <div className="px-3 pt-3">
                                 <button
                                     onClick={handleCreateCopilot}
-                                    className="w-full mb-3 px-4 py-2.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
+                                    className="w-full mb-3 px-4 py-2.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
                                 >
                                     <Plus size={16} weight="bold" />
                                     {t('copilots.newChat')}
@@ -1786,7 +1786,7 @@ export const Copilots: React.FC = () => {
                                                 <button
                                                     type="submit"
                                                     disabled={!input.trim() || isLoading}
-                                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                                                 >
                                                     <PaperPlaneTilt size={16} weight="light" />
                                                 </button>
@@ -2114,7 +2114,7 @@ export const Copilots: React.FC = () => {
                                     <button
                                         type="submit"
                                         disabled={!input.trim() || isLoading}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
                                         <PaperPlaneTilt size={16} weight="light" />
                                     </button>
@@ -2372,7 +2372,7 @@ export const Copilots: React.FC = () => {
                             <button
                                 onClick={handleSaveCopilot}
                                 disabled={!copilotName.trim()}
-                                className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Sparkle size={14} weight="light" />
                                 {t('copilots.createChat')}
@@ -2566,7 +2566,7 @@ export const Copilots: React.FC = () => {
                             </button>
                             <button
                                 onClick={handleSaveEdit}
-                                className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+                                className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 <Check size={14} weight="light" />
                                 {t('common.saveChanges')}

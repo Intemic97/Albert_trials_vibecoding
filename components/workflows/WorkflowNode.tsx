@@ -58,11 +58,11 @@ export const getNodeIconColor = (type: NodeType): string => {
     case 'mysql':
     case 'sapFetch':
     case 'limsFetch':
-      return 'text-[#256A65]';
+      return 'text-[var(--accent-primary)]';
     case 'llm':
     case 'agent':
     case 'specializedAgent':
-      return 'text-[#256A65]';
+      return 'text-[var(--accent-primary)]';
     case 'python':
       return 'text-[#84C4D1]';
     case 'condition':
@@ -206,7 +206,7 @@ export const WorkflowNode: React.FC<WorkflowNodeProps> = ({
             e.stopPropagation();
             onRunNode(node.id);
           }}
-          className="p-2 bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[#256A65] transition-all active:scale-90"
+          className="p-2 bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-all active:scale-90"
           title="Run Node"
         >
           <Play size={14} weight="light" />
@@ -230,7 +230,7 @@ export const WorkflowNode: React.FC<WorkflowNodeProps> = ({
             e.stopPropagation();
             onDuplicate(node.id);
           }}
-          className="p-2 bg-[var(--bg-card)] hover:bg-[#256A65]/10 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[#256A65] transition-all active:scale-90"
+          className="p-2 bg-[var(--bg-card)] hover:bg-[var(--accent-primary)]/10 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-all active:scale-90"
           title="Duplicate Node"
         >
           <Copy size={14} weight="light" />
@@ -308,8 +308,8 @@ export const WorkflowNode: React.FC<WorkflowNodeProps> = ({
           <div className={`
             w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none
             ${connectingFromNodeId === node.id 
-              ? 'border-[#256A65] scale-125 bg-[#256A65]/10 shadow-md' 
-              : 'border-[var(--border-medium)] group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}
+              ? 'border-[var(--accent-primary)] scale-125 bg-[var(--accent-primary)]/10 shadow-md' 
+              : 'border-[var(--border-medium)] group-hover/connector:border-[var(--accent-primary)] group-hover/connector:bg-[var(--accent-primary)]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}
           `} />
         </div>
       )}
@@ -329,7 +329,7 @@ export const WorkflowNode: React.FC<WorkflowNodeProps> = ({
           <div className={`
             w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none
             border-[var(--border-medium)] 
-            group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 
+            group-hover/connector:border-[var(--accent-primary)] group-hover/connector:bg-[var(--accent-primary)]/10 
             group-hover/connector:scale-110 group-hover/connector:shadow-md
           `} />
         </div>

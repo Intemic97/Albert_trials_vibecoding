@@ -185,7 +185,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
             <div className="flex flex-col h-full bg-[var(--bg-primary)]">
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
-                        <div className="w-12 h-12 border-4 border-[#256A65]/20 border-t-[#256A65] rounded-full animate-spin mx-auto mb-4"></div>
+                        <div className="w-12 h-12 border-4 border-[var(--accent-primary)]/20 border-t-[var(--accent-primary)] rounded-full animate-spin mx-auto mb-4"></div>
                         <p className="text-sm text-[var(--text-secondary)]">Loading your data...</p>
                     </div>
                 </div>
@@ -303,7 +303,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                         {/* Copilots Section */}
                         <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-4">
                             <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Your Copilots</h2>
+                                <h2 className="text-base font-normal text-[var(--text-primary)]" style={{ fontFamily: "'Berkeley Mono', monospace" }}>Agent conversations</h2>
                                 <button 
                                     onClick={() => navigate('/copilots')}
                                     className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
@@ -321,8 +321,8 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                             className="flex items-start gap-3 border border-[var(--border-light)] rounded-lg p-3 hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer" 
                                             onClick={() => navigate(`/copilots?chatId=${copilot.id}`)}
                                         >
-                                            <div className="p-2 bg-[#256A65]/10 rounded-lg flex-shrink-0">
-                                                <Sparkle size={16} weight="fill" className="text-[#256A65]" />
+                                            <div className="p-2 bg-[var(--accent-primary)]/10 rounded-lg flex-shrink-0">
+                                                <Sparkle size={16} weight="fill" className="text-[var(--accent-primary)]" />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-normal text-[var(--text-primary)] truncate">{copilot.title}</p>
@@ -334,7 +334,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                                     e.stopPropagation();
                                                     navigate(`/copilots?chatId=${copilot.id}`);
                                                 }}
-                                                className="text-xs text-[#256A65] hover:text-[#1e5a55] flex-shrink-0 font-medium"
+                                                className="text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] flex-shrink-0 font-medium"
                                             >
                                                 Open
                                             </button>
@@ -346,7 +346,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                         <p className="text-sm text-[var(--text-secondary)] mb-2">No copilots yet</p>
                                         <button
                                             onClick={() => navigate('/copilots')}
-                                            className="inline-flex items-center gap-1.5 text-xs text-[#256A65] hover:text-[#1e5a55] font-medium"
+                                            className="inline-flex items-center gap-1.5 text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium"
                                         >
                                             <Plus size={12} weight="bold" />
                                             Create your first copilot
@@ -402,7 +402,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                                 <td className="px-4 py-3 text-right">
                                                     <button 
                                                         onClick={() => navigate(`/workflow/${workflow.id}`)}
-                                                        className="text-xs text-[#256A65] hover:text-[#1e5a55] font-medium"
+                                                        className="text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium"
                                                     >
                                                         Open
                                                     </button>
@@ -416,7 +416,7 @@ export const Overview: React.FC<OverviewProps> = ({ entities, entitiesLoading = 
                                                 <p className="text-sm text-[var(--text-secondary)] mb-2">No workflows yet</p>
                                                 <button
                                                     onClick={() => navigate('/workflows')}
-                                                    className="inline-flex items-center gap-1.5 text-xs text-[#256A65] hover:text-[#1e5a55] font-medium"
+                                                    className="inline-flex items-center gap-1.5 text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium"
                                                 >
                                                     <Plus size={12} weight="bold" />
                                                     Create your first workflow

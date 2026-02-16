@@ -82,7 +82,7 @@ export const DataPreviewSidePanel: React.FC<DataPreviewSidePanelProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-light)]">
         <div className="flex items-center gap-2">
-          <Table size={18} className="text-[#256A65]" />
+          <Table size={18} className="text-[var(--accent-primary)]" />
           <span className="font-medium text-[var(--text-primary)]">
             {node.label || node.type}
           </span>
@@ -124,7 +124,7 @@ export const DataPreviewSidePanel: React.FC<DataPreviewSidePanelProps> = ({
           onClick={() => { setActiveTab('input'); setCurrentPage(0); }}
           className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
             activeTab === 'input'
-              ? 'text-[#256A65] border-b-2 border-[#256A65] bg-[#256A65]/5'
+              ? 'text-[var(--accent-primary)] border-b-2 border-[var(--accent-primary)] bg-[var(--accent-primary)]/5'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
@@ -134,7 +134,7 @@ export const DataPreviewSidePanel: React.FC<DataPreviewSidePanelProps> = ({
           onClick={() => { setActiveTab('output'); setCurrentPage(0); }}
           className={`flex-1 px-4 py-2.5 text-sm font-medium transition-colors ${
             activeTab === 'output'
-              ? 'text-[#256A65] border-b-2 border-[#256A65] bg-[#256A65]/5'
+              ? 'text-[var(--accent-primary)] border-b-2 border-[var(--accent-primary)] bg-[var(--accent-primary)]/5'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >

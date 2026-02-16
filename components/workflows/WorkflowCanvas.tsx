@@ -372,7 +372,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
       <div className="text-center max-w-lg px-6">
         <div className="mb-8">
           <div className="relative mb-6">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#256A65]/10 to-[var(--bg-tertiary)] rounded-full blur-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent-primary)]/10 to-[var(--bg-tertiary)] rounded-full blur-3xl" />
             <Workflow size={80} className="mx-auto relative text-[var(--text-tertiary)]" />
           </div>
           <h3 className="text-2xl font-normal text-[var(--text-primary)] mb-3">

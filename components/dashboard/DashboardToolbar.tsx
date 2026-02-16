@@ -66,7 +66,7 @@ export const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ value, onChang
                                 }}
                                 className={`w-full px-3 py-2 text-left text-sm transition-colors ${
                                     value === range.id
-                                        ? 'bg-[#256A65]/10 text-[#256A65]'
+                                        ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]'
                                         : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                                 }`}
                             >
@@ -111,7 +111,7 @@ export const AutoRefresh: React.FC<AutoRefreshProps> = ({ interval, onChange, on
                 disabled={isRefreshing}
                 className={`p-1.5 rounded-lg transition-colors ${
                     isRefreshing 
-                        ? 'text-[#256A65] bg-[#256A65]/10' 
+                        ? 'text-[var(--accent-primary)] bg-[var(--accent-primary)]/10' 
                         : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                 }`}
                 title="Refresh now"
@@ -124,7 +124,7 @@ export const AutoRefresh: React.FC<AutoRefreshProps> = ({ interval, onChange, on
                     onClick={() => setIsOpen(!isOpen)}
                     className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${
                         interval > 0
-                            ? 'bg-[#256A65]/10 text-[#256A65]'
+                            ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]'
                             : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)]'
                     }`}
                 >
@@ -146,7 +146,7 @@ export const AutoRefresh: React.FC<AutoRefreshProps> = ({ interval, onChange, on
                                     }}
                                     className={`w-full px-3 py-1.5 text-left text-xs transition-colors ${
                                         interval === opt.value
-                                            ? 'bg-[#256A65]/10 text-[#256A65]'
+                                            ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]'
                                             : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                                     }`}
                                 >
@@ -205,14 +205,14 @@ export const GlobalFilters: React.FC<GlobalFiltersProps> = ({ filters, onFilters
                 onClick={() => setIsOpen(!isOpen)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
                     filters.length > 0
-                        ? 'bg-[#256A65]/10 text-[#256A65] border border-[#256A65]/30'
+                        ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30'
                         : 'bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:border-[var(--border-medium)]'
                 }`}
             >
                 <Funnel size={14} weight="light" />
                 Filters
                 {filters.length > 0 && (
-                    <span className="px-1.5 py-0.5 bg-[#256A65] text-white text-xs rounded-full">
+                    <span className="px-1.5 py-0.5 bg-[var(--accent-primary)] text-white text-xs rounded-full">
                         {filters.length}
                     </span>
                 )}
@@ -226,7 +226,7 @@ export const GlobalFilters: React.FC<GlobalFiltersProps> = ({ filters, onFilters
                             <h4 className="text-sm font-medium text-[var(--text-primary)]">Global Filters</h4>
                             <button
                                 onClick={addFilter}
-                                className="text-xs text-[#256A65] hover:underline"
+                                className="text-xs text-[var(--accent-primary)] hover:underline"
                             >
                                 + Add filter
                             </button>
@@ -372,7 +372,7 @@ export const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
                 {/* Add Widget - always available */}
                 <button
                     onClick={onAddWidget}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e5a55] text-white rounded-lg text-xs font-medium transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-colors"
                 >
                     <Plus size={14} weight="light" />
                     Add Widget

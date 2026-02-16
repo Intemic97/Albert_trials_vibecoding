@@ -12,7 +12,8 @@
     "prefect:install": "cd server/prefect-worker && pip install -r requirements.txt",
     "seed": "node server/seed.js",
     "import-use-case": "node server/import-use-case.js",
-    "export-repsol-entities": "node server/export-repsol-entities.js"
+    "export-repsol-entities": "node server/export-repsol-entities.js",
+    "docs:pdf": "npx md-to-pdf docs/CONTEXTO_PLATAFORMA.md --dest docs/CONTEXTO_PLATAFORMA.pdf"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.958.0",
