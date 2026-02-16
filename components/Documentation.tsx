@@ -161,8 +161,8 @@ const DOC_SECTIONS: DocSection[] = [
 // ============================================================================
 
 const Tip: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="flex gap-3 p-4 bg-[#256A65]/10 border border-[#256A65]/20 rounded-lg my-4">
-        <Lightbulb size={20} className="text-[#256A65] flex-shrink-0 mt-0.5" weight="fill" />
+    <div className="flex gap-3 p-4 bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20 rounded-lg my-4">
+        <Lightbulb size={20} className="text-[var(--accent-primary)] flex-shrink-0 mt-0.5" weight="fill" />
         <div className="text-sm text-[var(--text-primary)]">{children}</div>
     </div>
 );
@@ -313,7 +313,7 @@ export const Documentation: React.FC = () => {
                         <ArrowLeft size={18} weight="light" />
                     </button>
                     <div className="flex items-center gap-3">
-                        <BookOpen size={20} className="text-[#256A65]" weight="light" />
+                        <BookOpen size={20} className="text-[var(--accent-primary)]" weight="light" />
                         <h1 className="text-lg font-normal text-[var(--text-primary)]">Documentation</h1>
                     </div>
                 </div>
@@ -354,7 +354,7 @@ export const Documentation: React.FC = () => {
                                                                     onClick={() => navigateToSection(subId)}
                                                                     className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${
                                                                         isSubActive
-                                                                            ? 'text-[#256A65] font-medium'
+                                                                            ? 'text-[var(--accent-primary)] font-medium'
                                                                             : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                                                     }`}
                                                                 >
@@ -445,21 +445,21 @@ export const Documentation: React.FC = () => {
 
                                     <div className="space-y-6">
                                         <div className="flex gap-4">
-                                            <div className="w-8 h-8 bg-[#256A65] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">1</div>
+                                            <div className="w-8 h-8 bg-[var(--accent-primary)] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">1</div>
                                             <div>
                                                 <h4 className="font-medium text-[var(--text-primary)] mb-1">Create a new workflow</h4>
                                                 <p className="text-sm text-[var(--text-secondary)]">Navigate to <strong>Workflows</strong> in the sidebar and click <strong>Create Workflow</strong>. Give it a name like "My First Workflow".</p>
                                             </div>
                                         </div>
                                         <div className="flex gap-4">
-                                            <div className="w-8 h-8 bg-[#256A65] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">2</div>
+                                            <div className="w-8 h-8 bg-[var(--accent-primary)] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">2</div>
                                             <div>
                                                 <h4 className="font-medium text-[var(--text-primary)] mb-1">Add nodes</h4>
                                                 <p className="text-sm text-[var(--text-secondary)]">From the left panel, drag a <strong>Manual Trigger</strong> onto the canvas. Then add a <strong>Fetch Data</strong> node and connect them by dragging from the output port to the input port.</p>
                                             </div>
                                         </div>
                                         <div className="flex gap-4">
-                                            <div className="w-8 h-8 bg-[#256A65] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">3</div>
+                                            <div className="w-8 h-8 bg-[var(--accent-primary)] text-white rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium">3</div>
                                             <div>
                                                 <h4 className="font-medium text-[var(--text-primary)] mb-1">Run the workflow</h4>
                                                 <p className="text-sm text-[var(--text-secondary)]">Click the <strong>Run</strong> button in the toolbar. Watch the execution progress through each node. Check the output in the right panel.</p>
@@ -491,7 +491,7 @@ export const Documentation: React.FC = () => {
                                     <div className="space-y-6 mb-6">
                                         <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
                                             <h4 className="font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
-                                                <Database size={18} className="text-[#256A65]" weight="light" />
+                                                <Database size={18} className="text-[var(--accent-primary)]" weight="light" />
                                                 Entities
                                             </h4>
                                             <p className="text-sm text-[var(--text-secondary)]">
@@ -500,7 +500,7 @@ export const Documentation: React.FC = () => {
                                         </div>
                                         <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
                                             <h4 className="font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
-                                                <Code size={18} className="text-[#256A65]" weight="light" />
+                                                <Code size={18} className="text-[var(--accent-primary)]" weight="light" />
                                                 Properties
                                             </h4>
                                             <p className="text-sm text-[var(--text-secondary)]">
@@ -509,7 +509,7 @@ export const Documentation: React.FC = () => {
                                         </div>
                                         <div className="p-4 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg">
                                             <h4 className="font-medium text-[var(--text-primary)] mb-2 flex items-center gap-2">
-                                                <FileText size={18} className="text-[#256A65]" weight="light" />
+                                                <FileText size={18} className="text-[var(--accent-primary)]" weight="light" />
                                                 Records
                                             </h4>
                                             <p className="text-sm text-[var(--text-secondary)]">
@@ -1488,10 +1488,10 @@ Order (Entity)
                                 </div>
 
                                 <div className="space-y-8">
-                                    <div className="border-l-2 border-[#256A65] pl-4">
+                                    <div className="border-l-2 border-[var(--accent-primary)] pl-4">
                                         <div className="flex items-center gap-2 mb-2">
                                             <h3 className="text-sm font-medium text-[var(--text-primary)]">v1.0.0</h3>
-                                            <span className="px-2 py-0.5 bg-[#256A65]/20 text-[#256A65] text-xs rounded">Latest</span>
+                                            <span className="px-2 py-0.5 bg-[var(--accent-primary)]/20 text-[var(--accent-primary)] text-xs rounded">Latest</span>
                                         </div>
                                         <p className="text-sm text-[var(--text-tertiary)] mb-3">January 2026</p>
                                         <ul className="list-disc pl-5 space-y-1 text-sm text-[var(--text-primary)]">

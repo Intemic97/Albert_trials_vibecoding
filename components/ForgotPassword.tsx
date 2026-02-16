@@ -100,8 +100,8 @@ export function ForgotPassword() {
                 <div className="w-full max-w-sm">
                     {/* Header */}
                     <div className="text-center mb-8">
-                        <div className="w-14 h-14 bg-[#256A65]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Envelope weight="light" className="w-7 h-7 text-[#256A65]" />
+                        <div className="w-14 h-14 bg-[var(--accent-primary)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Envelope weight="light" className="w-7 h-7 text-[var(--accent-primary)]" />
                         </div>
                         <h1 className="text-xl font-medium text-[#e8e8e8] mb-3" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                             Forgot password?
@@ -118,7 +118,7 @@ export function ForgotPassword() {
                             <input
                                 type="email"
                                 required
-                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition-all text-sm"
                                 placeholder="Enter your email address"
                                 value={email}
                                 onChange={e => setEmail(e.target.value)}
@@ -134,7 +134,7 @@ export function ForgotPassword() {
                         <button
                             type="submit"
                             disabled={status === 'loading'}
-                            className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                         >
                             {status === 'loading' ? (
                                 <SpinnerGap weight="bold" className="w-4 h-4 animate-spin" />

@@ -495,7 +495,7 @@ const ConditionConfig: React.FC<ConditionConfigProps> = ({
       
       <div className="mt-4 p-3 bg-[var(--bg-tertiary)] rounded-lg">
         <p className="text-xs text-[var(--text-secondary)] mb-1">Preview:</p>
-        <code className="text-xs text-[#256A65] font-mono">
+        <code className="text-xs text-[var(--accent-primary)] font-mono">
           {field || 'field'} {operators.find(o => o.value === operator)?.label.split(' ')[0].toLowerCase()} {value || '...'}
         </code>
       </div>
@@ -668,7 +668,7 @@ const ScheduleConfig: React.FC<ScheduleConfigProps> = ({
             max="999"
             value={intervalValue}
             onChange={(e) => setIntervalValue(e.target.value)}
-            className="w-20 px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#256A65]"
+            className="w-20 px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
           />
           <ConfigSelect
             value={intervalUnit}
@@ -747,7 +747,7 @@ const PythonConfig: React.FC<PythonConfigProps> = ({
           value={code}
           onChange={(e) => setCode(e.target.value)}
           rows={20}
-          className="w-full px-3 py-2.5 text-sm font-mono text-[var(--text-primary)] bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)] resize-none"
+          className="w-full px-3 py-2.5 text-sm font-mono text-[var(--text-primary)] bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)] resize-none"
           style={{ tabSize: 4 }}
           placeholder={PYTHON_DEFAULT_CODE}
           spellCheck={false}
@@ -757,9 +757,9 @@ const PythonConfig: React.FC<PythonConfigProps> = ({
       <div className="p-3 bg-[var(--bg-tertiary)] rounded-lg text-xs">
         <p className="font-medium text-[var(--text-secondary)] mb-2">Available variables:</p>
         <ul className="space-y-1 text-[var(--text-tertiary)]">
-          <li><code className="px-1.5 py-0.5 bg-[var(--bg-secondary)] rounded text-[#256A65] font-mono">data</code> - Input data from previous node</li>
-          <li><code className="px-1.5 py-0.5 bg-[var(--bg-secondary)] rounded text-[#256A65] font-mono">pd</code> - Pandas library</li>
-          <li><code className="px-1.5 py-0.5 bg-[var(--bg-secondary)] rounded text-[#256A65] font-mono">np</code> - NumPy library</li>
+          <li><code className="px-1.5 py-0.5 bg-[var(--bg-secondary)] rounded text-[var(--accent-primary)] font-mono">data</code> - Input data from previous node</li>
+          <li><code className="px-1.5 py-0.5 bg-[var(--bg-secondary)] rounded text-[var(--accent-primary)] font-mono">pd</code> - Pandas library</li>
+          <li><code className="px-1.5 py-0.5 bg-[var(--bg-secondary)] rounded text-[var(--accent-primary)] font-mono">np</code> - NumPy library</li>
         </ul>
       </div>
     </NodeConfigSidePanel>

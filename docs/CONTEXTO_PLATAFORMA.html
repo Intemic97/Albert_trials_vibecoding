@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Contexto de la plataforma – Intemic Structure Manager</title>
+  <style>
+    :root { --text: #1a1a1a; --muted: #555; --border: #ddd; --code-bg: #f5f5f5; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: var(--text); max-width: 800px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 1.75rem; border-bottom: 2px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.35rem; margin-top: 2rem; }
+    h3 { font-size: 1.1rem; margin-top: 1.25rem; }
+    p { margin: 0.5rem 0 1rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.95rem; }
+    th, td { border: 1px solid var(--border); padding: 0.5rem 0.75rem; text-align: left; }
+    th { background: var(--code-bg); font-weight: 600; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; }
+    li { margin: 0.25rem 0; }
+    pre, code { background: var(--code-bg); font-family: ui-monospace, monospace; font-size: 0.9em; }
+    pre { padding: 1rem; overflow-x: auto; border-radius: 6px; }
+    code { padding: 0.15rem 0.4rem; border-radius: 4px; }
+    pre code { padding: 0; background: none; }
+    .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .page-break { page-break-before: always; }
+    @media print {
+      body { padding: 1rem; max-width: none; }
+      h2 { page-break-after: avoid; }
+      pre, table { page-break-inside: avoid; }
+      a { color: var(--text); }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Contexto de la plataforma – Intemic Structure Manager</h1>
+  <p class="meta">Documento de contexto: visión del producto, documentación de usuario, importación de casos de uso y seguridad. Útil para onboarding, ventas o integración. <strong>Última actualización:</strong> Febrero 2026.</p>
+
+  <h2>1. Visión y características</h2>
+  <h3>1.1 Qué es la plataforma</h3>
+  <p><strong>Intemic Structure Manager</strong> es una aplicación de gestión de datos que combina:</p>
+  <ul>
+    <li><strong>Modelado de entidades</strong> – Estructuras de datos personalizables (entidades, propiedades, relaciones).</li>
+    <li><strong>Base de conocimiento</strong> – Entidades como “tablas” con registros, tipos de propiedad (texto, número, relación) e importación de datos.</li>
+    <li><strong>Workflows</strong> – Editor visual de flujos (trigger, fetch data, Excel/CSV, transformaciones, condiciones, envío de correo, webhooks).</li>
+    <li><strong>Inteligencia (IA)</strong> – Agentes configurables con instrucciones, acceso a datos y memoria de conversación; chat con menciones <code>@Entidad</code> e informes generados por IA.</li>
+    <li><strong>Dashboards</strong> – Paneles con widgets (KPI, gráficos) vinculados a entidades.</li>
+    <li><strong>Lab</strong> – Experimentos y simulaciones vinculados a workflows.</li>
+    <li><strong>Conexiones</strong> – Integraciones con sistemas externos.</li>
+    <li><strong>Multi-tenant</strong> – Organizaciones, equipos, invitaciones y control de acceso.</li>
+  </ul>
+  <p>Está pensada para entornos industriales, manufactura y producción (trazabilidad, calidad, KPIs, reportes).</p>
+
+  <h3>1.2 Stack técnico (resumen)</h3>
+  <table>
+    <tr><th>Capa</th><th>Tecnología principal</th></tr>
+    <tr><td>Frontend</td><td>React 19, TypeScript, Vite, Tailwind CSS</td></tr>
+    <tr><td>Backend</td><td>Node.js, Express</td></tr>
+    <tr><td>Base de datos</td><td>SQLite (embebida)</td></tr>
+    <tr><td>IA</td><td>OpenAI API (informes y agentes)</td></tr>
+  </table>
+
+  <h3>1.3 Estructura de la aplicación (rutas principales)</h3>
+  <p>Overview, Inteligencia (chat con agentes IA), Lab, Database / Knowledge Base, Workflows, Dashboards, Documents, Reports, Settings, Documentation.</p>
+
+  <h2 class="page-break">2. Documentación de usuario (resumen)</h2>
+  <p>La aplicación incluye una sección <strong>Documentation</strong> con la siguiente estructura.</p>
+  <table>
+    <tr><th>Sección</th><th>Contenido</th></tr>
+    <tr><td>Getting Started</td><td>What is Intemic?, Your First Workflow</td></tr>
+    <tr><td>Knowledge Base</td><td>Core Concepts, Property Types, Relationships, Import Data, Use Cases</td></tr>
+    <tr><td>Workflows</td><td>Canvas Basics, Node Types, Connecting Nodes, Execution &amp; Testing, Templates</td></tr>
+    <tr><td>Inteligencia (IA)</td><td>Agents, Chat, Data Access Control, Using Mentions, AI Reports</td></tr>
+    <tr><td>Dashboards</td><td>Widget Types, Data Sources, Filters &amp; Refresh, Sharing</td></tr>
+    <tr><td>Connections</td><td>Available Connectors, Configuration, Testing</td></tr>
+    <tr><td>Lab</td><td>Creating Experiments, Variables &amp; Parameters, Analysis, Comparing Scenarios</td></tr>
+    <tr><td>Settings &amp; Admin</td><td>User Management, Organizations, Notifications</td></tr>
+    <tr><td>Security</td><td>Overview, Authentication &amp; SSO, Roles &amp; Permissions, Data Protection, Privacy &amp; Compliance</td></tr>
+    <tr><td>Troubleshooting</td><td>Common Errors, FAQ</td></tr>
+  </table>
+
+  <h2 class="page-break">3. Importación de casos de uso (Import Package)</h2>
+  <p>La pantalla <strong>Import Package</strong> solo acepta el formato <strong>Use Case</strong>, no el formato Knowledge Base (folders/documents).</p>
+  <h3>3.1 Qué acepta el importador</h3>
+  <table>
+    <tr><th>Sección</th><th>Descripción</th></tr>
+    <tr><td>entities</td><td>Definiciones de entidades (id, name, properties). Obligatorio al menos 1 entidad si se importa modelo.</td></tr>
+    <tr><td>records</td><td>Registros por entidad (id, entityId, values). Puede ser [].</td></tr>
+    <tr><td>workflow</td><td>Un workflow (id, name, data.nodes, data.connections). Opcional.</td></tr>
+    <tr><td>simulation</td><td>Experimento Lab (id, workflowId, parameters, visualizations). Opcional.</td></tr>
+    <tr><td>dashboard</td><td>Dashboard (id, name, widgets). Opcional.</td></tr>
+  </table>
+  <p><strong>No usar:</strong> folders, documents (formato Knowledge Base).</p>
+
+  <h3>3.2 Estructura mínima del JSON</h3>
+  <pre><code>{
+  "name": "Mi paquete",
+  "version": "1.0.0",
+  "entities": [
+    {
+      "id": "ent_ejemplo",
+      "name": "Ejemplo",
+      "properties": [
+        { "id": "p_ej_nombre", "name": "Nombre", "type": "text", "defaultValue": "" },
+        { "id": "p_ej_valor", "name": "Valor", "type": "number", "defaultValue": "0" }
+      ]
+    }
+  ],
+  "records": [
+    { "id": "r_001", "entityId": "ent_ejemplo", "values": { "p_ej_nombre": "Item 1", "p_ej_valor": "10" } }
+  ]
+}</code></pre>
+
+  <h3>3.3 Flujo recomendado</h3>
+  <ol>
+    <li>Generar o exportar el JSON del caso de uso.</li>
+    <li>Validar: POST /api/use-case/validate (body = JSON).</li>
+    <li>Probar sin escribir: POST /api/use-case/import?dryRun=true.</li>
+    <li>Importar en serio: desactivar dry run y usar la UI “Importar package”.</li>
+  </ol>
+  <p>Para crear JSON desde Excel u otras fuentes: usar el prompt para GPT en <code>docs/PROMPT_GPT_CREAR_PAQUETE_CASO_DE_USO.md</code>.</p>
+
+  <h2 class="page-break">4. Seguridad (resumen)</h2>
+  <p>Roadmap de seguridad para adopción enterprise. Detalle en <code>docs/SECURITY_ROADMAP.md</code>.</p>
+  <h3>4.1 Estado actual (implementado)</h3>
+  <ul>
+    <li>Autenticación JWT (cookies HTTP-only), bcrypt, política de contraseñas.</li>
+    <li>Rate limiting, audit logs, multi-tenant por organización.</li>
+    <li>Protección frente a inyección SQL, Helmet, CSP, HSTS.</li>
+    <li>SSO (SAML 2.0 y OpenID Connect), cifrado AES-256-GCM para campos sensibles.</li>
+    <li>RBAC: Admin, Editor, Viewer, Auditor. GDPR: olvido, exportación, consentimientos.</li>
+    <li>Pipeline CI/CD de seguridad.</li>
+  </ul>
+  <h3>4.2 Requisitos típicos enterprise</h3>
+  <p>Mínimo habitual: SSO + SOC 2 + GDPR + Pentest + DPA.</p>
+
+  <h2>5. Cómo obtener este documento en PDF</h2>
+  <ul>
+    <li><strong>Opción A:</strong> Abrir este archivo HTML en el navegador → Archivo → Imprimir → Destino: Guardar como PDF.</li>
+    <li><strong>Opción B:</strong> <code>npx md-to-pdf docs/CONTEXTO_PLATAFORMA.md --dest docs/CONTEXTO_PLATAFORMA.pdf</code></li>
+    <li><strong>Opción C:</strong> Extensión “Markdown PDF” en VS Code/Cursor sobre CONTEXTO_PLATAFORMA.md.</li>
+  </ul>
+
+  <h2>6. Referencia rápida de archivos</h2>
+  <table>
+    <tr><th>Archivo</th><th>Contenido</th></tr>
+    <tr><td>README.md</td><td>Instalación, scripts, variables de entorno.</td></tr>
+    <tr><td>docs/CONTEXTO_PLATAFORMA.md</td><td>Este documento (Markdown).</td></tr>
+    <tr><td>docs/CONTEXTO_PLATAFORMA.html</td><td>Esta versión HTML para imprimir/PDF.</td></tr>
+    <tr><td>docs/SECURITY_ROADMAP.md</td><td>Roadmap de seguridad detallado.</td></tr>
+    <tr><td>docs/PROMPT_GPT_CREAR_PAQUETE_CASO_DE_USO.md</td><td>Prompt para GPT que genera JSON de caso de uso.</td></tr>
+    <tr><td>server/use-case-package-format.md</td><td>Formato técnico del package (entidades, records, workflow, simulation, dashboard).</td></tr>
+  </table>
+
+  <p class="meta" style="margin-top: 2rem;">Documento generado para uso interno y como contexto de la plataforma Intemic Structure Manager.</p>
+
+</body>
+</html>

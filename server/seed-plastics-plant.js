@@ -360,11 +360,11 @@ const simulationData = {
         }
     ],
     visualizations: [
-        { id: 'v_prod', type: 'kpi', title: 'Producción Mensual', dataMapping: { source: 'produccion_mensual', format: 'number' }, position: { x: 0, y: 0, w: 1, h: 1 }, color: '#256A65' },
+        { id: 'v_prod', type: 'kpi', title: 'Producción Mensual', dataMapping: { source: 'produccion_mensual', format: 'number' }, position: { x: 0, y: 0, w: 1, h: 1 }, color: '#5B7476' },
         { id: 'v_ing', type: 'kpi', title: 'Ingresos Mensuales', dataMapping: { source: 'ingresos', format: 'currency' }, position: { x: 1, y: 0, w: 1, h: 1 }, color: '#2563eb' },
         { id: 'v_ben', type: 'kpi', title: 'Beneficio Mensual', dataMapping: { source: 'beneficio', format: 'currency' }, position: { x: 2, y: 0, w: 1, h: 1 }, color: '#16a34a' },
         { id: 'v_mar', type: 'kpi', title: 'Margen', dataMapping: { source: 'margen', format: 'percent' }, position: { x: 3, y: 0, w: 1, h: 1 }, color: '#9333ea' },
-        { id: 'v_proy', type: 'line', title: 'Proyección 12 Meses', dataMapping: { source: 'proyeccion_mensual', xAxis: 'name', yAxis: ['ingresos', 'costos', 'beneficio'], format: 'currency' }, position: { x: 0, y: 1, w: 2, h: 1 }, color: '#256A65' },
+        { id: 'v_proy', type: 'line', title: 'Proyección 12 Meses', dataMapping: { source: 'proyeccion_mensual', xAxis: 'name', yAxis: ['ingresos', 'costos', 'beneficio'], format: 'currency' }, position: { x: 0, y: 1, w: 2, h: 1 }, color: '#5B7476' },
         { id: 'v_costos', type: 'pie', title: 'Desglose de Costos', dataMapping: { source: 'desglose_costos', labelKey: 'name', valueKey: 'value', format: 'currency' }, position: { x: 2, y: 1, w: 2, h: 1 }, color: '#f59e0b' }
     ],
     savedScenarios: [

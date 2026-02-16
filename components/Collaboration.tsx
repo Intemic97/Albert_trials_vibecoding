@@ -119,7 +119,7 @@ export const PresenceIndicator: React.FC<PresenceIndicatorProps> = ({
                     <div className="fixed inset-0 z-40" onClick={() => setIsExpanded(false)} />
                     <div className="absolute top-full mt-2 right-0 w-64 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-lg z-50 overflow-hidden">
                         <div className="px-3 py-2 border-b border-[var(--border-light)] flex items-center gap-2">
-                            <Users size={14} className="text-[#256A65]" weight="light" />
+                            <Users size={14} className="text-[var(--accent-primary)]" weight="light" />
                             <span className="text-xs font-medium text-[var(--text-primary)]">
                                 {users.length} {users.length === 1 ? 'person' : 'people'} online
                             </span>
@@ -220,7 +220,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({
     const getActionIcon = (action: string) => {
         switch (action) {
             case 'create': return <Plus size={12} className="text-emerald-500" weight="bold" />;
-            case 'update': return <PencilSimple size={12} className="text-[#256A65]" weight="light" />;
+            case 'update': return <PencilSimple size={12} className="text-[var(--accent-primary)]" weight="light" />;
             case 'delete': return <Trash size={12} className="text-red-500" weight="light" />;
             case 'comment': return <ChatCircle size={12} className="text-[#84C4D1]" weight="light" />;
             default: return <Eye size={12} className="text-[var(--text-tertiary)]" weight="light" />;
@@ -252,7 +252,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({
                 className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--bg-tertiary)] transition-colors"
             >
                 <div className="flex items-center gap-2">
-                    <Clock size={14} className="text-[#256A65]" weight="light" />
+                    <Clock size={14} className="text-[var(--accent-primary)]" weight="light" />
                     <span className="text-sm font-medium text-[var(--text-primary)]">Recent Activity</span>
                 </div>
                 {isExpanded ? <CaretDown size={12} weight="bold" /> : <CaretRight size={12} weight="bold" />}
@@ -263,7 +263,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({
                 <div className="border-t border-[var(--border-light)]">
                     {isLoading ? (
                         <div className="px-4 py-6 text-center">
-                            <div className="animate-spin w-5 h-5 border-2 border-[var(--border-medium)] border-t-[#256A65] rounded-full mx-auto" />
+                            <div className="animate-spin w-5 h-5 border-2 border-[var(--border-medium)] border-t-[var(--accent-primary)] rounded-full mx-auto" />
                         </div>
                     ) : activities.length === 0 ? (
                         <div className="px-4 py-6 text-center text-xs text-[var(--text-tertiary)]">
@@ -424,7 +424,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
         <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl overflow-hidden">
             {/* Header */}
             <div className="px-4 py-3 border-b border-[var(--border-light)] flex items-center gap-2">
-                <ChatCircle size={14} className="text-[#256A65]" weight="light" />
+                <ChatCircle size={14} className="text-[var(--accent-primary)]" weight="light" />
                 <span className="text-sm font-medium text-[var(--text-primary)]">
                     Comments ({comments.length})
                 </span>
@@ -434,7 +434,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
             <div className="max-h-[300px] overflow-y-auto divide-y divide-[var(--border-light)]">
                 {isLoading ? (
                     <div className="px-4 py-6 text-center">
-                        <div className="animate-spin w-5 h-5 border-2 border-[var(--border-medium)] border-t-[#256A65] rounded-full mx-auto" />
+                        <div className="animate-spin w-5 h-5 border-2 border-[var(--border-medium)] border-t-[var(--accent-primary)] rounded-full mx-auto" />
                     </div>
                 ) : comments.length === 0 ? (
                     <div className="px-4 py-6 text-center text-xs text-[var(--text-tertiary)]">
@@ -493,13 +493,13 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({
                         onChange={e => setNewComment(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && !e.shiftKey && submitComment()}
                         placeholder="Write a comment..."
-                        className="flex-1 px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#256A65] placeholder:text-[var(--text-tertiary)]"
+                        className="flex-1 px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
                         disabled={isSubmitting}
                     />
                     <button
                         onClick={submitComment}
                         disabled={!newComment.trim() || isSubmitting}
-                        className="p-2 bg-[#256A65] hover:bg-[#1e5a55] disabled:bg-[var(--bg-tertiary)] text-white disabled:text-[var(--text-tertiary)] rounded-lg transition-colors"
+                        className="p-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] disabled:bg-[var(--bg-tertiary)] text-white disabled:text-[var(--text-tertiary)] rounded-lg transition-colors"
                     >
                         <PaperPlaneTilt size={14} weight="light" />
                     </button>

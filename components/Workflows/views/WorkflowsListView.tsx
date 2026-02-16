@@ -141,7 +141,7 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                         </button>
                         <button
                             onClick={onCreateNew}
-                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                            className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                         >
                             <FlowArrow size={14} className="mr-2" weight="light" />
                             Create Workflow
@@ -248,9 +248,9 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                         <div
                             data-tutorial="create-workflow"
                             onClick={onCreateNew}
-                            className="border border-dashed border-[var(--border-medium)] rounded-lg flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] cursor-pointer group hover:border-[#256A65] hover:text-[#256A65] transition-colors"
+                            className="border border-dashed border-[var(--border-medium)] rounded-lg flex flex-col items-center justify-center min-h-[200px] text-[var(--text-tertiary)] cursor-pointer group hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] transition-colors"
                         >
-                            <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3 group-hover:bg-[#256A65]/10 transition-colors">
+                            <div className="p-4 bg-[var(--bg-tertiary)] rounded-full mb-3 group-hover:bg-[var(--accent-primary)]/10 transition-colors">
                                 <FlowArrow size={24} weight="light" />
                             </div>
                             <span className="font-medium">Create new workflow</span>

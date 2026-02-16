@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, SignOut, CaretRight, Camera, X, SpinnerGap, ShieldCheck, Plus, CaretUpDown, Cube } from '@phosphor-icons/react';
+import { User, SignOut, CaretRight, Camera, X, SpinnerGap, ShieldCheck, Plus, CaretUpDown, Cube, GearSix, Globe } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { useTranslation } from 'react-i18next';
 
@@ -12,6 +12,11 @@ interface ProfileMenuProps {
     triggerClassName?: string;
     menuPlacement?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
     initialView?: 'main' | 'organizations';
+    /** Cuando se usa, mainTrigger abre el menú principal (ajustes, ayuda, cerrar sesión) y workspaceTrigger abre el selector de workspace */
+    splitTrigger?: {
+        main: React.ReactNode;
+        workspace: React.ReactNode;
+    };
 }
 
 // Reusable Avatar component
@@ -79,7 +84,7 @@ export const OrganizationLogo: React.FC<{
     );
 };
 
-export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerContent, triggerClassName = '', menuPlacement = 'bottom-right', initialView = 'main' }) => {
+export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerContent, triggerClassName = '', menuPlacement = 'bottom-right', initialView = 'main', splitTrigger }) => {
     const { user, logout, organizations, switchOrganization, updateProfile, refreshOrganizations } = useAuth();
     const { t } = useTranslation();
     // console.log('[ProfileMenu] user.isAdmin:', user?.isAdmin);
@@ -186,8 +191,9 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
         const handleClickOutside = (event: MouseEvent) => {
             const targetNode = event.target as Node;
             const clickedTrigger = triggerRef.current?.contains(targetNode);
+            const clickedSplit = splitContainerRef.current?.contains(targetNode);
             const clickedMenu = menuRef.current?.contains(targetNode);
-            if (!clickedTrigger && !clickedMenu) {
+            if (!clickedTrigger && !clickedSplit && !clickedMenu) {
                 setIsOpen(false);
             }
         };
@@ -200,39 +206,46 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
 
     const currentOrg = organizations.find(o => o.id === user?.orgId);
     const triggerRef = useRef<HTMLButtonElement>(null);
-    
+    const splitContainerRef = useRef<HTMLDivElement>(null);
+    const workspaceTriggerRef = useRef<HTMLButtonElement>(null);
+
     // Calculate position for fixed positioning
     const [menuPosition, setMenuPosition] = useState<{ top: number; left?: number; right?: number } | null>(null);
 
+    const MENU_WIDTH_PX = 240; // w-60
+
     useEffect(() => {
-        if (isOpen && triggerRef.current) {
-            const rect = triggerRef.current.getBoundingClientRect();
+        // Anclar al botón que abre el menú: main (INTEMIC) → triggerRef; organizations → botón workspace (⌄)
+        const anchorEl = splitTrigger
+            ? (view === 'main' ? triggerRef.current : workspaceTriggerRef.current ?? splitContainerRef.current)
+            : triggerRef.current;
+        if (isOpen && anchorEl) {
+            const rect = anchorEl.getBoundingClientRect();
             const windowHeight = window.innerHeight;
-            const menuHeight = view === 'organizations' ? 220 : 280; // approximate heights
+            const menuHeight = view === 'organizations' ? 220 : 281; // main: altura real del menú para quedar colindante
             
             let position: { top: number; left?: number; right?: number };
             let top: number;
-            
-            // Position menu to the right of the trigger
-            const left = rect.right + 8;
-            
-            // Position menu so its BOTTOM aligns with the trigger's BOTTOM (near bottom of screen)
-            top = rect.bottom - menuHeight;
-            
-            // Ensure menu doesn't go above screen
-            if (top < 8) {
-                top = 8;
+            let left: number;
+            const gapPx = 0; // colindante: borde inferior del menú = borde superior del botón
+
+            // top-right / top-left: menú encima del trigger, colindando (sin hueco)
+            if (menuPlacement === 'top-right' || menuPlacement === 'top-left') {
+                top = rect.top - menuHeight - gapPx;
+                left = menuPlacement === 'top-left' ? rect.left : Math.max(8, rect.right - MENU_WIDTH_PX);
+                top = Math.max(8, top);
+                if (top + menuHeight > windowHeight - 16) {
+                    top = Math.min(rect.top - menuHeight - gapPx, windowHeight - menuHeight - 16);
+                }
+                position = { left, top };
+            } else {
+                // bottom-right / bottom-left: menú al lado del trigger (comportamiento anterior)
+                left = menuPlacement === 'bottom-left' ? Math.max(8, rect.left) : rect.right + 8;
+                top = rect.bottom - menuHeight;
+                if (top < 8) top = 8;
+                if (top + menuHeight > windowHeight - 16) top = windowHeight - menuHeight - 16;
+                position = { left, top: Math.max(8, top) };
             }
-            
-            // Ensure menu doesn't go below screen - keep it aligned near bottom
-            if (top + menuHeight > windowHeight - 16) {
-                top = windowHeight - menuHeight - 16;
-            }
-            
-            position = { 
-                left,
-                top: Math.max(8, top)
-            };
             
             setMenuPosition(position);
         } else {
@@ -240,27 +253,68 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
         }
     }, [isOpen, menuPlacement, view]);
 
+    const openMainMenu = () => {
+        if (isOpen && view === 'main') {
+            setIsOpen(false);
+        } else {
+            setView('main');
+            setIsOpen(true);
+        }
+    };
+    const openWorkspaceMenu = () => {
+        if (isOpen && view === 'organizations') {
+            setIsOpen(false);
+        } else {
+            setView('organizations');
+            setIsOpen(true);
+        }
+    };
+
     return (
         <>
-        <div className="relative">
-            <button
-                ref={triggerRef}
-                type="button"
-                data-tutorial="profile-menu"
-                onClick={() => setIsOpen(!isOpen)}
-                className={triggerContent
-                    ? triggerClassName
-                    : "rounded-full shadow-md hover:ring-2 hover:ring-[#256A65] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#256A65]"}
-            >
-                {triggerContent ? triggerContent : (
-                    <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />
-                )}
-            </button>
+        <div className="relative" ref={splitTrigger ? splitContainerRef : undefined}>
+            {splitTrigger ? (
+                <div
+                    data-tutorial="profile-menu"
+                    className={`flex items-center justify-between w-full rounded-lg ${triggerClassName}`}
+                >
+                    <button
+                        ref={triggerRef}
+                        type="button"
+                        onClick={openMainMenu}
+                        className="flex items-center gap-3 min-w-0 flex-1 px-2 py-2 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out cursor-pointer text-left"
+                    >
+                        {splitTrigger.main}
+                    </button>
+                    <button
+                        ref={workspaceTriggerRef}
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); openWorkspaceMenu(); }}
+                        className="p-1.5 flex-shrink-0 rounded-lg hover:bg-[var(--sidebar-bg-hover)] transition-colors duration-200 ease-in-out cursor-pointer"
+                    >
+                        {splitTrigger.workspace}
+                    </button>
+                </div>
+            ) : (
+                <button
+                    ref={triggerRef}
+                    type="button"
+                    data-tutorial="profile-menu"
+                    onClick={() => setIsOpen(!isOpen)}
+                    className={triggerContent
+                        ? triggerClassName
+                        : "rounded-full shadow-md hover:ring-2 hover:ring-[var(--accent-primary)] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--accent-primary)]"}
+                >
+                    {triggerContent ? triggerContent : (
+                        <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="md" />
+                    )}
+                </button>
+            )}
 
             {isOpen && menuPosition && createPortal(
                 <div 
                     ref={menuRef}
-                    className="fixed w-60 bg-[var(--sidebar-bg)] rounded-lg border border-[var(--sidebar-border)] py-2 z-[99999] overflow-hidden text-sm font-sans pointer-events-auto transition-colors duration-200"
+                    className="fixed w-60 bg-[var(--sidebar-bg)] rounded-lg border border-[var(--sidebar-border)] py-2 z-[99999] overflow-hidden text-sm font-sans pointer-events-auto transition-colors duration-200 shadow-xl"
                     style={{
                         top: `${menuPosition.top}px`,
                         ...(menuPosition.left !== undefined ? { left: `${menuPosition.left}px` } : {}),
@@ -270,60 +324,71 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
 
                     {view === 'main' ? (
                         <>
-                            {/* Header with user info */}
-                            <div className="px-4 py-3 border-b border-[var(--sidebar-border)]">
-                                <button 
-                                    onClick={openProfileModal}
-                                    className="w-full flex items-center gap-3 hover:opacity-80 transition-opacity"
+                            {/* Email at top - estilo Claude/Cursor */}
+                            <div className="px-4 py-3">
+                                <p className="text-sm text-[var(--sidebar-text)] truncate">{user?.email || 'user@example.com'}</p>
+                            </div>
+
+                            {/* Menu Items - estilo imagen */}
+                            <div className="px-2 py-1 space-y-0.5">
+                                <button
+                                    onClick={() => { setIsOpen(false); onNavigate?.('settings'); }}
+                                    className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                 >
-                                    <UserAvatar name={user?.name} profilePhoto={user?.profilePhoto} size="sm" />
-                                    <div className="min-w-0 flex-1 text-left">
-                                        <h3 className="font-normal text-[var(--sidebar-text)] text-sm truncate">{user?.name || 'User'}</h3>
-                                        <p className="text-xs text-[var(--text-tertiary)] truncate">{user?.email || 'user@example.com'}</p>
+                                    <div className="flex items-center gap-3">
+                                        <GearSix size={16} weight="light" className="text-[var(--sidebar-icon)] flex-shrink-0" />
+                                        <span>{t('profile.settings')}</span>
+                                    </div>
+                                    <kbd className="text-[10px] text-[var(--text-tertiary)] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)]">⌘,</kbd>
+                                </button>
+                                <button
+                                    onClick={() => { setIsOpen(false); onNavigate?.('settings'); }}
+                                    className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Globe size={16} weight="light" className="text-[var(--sidebar-icon)] flex-shrink-0" />
+                                        <span>{t('profile.language')}</span>
                                     </div>
                                     <CaretRight size={14} weight="light" className="text-[var(--sidebar-icon)]" />
                                 </button>
-                            </div>
-
-                            {/* Menu Items */}
-                            <div className="px-3 py-2 space-y-0.5">
+                                <button
+                                    onClick={() => { setIsOpen(false); onNavigate?.('settings-team'); }}
+                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
+                                >
+                                    <User size={16} weight="light" className="text-[var(--sidebar-icon)] flex-shrink-0" />
+                                    <span>{t('profile.inviteMembers')}</span>
+                                </button>
                                 <button
                                     onClick={() => setView('organizations')}
-                                    className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
+                                    className="w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                 >
-                                    <div className="flex items-center">
-                                        <OrganizationLogo name={currentOrg?.name} logo={(currentOrg as any)?.logo} size="sm" className="mr-3" />
-                                        <div className="text-left">
-                                            <span className="text-sm">{t('profile.changeWorkspace')}</span>
-                                            <p className="text-xs text-[var(--text-tertiary)] mt-0.5">{currentOrg?.name || t('profile.select')}</p>
-                                        </div>
+                                    <div className="flex items-center gap-3">
+                                        <OrganizationLogo name={currentOrg?.name} logo={(currentOrg as any)?.logo} size="sm" />
+                                        <span>{t('profile.changeWorkspace')}</span>
                                     </div>
-                                    <CaretRight size={16} weight="light" className="text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)] transition-colors duration-200 ease-in-out" />
+                                    <CaretRight size={14} weight="light" className="text-[var(--sidebar-icon)]" />
                                 </button>
                                 {/* Admin Panel - Only visible for admins */}
                                 {user?.isAdmin && (
                                     <button
-                                        onClick={() => {
-                                            setIsOpen(false);
-                                            onNavigate?.('admin');
-                                        }}
-                                        className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
+                                        onClick={() => { setIsOpen(false); onNavigate?.('admin'); }}
+                                        className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                     >
-                                        <ShieldCheck size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                        <span className="transition-colors duration-200 ease-in-out">{t('profile.adminPanel')}</span>
+                                        <ShieldCheck size={16} weight="light" className="text-[var(--sidebar-icon)] flex-shrink-0" />
+                                        <span>{t('profile.adminPanel')}</span>
                                     </button>
                                 )}
                             </div>
 
                             <div className="border-t border-[var(--sidebar-border)] my-1 mx-3"></div>
 
-                            <div className="px-3 pb-2">
+                            <div className="px-2 pb-2">
                                 <button
                                     onClick={logout}
-                                    className="w-full flex items-center px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left group text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
+                                    className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg cursor-pointer transition-all duration-200 ease-in-out text-left text-[var(--sidebar-text)] hover:text-[var(--sidebar-text-hover)] hover:bg-[var(--sidebar-bg-hover)]"
                                 >
-                                    <SignOut size={16} weight="light" className="mr-3 transition-colors duration-200 ease-in-out text-[var(--sidebar-icon)] group-hover:text-[var(--sidebar-text-hover)]" />
-                                    <span className="transition-colors duration-200 ease-in-out">{t('profile.logout')}</span>
+                                    <SignOut size={16} weight="light" className="text-[var(--sidebar-icon)] flex-shrink-0" />
+                                    <span>{t('profile.logout')}</span>
                                 </button>
                             </div>
                         </>
@@ -447,7 +512,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     type="text"
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
-                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
+                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
                                     placeholder={t('profile.yourName')}
                                 />
                             </div>
@@ -460,7 +525,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                     type="text"
                                     value={editRole}
                                     onChange={(e) => setEditRole(e.target.value)}
-                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
+                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
                                     placeholder={t('profile.companyRolePlaceholder')}
                                 />
                             </div>
@@ -530,7 +595,7 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
                                 type="text"
                                 value={newOrgName}
                                 onChange={(e) => setNewOrgName(e.target.value)}
-                                className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[#256A65] focus:border-[#256A65] placeholder:text-[var(--text-tertiary)]"
+                                className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] bg-[var(--bg-card)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
                                 placeholder={t('profile.workspaceNamePlaceholder')}
                                 autoFocus
                                 onKeyDown={(e) => {

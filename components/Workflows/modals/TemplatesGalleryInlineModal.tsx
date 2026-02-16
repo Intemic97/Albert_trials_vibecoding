@@ -57,7 +57,7 @@ export const TemplatesGalleryInlineModal: React.FC<TemplatesGalleryInlineModalPr
         <div className="px-6 py-5 border-b border-[var(--border-light)] shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#256A65] to-[#84C4D1] flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--accent-primary)] to-[#84C4D1] flex items-center justify-center">
                 <BookOpen size={24} className="text-white" weight="light" />
               </div>
               <div>

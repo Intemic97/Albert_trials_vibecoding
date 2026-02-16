@@ -139,7 +139,7 @@ const InputField: React.FC<InputFieldProps> = ({ input, value, onChange }) => {
                             value={value || ''}
                             onChange={(e) => onChange(e.target.value)}
                             placeholder={input.placeholder}
-                            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[#256A65] transition-colors"
+                            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors"
                         />
                     )}
 
@@ -149,7 +149,7 @@ const InputField: React.FC<InputFieldProps> = ({ input, value, onChange }) => {
                                 type="file"
                                 accept={input.nodeType === 'excelInput' ? '.xlsx,.xls,.csv' : '.pdf'}
                                 onChange={(e) => onChange(e.target.files?.[0] || null)}
-                                className="w-full text-sm text-[var(--text-secondary)] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-[#256A65]/10 file:text-[#256A65] hover:file:bg-[#256A65]/20 file:cursor-pointer cursor-pointer"
+                                className="w-full text-sm text-[var(--text-secondary)] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-[var(--accent-primary)]/10 file:text-[var(--accent-primary)] hover:file:bg-[var(--accent-primary)]/20 file:cursor-pointer cursor-pointer"
                             />
                             {value && (
                                 <p className="text-xs text-[var(--text-tertiary)]">
@@ -165,7 +165,7 @@ const InputField: React.FC<InputFieldProps> = ({ input, value, onChange }) => {
                             onChange={(e) => onChange(e.target.value)}
                             placeholder={input.placeholder}
                             rows={4}
-                            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[#256A65] transition-colors font-mono resize-none"
+                            className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:border-[var(--accent-primary)] transition-colors font-mono resize-none"
                         />
                     )}
                 </div>
@@ -333,16 +333,16 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                             status === 'success' ? 'bg-green-500/10' :
                             status === 'error' ? 'bg-red-500/10' :
-                            'bg-[#256A65]/10'
+                            'bg-[var(--accent-primary)]/10'
                         }`}>
                             {status === 'running' ? (
-                                <SpinnerGap size={20} className="text-[#256A65] animate-spin" weight="light" />
+                                <SpinnerGap size={20} className="text-[var(--accent-primary)] animate-spin" weight="light" />
                             ) : status === 'success' ? (
                                 <CheckCircle size={20} className="text-green-500" weight="fill" />
                             ) : status === 'error' ? (
                                 <XCircle size={20} className="text-red-500" weight="fill" />
                             ) : (
-                                <Play size={20} className="text-[#256A65]" weight="fill" />
+                                <Play size={20} className="text-[var(--accent-primary)]" weight="fill" />
                             )}
                         </div>
                         <div>
@@ -381,7 +381,7 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
                         <div className="mb-4 space-y-2">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Lightning size={14} className="text-[#256A65]" weight="fill" />
+                                    <Lightning size={14} className="text-[var(--accent-primary)]" weight="fill" />
                                     <span className="text-xs font-medium text-[var(--text-secondary)]">
                                         Running in background
                                     </span>
@@ -407,7 +407,7 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
                             </div>
                             <div className="w-full bg-[var(--bg-tertiary)] rounded-full h-2 overflow-hidden">
                                 <div 
-                                    className="bg-[#256A65] h-2 rounded-full transition-all duration-300 ease-out"
+                                    className="bg-[var(--accent-primary)] h-2 rounded-full transition-all duration-300 ease-out"
                                     style={{ width: `${progressPercentage}%` }}
                                 />
                             </div>
@@ -430,7 +430,7 @@ export const WorkflowRunnerModal: React.FC<WorkflowRunnerModalProps> = ({
                                         ) : log.status === 'error' || log.status === 'failed' ? (
                                             <XCircle size={12} className="text-red-500 flex-shrink-0" weight="fill" />
                                         ) : (
-                                            <CircleNotch size={12} className="text-[#256A65] flex-shrink-0 animate-spin" weight="light" />
+                                            <CircleNotch size={12} className="text-[var(--accent-primary)] flex-shrink-0 animate-spin" weight="light" />
                                         )}
                                         <span className="text-[var(--text-secondary)] truncate">
                                             {log.nodeLabel || log.nodeType}

@@ -305,7 +305,7 @@ export const PromptInput: React.FC<PromptInputProps> = ({
                 <button
                     onClick={handleSubmit}
                     disabled={isGenerating || !prompt.trim()}
-                    className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="absolute right-3 bottom-3 w-10 h-10 flex items-center justify-center bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
                     title="Send (Enter)"
                 >
                     {isGenerating ? (

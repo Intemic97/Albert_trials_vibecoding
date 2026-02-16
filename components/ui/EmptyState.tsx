@@ -60,7 +60,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       {action && (
         <button
           onClick={action.onClick}
-          className="inline-flex items-center px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+          className="inline-flex items-center px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
         >
           {action.label}
         </button>

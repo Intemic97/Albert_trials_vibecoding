@@ -66,7 +66,7 @@ export const VisualizationConfigPanel: React.FC<VisualizationConfigPanelProps> =
                 <button
                     onClick={handleSave}
                     disabled={!generatedWidget}
-                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     Save Visualization
                 </button>
@@ -123,7 +123,7 @@ export const VisualizationConfigPanel: React.FC<VisualizationConfigPanelProps> =
                     <button
                         onClick={generateWidgetFromPrompt}
                         disabled={!visualizationPrompt.trim() || !hasInputData || isGeneratingWidget}
-                        className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
+                        className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed gap-2"
                     >
                         {isGeneratingWidget ? (
                             <>

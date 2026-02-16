@@ -980,7 +980,7 @@ export const DynamicChart: React.FC<DynamicChartProps> = memo(({ config, height 
                     isConfigIncomplete ? 'Configuration incomplete for this visualization' : 'No data available'
                 ) : (
                     <div className="flex flex-col items-center gap-2">
-                        <div className="w-6 h-6 border-2 border-[var(--border-medium)] border-t-[#256A65] rounded-full animate-spin" />
+                        <div className="w-6 h-6 border-2 border-[var(--border-medium)] border-t-[var(--accent-primary)] rounded-full animate-spin" />
                         <span className="text-xs">Loading chart...</span>
                     </div>
                 )}

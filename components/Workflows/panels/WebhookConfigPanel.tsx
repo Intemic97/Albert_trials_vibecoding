@@ -32,7 +32,7 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({ nodeId, 
         footer={
             <button
                 onClick={onClose}
-                className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
             >
                 Close
             </button>
@@ -55,7 +55,7 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({ nodeId, 
                             navigator.clipboard.writeText(webhookUrl);
                             showToast('Webhook URL copied!', 'success');
                         }}
-                        className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                        className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                     >
                         Copy
                     </button>
@@ -78,7 +78,7 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({ nodeId, 
                             navigator.clipboard.writeText(`${webhookUrl}/${webhookToken}`);
                             showToast('Secure webhook URL copied!', 'success');
                         }}
-                        className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                        className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                     >
                         Copy
                     </button>
@@ -96,7 +96,7 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({ nodeId, 
 
             <div className="text-xs text-[var(--text-secondary)]">
                     <p className="font-medium mb-1">Example cURL:</p>
-                    <pre className="bg-slate-800 text-[#256A65] p-2 rounded overflow-x-auto">
+                    <pre className="bg-slate-800 text-[var(--accent-primary)] p-2 rounded overflow-x-auto">
 {`curl -X POST ${webhookUrl} \\
 -H "Content-Type: application/json" \\
 -d '{"key": "value"}'`}

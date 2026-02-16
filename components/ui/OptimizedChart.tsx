@@ -54,7 +54,7 @@ export interface OptimizedChartProps {
 // ============================================================================
 
 const DEFAULT_COLORS = [
-    '#256A65', // Primary brand color
+    '#5B7476', // Primary brand color
     '#84C4D1', // Secondary brand color
     '#3B82F6', // Blue
     '#10B981', // Green

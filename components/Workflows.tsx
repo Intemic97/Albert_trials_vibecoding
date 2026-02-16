@@ -3122,7 +3122,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                 </button>
                                 <button
                                     onClick={createNewWorkflow}
-                                    className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
+                                    className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all duration-200 shadow-sm hover:shadow-md active:scale-95"
                                 >
                                     <Workflow size={14} className="mr-2" weight="light" />
                                     Create Workflow
@@ -3843,7 +3843,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                     e.stopPropagation();
                                                     handleRunNode(node.id);
                                                 }}
-                                                className="p-2 bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[#256A65] transition-all"
+                                                className="p-2 bg-[var(--bg-card)] hover:bg-[var(--bg-tertiary)] rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-all"
                                                 title="Run Node"
                                             >
                                                 <Play size={14} fill="currentColor" weight="light" />
@@ -3868,7 +3868,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                     e.stopPropagation();
                                                     duplicateNode(node.id);
                                                 }}
-                                                className="p-2 bg-[var(--bg-card)] hover:bg-[#256A65]/10 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[#256A65] transition-all"
+                                                className="p-2 bg-[var(--bg-card)] hover:bg-[var(--accent-primary)]/10 rounded-lg shadow-md border border-[var(--border-light)] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] transition-all"
                                                 title="Duplicate Node (Ctrl+D)"
                                             >
                                                 <Copy size={14} weight="light" />
@@ -4167,7 +4167,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                 {(node.config?.columnsOutputA?.length || 0) > 0 || (node.config?.columnsOutputB?.length || 0) > 0 ? (
                                                     <div className="flex flex-col gap-1.5">
                                                         <p className="text-xs text-[var(--text-secondary)] break-words">
-                                                            <span className="font-medium text-[#256A65]">A:</span> {node.config?.columnsOutputA?.length || 0} cols
+                                                            <span className="font-medium text-[var(--accent-primary)]">A:</span> {node.config?.columnsOutputA?.length || 0} cols
                                                         </p>
                                                         <p className="text-xs text-[var(--text-secondary)] break-words">
                                                             <span className="font-medium text-[#84C4D1]">B:</span> {node.config?.columnsOutputB?.length || 0} cols
@@ -4273,7 +4273,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                             <div className={`w-5 h-5 bg-green-50 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'true' ? 'border-green-500 scale-125 bg-green-100 shadow-md' : 'border-green-400 group-hover/connector:border-green-500 group-hover/connector:bg-green-100 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
                                                                 title="TRUE path" />
                                                         </div>
-                                                        <span className="absolute -right-6 text-[9px] font-normal text-[#256A65]" style={{ top: 'calc(50% - 37px)', transform: 'translateY(-50%)' }}>✓</span>
+                                                        <span className="absolute -right-6 text-[9px] font-normal text-[var(--accent-primary)]" style={{ top: 'calc(50% - 37px)', transform: 'translateY(-50%)' }}>✓</span>
 
                                                         {/* FALSE output - below center (red) */}
                                                         <div className="absolute right-0 group/connector z-30 pointer-events-auto" style={{ top: 'calc(50% + 37px)', transform: 'translate(50%, -50%)' }}>
@@ -4311,7 +4311,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                                 }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-5 h-5 bg-[#256A65]/10 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-[#256A65] scale-125 bg-[#256A65]/20 shadow-md' : 'border-[#256A65]/60 group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/20 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
+                                                            <div className={`w-5 h-5 bg-[var(--accent-primary)]/10 border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id && dragConnectionStart?.outputType === 'A' ? 'border-[var(--accent-primary)] scale-125 bg-[var(--accent-primary)]/20 shadow-md' : 'border-[var(--accent-primary)]/60 group-hover/connector:border-[var(--accent-primary)] group-hover/connector:bg-[var(--accent-primary)]/20 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} 
                                                                 title="Output A" />
                                                         </div>
                                                         <span className="absolute -right-6 text-[9px] font-normal text-blue-600" style={{ top: 'calc(50% - 37px)', transform: 'translateY(-50%)' }}>A</span>
@@ -4351,7 +4351,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                         {/* Larger hit area for easier clicking */}
                                                         <div className="absolute inset-0 -m-2 cursor-crosshair pointer-events-auto" />
                                                         {/* Visible connector point */}
-                                                        <div className={`w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id ? 'border-[#256A65] scale-125 bg-[#256A65]/10 shadow-md' : 'border-[var(--border-medium)] group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} />
+                                                        <div className={`w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none ${dragConnectionStart?.nodeId === node.id ? 'border-[var(--accent-primary)] scale-125 bg-[var(--accent-primary)]/10 shadow-md' : 'border-[var(--border-medium)] group-hover/connector:border-[var(--accent-primary)] group-hover/connector:bg-[var(--accent-primary)]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md'}`} />
                                                     </div>
                                                 )}
                                                 
@@ -4398,7 +4398,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                                 }}
                                                             />
                                                             {/* Visible connector point */}
-                                                            <div className={`w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none border-[var(--border-medium)] group-hover/connector:border-[#256A65] group-hover/connector:bg-[#256A65]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md`} />
+                                                            <div className={`w-5 h-5 bg-[var(--bg-card)] border-2 rounded-full transition-all shadow-sm pointer-events-none border-[var(--border-medium)] group-hover/connector:border-[var(--accent-primary)] group-hover/connector:bg-[var(--accent-primary)]/10 group-hover/connector:scale-110 group-hover/connector:shadow-md`} />
                                                         </div>
                                                     )
                                                 )}
@@ -4415,10 +4415,10 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                             setShowComponentSearch(true);
                                                             setComponentSearchQuery('');
                                                         }}
-                                                        className="absolute -right-14 top-1/2 -translate-y-1/2 w-6 h-6 bg-[var(--bg-card)] border-2 border-[var(--border-medium)] rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-[#256A65] hover:bg-[#256A65]/10 hover:scale-110 shadow-sm z-25 pointer-events-auto"
+                                                        className="absolute -right-14 top-1/2 -translate-y-1/2 w-6 h-6 bg-[var(--bg-card)] border-2 border-[var(--border-medium)] rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 hover:scale-110 shadow-sm z-25 pointer-events-auto"
                                                         title="Quick connect component"
                                                     >
-                                                        <Plus size={14} className="text-[var(--text-secondary)] group-hover:text-[#256A65]" />
+                                                        <Plus size={14} className="text-[var(--text-secondary)] group-hover:text-[var(--accent-primary)]" />
                                                     </button>
                                                 )}
                                             </>
@@ -4458,7 +4458,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                         : dragConnectionStart.outputType === 'false' ? '#ef4444'
                                         : dragConnectionStart.outputType === 'A' ? '#3b82f6'
                                         : dragConnectionStart.outputType === 'B' ? '#a855f7'
-                                            : '#256A65';
+                                            : 'var(--accent-primary)';
                                     
                                     return (
                                     <svg
@@ -4521,7 +4521,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                         <div className="text-center max-w-lg px-6">
                                             <div className="mb-8">
                                                 <div className="relative mb-6">
-                                                    <div className="absolute inset-0 bg-gradient-to-br from-[#256A65]/10 to-[var(--bg-tertiary)] rounded-full blur-3xl"></div>
+                                                    <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent-primary)]/10 to-[var(--bg-tertiary)] rounded-full blur-3xl"></div>
                                                     <Workflow size={80} className="mx-auto relative text-[var(--text-tertiary)]" />
                                                 </div>
                                                 <h3 className="text-2xl font-normal text-[var(--text-primary)] mb-3">Start building your workflow</h3>
@@ -4618,7 +4618,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                         <button
                                             onClick={saveNodeConfig}
                                             disabled={!selectedEntityId}
-                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Save
                                         </button>
@@ -5060,7 +5060,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                     {/* Share & Embed Section */}
                                     <div className="mb-6 space-y-4">
                                         {/* Shareable Link */}
-                                        <div className="bg-gradient-to-r from-[#256A65]/5 to-[#256A65]/10 rounded-xl p-4 border border-[#256A65]/20">
+                                        <div className="bg-gradient-to-r from-[var(--accent-primary)]/5 to-[var(--accent-primary)]/10 rounded-xl p-4 border border-[var(--accent-primary)]/20">
                                             <label className="block text-sm font-normal text-teal-800 mb-2 flex items-center gap-2">
                                                 <Globe size={16} weight="light" />
                                                 Published Interface
@@ -5070,11 +5070,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                     type="text"
                                                     readOnly
                                                     value={getShareableUrl()}
-                                                    className="flex-1 px-3 py-2 bg-[var(--bg-card)] border border-[#256A65]/30 rounded-lg text-sm text-[var(--text-secondary)] focus:outline-none"
+                                                    className="flex-1 px-3 py-2 bg-[var(--bg-card)] border border-[var(--accent-primary)]/30 rounded-lg text-sm text-[var(--text-secondary)] focus:outline-none"
                                                 />
                                                 <button
                                                     onClick={() => copyToClipboard(getShareableUrl(), 'Link copied to clipboard!')}
-                                                    className="px-4 py-2 bg-[var(--bg-card)] border border-[#256A65]/30 rounded-lg hover:bg-[#256A65]/5 transition-colors text-[#1e554f] font-medium text-sm flex items-center gap-2"
+                                                    className="px-4 py-2 bg-[var(--bg-card)] border border-[var(--accent-primary)]/30 rounded-lg hover:bg-[var(--accent-primary)]/5 transition-colors text-[var(--accent-primary)] font-medium text-sm flex items-center gap-2"
                                                 >
                                                     <Share2 size={16} weight="light" />
                                                     Copy
@@ -5148,11 +5148,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                         />
                                                         <label
                                                             htmlFor={`runner-file-${node.id}`}
-                                                            className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-[var(--border-medium)] rounded-lg cursor-pointer hover:border-[#256A65] hover:bg-[#256A65]/5 transition-all"
+                                                            className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-[var(--border-medium)] rounded-lg cursor-pointer hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/5 transition-all"
                                                         >
                                                             {runnerFileInputs[node.id] ? (
                                                                 <>
-                                                                    <CheckCircle className="text-[#256A65]" size={20} weight="light" />
+                                                                    <CheckCircle className="text-[var(--accent-primary)]" size={20} weight="light" />
                                                                     <span className="text-[var(--text-primary)] font-medium">{runnerFileInputs[node.id]?.name}</span>
                                                                 </>
                                                             ) : (

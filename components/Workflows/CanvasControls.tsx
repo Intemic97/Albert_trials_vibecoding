@@ -33,7 +33,7 @@ export const CanvasControls: React.FC<CanvasControlsProps> = ({
             className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
             title="AI Workflow Assistant"
           >
-            <Sparkle size={16} className="text-[#256A65]" weight="light" />
+            <Sparkle size={16} className="text-[var(--accent-primary)]" weight="light" />
             <span className="text-sm text-[var(--text-primary)]">Ask</span>
           </button>
           

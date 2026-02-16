@@ -231,7 +231,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                     <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-4">
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-[#84C4D1]/20 rounded-lg">
-                                <Users size={20} weight="light" className="text-[#256A65]" />
+                                <Users size={20} weight="light" className="text-[var(--accent-primary)]" />
                             </div>
                             <div>
                                 <p className="text-2xl font-normal text-slate-800">{stats?.users || 0}</p>
@@ -241,8 +241,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onNavigate }) => {
                     </div>
                     <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-[#256A65]/10 rounded-lg">
-                                <Buildings size={20} weight="light" className="text-[#256A65]" />
+                            <div className="p-2 bg-[var(--accent-primary)]/10 rounded-lg">
+                                <Buildings size={20} weight="light" className="text-[var(--accent-primary)]" />
                             </div>
                             <div>
                                 <p className="text-2xl font-normal text-slate-800">{stats?.organizations || 0}</p>

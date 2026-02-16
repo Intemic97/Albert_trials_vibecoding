@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { WidgetFullConfig } from './WidgetConfigurator';
 
-const DEFAULT_COLORS = ['#256A65', '#84C4D1', '#3d8a84', '#5ba9a3', '#79c9c3'];
+const DEFAULT_COLORS = ['#5B7476', '#84C4D1', '#3d8a84', '#5ba9a3', '#79c9c3'];
 
 // ============================================================================
 // KPI WIDGET
@@ -32,7 +32,7 @@ export const KPIWidget: React.FC<KPIWidgetProps> = ({
     format = 'number',
     prefix = '',
     suffix = '',
-    color = '#256A65'
+    color = '#5B7476'
 }) => {
     const numericValue = typeof value === 'number' ? value : parseFloat(value) || 0;
     const change = previousValue ? ((numericValue - previousValue) / previousValue) * 100 : null;
@@ -84,7 +84,7 @@ export const StatWidget: React.FC<StatWidgetProps> = ({
     value,
     subtitle,
     icon,
-    color = '#256A65'
+    color = '#5B7476'
 }) => {
     return (
         <div className="h-full flex items-center gap-4 p-4">
@@ -135,7 +135,7 @@ export const GaugeWidget: React.FC<GaugeWidgetProps> = ({
     suffix = '%'
 }) => {
     const percentage = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
-    const currentColor = thresholds.reduce((acc, t) => percentage <= t.value ? acc : t.color, thresholds[0]?.color || '#256A65');
+    const currentColor = thresholds.reduce((acc, t) => percentage <= t.value ? acc : t.color, thresholds[0]?.color || '#5B7476');
 
     return (
         <div className="h-full flex flex-col items-center justify-center p-4">
@@ -185,7 +185,7 @@ export const TrendWidget: React.FC<TrendWidgetProps> = ({
     title,
     value,
     data,
-    color = '#256A65'
+    color = '#5B7476'
 }) => {
     const lastValue = data[data.length - 1]?.value || 0;
     const firstValue = data[0]?.value || 0;

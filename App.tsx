@@ -215,6 +215,7 @@ function AuthenticatedApp() {
             'documentation': '/documentation',
             'import-use-case': '/import-use-case',
             'settings': '/settings',
+            'settings-team': '/settings?tab=team',
             'admin': '/admin',
         };
         navigate(routes[view] || '/overview');
@@ -1452,7 +1453,7 @@ function AuthenticatedApp() {
                                     <button
                                         key={id}
                                         onClick={(e) => { e.stopPropagation(); rec && handleRecordClick(rec, relatedInfo.entity); }}
-                                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-800 hover:bg-teal-200 transition-colors"
+                                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/20 transition-colors"
                                     >
                                         {rec ? getRecordDisplayName(rec, relatedInfo.entity) : 'Unknown'}
                                     </button>

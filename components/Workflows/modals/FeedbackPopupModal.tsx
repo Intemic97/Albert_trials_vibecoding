@@ -71,7 +71,7 @@ export const FeedbackPopupModal: React.FC<FeedbackPopupModalProps> = ({
           <button
             onClick={onSubmit}
             disabled={!feedbackText.trim() || isSubmittingFeedback}
-            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmittingFeedback ? (
               <>

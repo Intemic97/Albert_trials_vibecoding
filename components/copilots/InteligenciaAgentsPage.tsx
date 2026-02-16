@@ -140,7 +140,7 @@ export const InteligenciaAgentsPage: React.FC = () => {
         </div>
         <button
           onClick={() => openFromTemplate(template)}
-          className="w-full py-2 px-3 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+          className="w-full py-2 px-3 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
         >
           {t('agents.useTemplate')}
         </button>
@@ -175,7 +175,7 @@ export const InteligenciaAgentsPage: React.FC = () => {
           </button>
           <button
             onClick={() => { setSelectedTemplate(undefined); setShowCreateWorkflow(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md"
           >
             <Plus size={16} weight="bold" />
             {t('agents.newAgent')}
@@ -205,7 +205,7 @@ export const InteligenciaAgentsPage: React.FC = () => {
                 </button>
                 <button
                   onClick={() => { setSelectedTemplate(undefined); setShowCreateWorkflow(true); }}
-                  className="flex items-center gap-2 px-4 py-2 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-sm font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium"
                 >
                   <Plus size={16} weight="bold" />
                   {t('agents.newAgent')}
@@ -264,7 +264,7 @@ export const InteligenciaAgentsPage: React.FC = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleChat(agent)}
-                        className="flex-1 px-3 py-1.5 bg-[var(--bg-selected)] hover:bg-[#555555] text-white rounded-lg text-xs transition-colors flex items-center justify-center"
+                        className="flex-1 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs transition-colors flex items-center justify-center"
                         title="Chat"
                       >
                         {t('agents.chat')}

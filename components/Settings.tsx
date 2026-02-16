@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { User, Envelope, Plus, X, Check, Lightning, Crown, Sparkle, CreditCard, ArrowSquareOut, SpinnerGap, LinkSimple, LinkBreak, Copy, CheckCircle, WarningCircle, Sun, Moon, Monitor, Shield, Camera } from '@phosphor-icons/react';
 import { UserAvatar, OrganizationLogo } from './ProfileMenu';
 import { PageHeader } from './PageHeader';
@@ -58,7 +59,19 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
     const { mode, setMode, isDark } = useTheme();
     const { organizations, refreshOrganizations, user, updateProfile } = useAuth();
     const { t, i18n } = useTranslation();
-    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'integrations' | 'activity'>('general');
+    const [searchParams] = useSearchParams();
+    const tabParam = searchParams.get('tab');
+    const [activeTab, setActiveTab] = useState<'general' | 'team' | 'integrations' | 'activity'>(
+        (tabParam === 'team' || tabParam === 'integrations' || tabParam === 'activity') ? tabParam : 'general'
+    );
+
+    // Sync activeTab when URL ?tab= changes (e.g. from profile menu "Invite members")
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab === 'team' || tab === 'integrations' || tab === 'activity') {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
     const [users, setUsers] = useState<OrgUser[]>([]);
     const [pendingInvitations, setPendingInvitations] = useState<{ id: string; email: string; invitedByName: string; createdAt: string }[]>([]);
     const [isInviting, setIsInviting] = useState(false);
@@ -136,7 +149,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
             description: 'Para equipos en crecimiento',
             icon: <Lightning weight="light" className="w-6 h-6" />,
             popular: true,
-            gradient: 'from-[#256A65] to-emerald-600',
+            gradient: 'from-[var(--accent-primary)] to-emerald-600',
             features: [
                 { text: 'Workflows ilimitados', included: true },
                 { text: '5.000 ejecuciones/mes', included: true },
@@ -693,7 +706,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${user.role === 'admin'
-                                                        ? 'bg-[#256A65]/10 text-[#256A65] border border-[#256A65]/30'
+                                                        ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] border border-[var(--accent-primary)]/30'
                                                         : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)]'
                                                         }`}>
                                                         {user.role}
@@ -996,7 +1009,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     <button
                                         onClick={updateCompanyInfo}
                                         disabled={isSavingCompany}
-                                        className="btn-3d btn-primary-3d text-sm text-white rounded-lg font-medium hover:bg-[#1e554f] transition-colors disabled:opacity-50 flex items-center gap-2"
+                                        className="btn-3d btn-primary-3d text-sm text-white rounded-lg font-medium hover:bg-[var(--accent-primary-hover)] transition-colors disabled:opacity-50 flex items-center gap-2"
                                     >
                                         {isSavingCompany ? (
                                             <>
@@ -1267,7 +1280,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                                 ? 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-default'
                                                                 : plan.id === 'free'
                                                                     ? 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed'
-                                                                    : 'bg-[rgb(91,121,128)] text-white hover:bg-[#1e554f]'
+                                                                    : 'bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-primary-hover)]'
                                                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                                                     >
                                                         {isProcessingPayment ? (
@@ -1461,7 +1474,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                                     <button
                                                         onClick={connectSlack}
                                                         disabled={isConnectingSlack || !slackBotToken.trim()}
-                                                        className="flex items-center gap-2 btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="flex items-center gap-2 btn-3d btn-primary-3d text-sm hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     >
                                                         {isConnectingSlack ? (
                                                             <>
@@ -1504,7 +1517,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
 
                 {/* Invite Modal */}
                 {isInviting && (
-                    <div className="fixed inset-0 bg-[#256A65]/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-[var(--accent-primary)]/20 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                         <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-md overflow-hidden">
                             <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between bg-[var(--bg-tertiary)]/50">
                                 <h3 className="font-normal text-slate-800">Invite Team Member</h3>
@@ -1568,7 +1581,7 @@ export const Settings: React.FC<SettingsProps> = ({ onViewChange, onShowTutorial
                                     {!inviteLink && (
                                         <button
                                             type="submit"
-                                            className="btn-3d btn-primary-3d text-sm hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-colors"
+                                            className="btn-3d btn-primary-3d text-sm hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
                                         >
                                             Send Invitation
                                         </button>

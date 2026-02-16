@@ -424,11 +424,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
                                                 onMouseEnter={() => setSelectedIndex(currentIndex)}
                                                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
                                                     isSelected
-                                                        ? 'bg-[#256A65]/10 text-[#256A65]'
+                                                        ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]'
                                                         : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                                                 }`}
                                             >
-                                                <div className={`shrink-0 ${isSelected ? 'text-[#256A65]' : 'text-[var(--text-tertiary)]'}`}>
+                                                <div className={`shrink-0 ${isSelected ? 'text-[var(--accent-primary)]' : 'text-[var(--text-tertiary)]'}`}>
                                                     {item.icon}
                                                 </div>
                                                 <div className="flex-1 min-w-0">

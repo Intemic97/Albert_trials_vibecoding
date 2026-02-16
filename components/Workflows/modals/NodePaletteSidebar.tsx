@@ -63,7 +63,7 @@ export const NodePaletteSidebar: React.FC<NodePaletteSidebarProps> = ({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoComplete="off"
                 name="component-search-nofill"
-                className="w-full pl-9 pr-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#256A65] focus:border-transparent placeholder:text-[var(--text-tertiary)]"
+                className="w-full pl-9 pr-4 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-transparent placeholder:text-[var(--text-tertiary)]"
               />
             </div>
           </div>
@@ -183,9 +183,9 @@ export const NodePaletteSidebar: React.FC<NodePaletteSidebarProps> = ({
                 title={item.label}
               >
                 <div className={`p-1 rounded ${item.category === 'Triggers' ? 'bg-cyan-100 text-cyan-700' :
-                  item.category === 'Data' ? 'bg-[#256A65]/10 text-[#256A65]' :
+                  item.category === 'Data' ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]' :
                     item.category === 'Logic' ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' :
-                      'bg-[#84C4D1]/20 text-[#256A65]'
+                      'bg-[#84C4D1]/20 text-[var(--accent-primary)]'
                   }`}>
                   {React.createElement(item.icon, { size: 16, weight: "light" })}
                 </div>

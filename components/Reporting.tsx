@@ -821,7 +821,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                             </div>
                             <button
                                 onClick={() => setShowNewReportModal(true)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                             >
                                 <Plus size={14} />
                                 New Document
@@ -853,7 +853,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 <p className="text-[var(--text-tertiary)] text-xs mt-1">Create your first document to get started</p>
                                 <button
                                     onClick={() => setShowNewReportModal(true)}
-                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                                 >
                                     <Plus size={16} />
                                     Create Document
@@ -978,7 +978,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 </button>
                                 <button
                                     onClick={handleCreateTemplate}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                 >
                                     <Plus size={14} />
                                     New Template
@@ -1011,7 +1011,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                 <p className="text-[var(--text-tertiary)] text-xs mt-1">Create your first template to structure your documents</p>
                                 <button
                                     onClick={handleCreateTemplate}
-                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
+                                    className="mt-6 flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md mx-auto"
                                 >
                                     <Plus size={16} />
                                     Create Template
@@ -1238,7 +1238,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                         <button
                                             onClick={handleGenerateTemplate}
                                             disabled={!aiPrompt.trim() || isGeneratingTemplate}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {isGeneratingTemplate ? (
                                                 <>
@@ -1294,7 +1294,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                         </button>
                                         <button
                                             onClick={handleUseGeneratedTemplate}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-[#256A65] hover:bg-[#1e554f] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
                                         >
                                             Use This Template
                                         </button>
@@ -1463,7 +1463,7 @@ const NewReportModal: React.FC<NewReportModalProps> = ({ templates, orgUsers, on
                     <button
                         onClick={handleSubmit}
                         disabled={isCreating || templates.length === 0}
-                        className="flex items-center gap-2 px-3 py-2 bg-[#256A65] hover:bg-[#1e554f] disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-tertiary)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
+                        className="flex items-center gap-2 px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-tertiary)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                         {isCreating ? (
                             <>
@@ -1810,7 +1810,7 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     <button
                         onClick={handleSubmit}
                         disabled={isSaving}
-                        className="flex items-center gap-2 px-3 py-2 bg-[#256A65] hover:bg-[#1e554f] disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-tertiary)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
+                        className="flex items-center gap-2 px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-tertiary)] text-white rounded-lg text-sm font-medium transition-all shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                         {isSaving ? (
                             <>

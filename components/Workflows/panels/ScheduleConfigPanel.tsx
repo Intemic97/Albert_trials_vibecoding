@@ -44,10 +44,10 @@ export const ScheduleConfigPanel: React.FC<ScheduleConfigPanelProps> = ({
             <div className="flex gap-2">
               <input type="number" min={1} max={999} value={scheduleIntervalValue}
                 onChange={(e) => setScheduleIntervalValue(e.target.value)}
-                className="w-20 px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#256A65]" />
+                className="w-20 px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]" />
               <select value={scheduleIntervalUnit}
                 onChange={(e) => setScheduleIntervalUnit(e.target.value as 'minutes' | 'hours' | 'days')}
-                className="flex-1 px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#256A65]">
+                className="flex-1 px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]">
                 <option value="minutes">Minutes</option>
                 <option value="hours">Hours</option>
                 <option value="days">Days</option>

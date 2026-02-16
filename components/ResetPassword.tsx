@@ -101,7 +101,7 @@ export function ResetPassword() {
                 </div>
                 <div className="flex-1 flex items-center justify-center">
                     <div className="text-center">
-                        <SpinnerGap weight="bold" className="w-10 h-10 text-[#256A65] animate-spin mx-auto mb-4" />
+                        <SpinnerGap weight="bold" className="w-10 h-10 text-[var(--accent-primary)] animate-spin mx-auto mb-4" />
                         <p className="text-[#9b9b9b] text-sm">Validating reset link...</p>
                     </div>
                 </div>
@@ -136,7 +136,7 @@ export function ResetPassword() {
                         <div className="space-y-3">
                             <Link
                                 to="/forgot-password"
-                                className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center text-sm"
+                                className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center text-sm"
                             >
                                 Request new link
                             </Link>
@@ -184,7 +184,7 @@ export function ResetPassword() {
                         </p>
                         <button
                             onClick={() => navigate('/login')}
-                            className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-colors text-sm"
+                            className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-medium py-3 rounded-lg transition-colors text-sm"
                         >
                             Go to sign in
                         </button>
@@ -215,8 +215,8 @@ export function ResetPassword() {
                 <div className="w-full max-w-sm">
                     {/* Header */}
                     <div className="text-center mb-8">
-                        <div className="w-14 h-14 bg-[#256A65]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Key weight="light" className="w-7 h-7 text-[#256A65]" />
+                        <div className="w-14 h-14 bg-[var(--accent-primary)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Key weight="light" className="w-7 h-7 text-[var(--accent-primary)]" />
                         </div>
                         <h1 className="text-xl font-medium text-[#e8e8e8] mb-3" style={{ fontFamily: "'Berkeley Mono', monospace" }}>
                             Set new password
@@ -233,7 +233,7 @@ export function ResetPassword() {
                             <input
                                 type="password"
                                 required
-                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition-all text-sm"
                                 placeholder="New password"
                                 value={formData.password}
                                 onChange={e => setFormData({ ...formData, password: e.target.value })}
@@ -245,7 +245,7 @@ export function ResetPassword() {
                             <input
                                 type="password"
                                 required
-                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[#256A65] focus:ring-1 focus:ring-[#256A65] transition-all text-sm"
+                                className="w-full bg-[#2f2f2f] border border-[#404040] rounded-lg py-3 pl-10 pr-4 text-[#e8e8e8] placeholder:text-[#6b6b6b] focus:outline-none focus:border-[var(--accent-primary)] focus:ring-1 focus:ring-[var(--accent-primary)] transition-all text-sm"
                                 placeholder="Confirm new password"
                                 value={formData.confirmPassword}
                                 onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
@@ -261,7 +261,7 @@ export function ResetPassword() {
                         <button
                             type="submit"
                             disabled={status === 'submitting'}
-                            className="w-full bg-[#256A65] hover:bg-[#1e5a55] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                            className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                         >
                             {status === 'submitting' ? (
                                 <SpinnerGap weight="bold" className="w-4 h-4 animate-spin" />
