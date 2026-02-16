@@ -1369,6 +1369,57 @@ IMPORTANT:
     }
 });
 
+// AI Entity Schema Generation Endpoint
+router.post('/generate-entity-schema', authenticateToken, async (req, res) => {
+    try {
+        const { description } = req.body;
+
+        if (!description || typeof description !== 'string') {
+            return res.status(400).json({ error: 'A description is required' });
+        }
+
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const systemPrompt = `You are a data-modelling assistant. Given a plain-language description of what the user wants to track, generate a JSON object with:
+- "name": a short entity name (2-3 words max)
+- "properties": an array of property objects, each with:
+  - "name": the column/field name (concise, Title Case)
+  - "type": one of "text", "number", "date", "url", "file", "select", "multi-select", "relation"
+  - "unit": optional string for numeric fields (e.g. "kg", "°C", "m³/h")
+
+Guidelines:
+- Always include a "Name" property first (type: text)
+- Generate between 4-8 relevant properties
+- Choose the most appropriate type for each property
+- Use "select" for fields that would have a fixed set of options (e.g. Status, Priority, Category)
+- Use "number" for quantitative data and include units when applicable
+- Use "date" for temporal fields
+- Output ONLY valid JSON, no markdown, no explanations`;
+
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `Create an entity schema for: ${description}` }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.7
+        });
+
+        const schema = JSON.parse(completion.choices[0].message.content);
+        res.json(schema);
+
+    } catch (error) {
+        console.error('Error generating entity schema:', error);
+        res.status(500).json({ error: 'Failed to generate entity schema' });
+    }
+});
+
 // Dashboard Management Endpoints
 
     return router;

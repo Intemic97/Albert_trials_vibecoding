@@ -52,25 +52,31 @@ interface GraphEdge {
 }
 
 // Entity type detection based on folder name or entity name patterns
-type EntityCategory = 'plant' | 'equipment' | 'sensor' | 'material' | 'process' | 'safety' | 'generic';
+type EntityCategory = 'plant' | 'equipment' | 'sensor' | 'material' | 'process' | 'safety' | 'product' | 'deviation' | 'financials' | 'generic';
 
 const ENTITY_CATEGORY_CONFIG: Record<EntityCategory, { color: string; label: string }> = {
-    plant:     { color: '#F59E0B', label: 'Plant/Area' },
-    equipment: { color: '#3B82F6', label: 'Equipment' },
-    sensor:    { color: '#10B981', label: 'Sensor' },
-    material:  { color: '#8B5CF6', label: 'Material' },
-    process:   { color: '#EC4899', label: 'Process' },
-    safety:    { color: '#EF4444', label: 'Safety' },
-    generic:   { color: '#419CAF', label: 'Entity' },
+    product:    { color: '#3B82F6', label: 'Product' },
+    process:    { color: '#10B981', label: 'Process' },
+    equipment:  { color: '#F59E0B', label: 'Equipment' },
+    deviation:  { color: '#EF4444', label: 'Deviation' },
+    financials: { color: '#8B5CF6', label: 'Financials' },
+    plant:      { color: '#F97316', label: 'Plant/Area' },
+    sensor:     { color: '#06B6D4', label: 'Sensor' },
+    material:   { color: '#EC4899', label: 'Material' },
+    safety:     { color: '#DC2626', label: 'Safety' },
+    generic:    { color: '#419CAF', label: 'Entity' },
 };
 
 const CATEGORY_PATTERNS: { category: EntityCategory; patterns: RegExp[] }[] = [
+    { category: 'product', patterns: [/product|producto|sku|catalog|cat[aá]logo|item|art[ií]culo|merchandise|mercanc[ií]a/i] },
+    { category: 'deviation', patterns: [/deviation|desviaci[oó]n|incident|incidente|non.?conformance|no.?conformidad|defect|defecto|anomaly|anomal[ií]a|corrective|correctiv/i] },
+    { category: 'financials', patterns: [/financ|finance|finanza|budget|presupuesto|cost|coste|revenue|ingreso|invoice|factura|expense|gasto|accounting|contabilidad|profit|beneficio/i] },
     { category: 'plant', patterns: [/plant|planta|factory|f[aá]brica|area|[aá]rea|site|facility|building|nave/i] },
     { category: 'equipment', patterns: [/equip|reactor|pump|bomba|compresor|compressor|valve|v[aá]lvula|tank|tanque|column|columna|heat.*exchanger|intercambiador|motor|turbine|turbina|conveyor|cinta|mixer|mezclador|machine|m[aá]quina|extruder|extrusora/i] },
     { category: 'sensor', patterns: [/sensor|instrument|gauge|meter|medidor|termopar|thermocouple|transmitter|transmisor|detector|analyz|analizador|probe|sonda|flow.*meter|caudal[ií]metro|thermometer|term[oó]metro|pressure|presi[oó]n|temperature|temperatura|level|nivel/i] },
-    { category: 'material', patterns: [/material|product|producto|chemical|qu[ií]mico|raw.*material|materia.*prima|ingredient|ingrediente|batch|lote|sample|muestra|compound|compuesto|polymer|pol[ií]mero|resin|resina/i] },
+    { category: 'material', patterns: [/material|chemical|qu[ií]mico|raw.*material|materia.*prima|ingredient|ingrediente|batch|lote|sample|muestra|compound|compuesto|polymer|pol[ií]mero|resin|resina/i] },
     { category: 'process', patterns: [/process|proceso|workflow|recipe|receta|operation|operaci[oó]n|step|etapa|phase|fase|procedure|procedimiento|production|producci[oó]n|maintenance|mantenimiento/i] },
-    { category: 'safety', patterns: [/safety|seguridad|alarm|alarma|alert|alerta|emergency|emergencia|hazard|peligro|risk|riesgo|compliance|cumplimiento|inspection|inspecci[oó]n|incident|incidente/i] },
+    { category: 'safety', patterns: [/safety|seguridad|alarm|alarma|alert|alerta|emergency|emergencia|hazard|peligro|risk|riesgo|compliance|cumplimiento|inspection|inspecci[oó]n/i] },
 ];
 
 function detectEntityCategory(entityName: string, folderName?: string): EntityCategory {
@@ -1086,12 +1092,15 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
                                                 fontWeight={600}
                                                 style={{ pointerEvents: 'none' }}
                                             >
-                                                {node.category === 'plant' && 'P'}
+                                                {node.category === 'product' && 'P'}
+                                                {node.category === 'process' && 'F'}
                                                 {node.category === 'equipment' && 'E'}
+                                                {node.category === 'deviation' && '!'}
+                                                {node.category === 'financials' && '$'}
+                                                {node.category === 'plant' && 'A'}
                                                 {node.category === 'sensor' && 'S'}
                                                 {node.category === 'material' && 'M'}
-                                                {node.category === 'process' && 'F'}
-                                                {node.category === 'safety' && '!'}
+                                                {node.category === 'safety' && '⚠'}
                                             </text>
                                         )}
                                         

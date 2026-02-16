@@ -789,7 +789,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         </button>
                         <div className="w-px h-5 bg-[var(--border-light)]" />
                         <button
-                            onClick={() => setIsCreatingEntity(true)}
+                            onClick={() => navigate('/database/new')}
                             className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-medium text-[var(--text-primary)] transition-colors"
                             title={currentFolder ? `Create entity in "${currentFolder.name}"` : 'Create new entity'}
                         >
@@ -905,7 +905,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 {!searchQuery && (
                                     <div className="flex gap-2">
                                         <button
-                                            onClick={() => setIsCreatingEntity(true)}
+                                            onClick={() => navigate('/database/new')}
                                             className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-medium transition-colors"
                                         >
                                             <Database size={14} weight="light" />

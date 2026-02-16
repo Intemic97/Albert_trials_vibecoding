@@ -84,6 +84,42 @@ router.get('/entities', authenticateToken, async (req, res) => {
     }
 });
 
+// GET single entity
+router.get('/entities/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const entity = await db.get('SELECT * FROM entities WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        if (!entity) return res.status(404).json({ error: 'Entity not found' });
+        const properties = await db.all('SELECT * FROM properties WHERE entityId = ?', [id]);
+        res.json({ ...entity, properties });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch entity' });
+    }
+});
+
+// PUT update entity name/description
+router.put('/entities/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { name, description, entityType } = req.body;
+    try {
+        const entity = await db.get('SELECT id FROM entities WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        if (!entity) return res.status(404).json({ error: 'Entity not found' });
+        const updates = [];
+        const params = [];
+        if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+        if (description !== undefined) { updates.push('description = ?'); params.push(description); }
+        if (entityType !== undefined) { updates.push('entityType = ?'); params.push(entityType); }
+        updates.push("lastEdited = ?"); params.push(new Date().toISOString());
+        params.push(id);
+        await db.run(`UPDATE entities SET ${updates.join(', ')} WHERE id = ?`, params);
+        res.json({ message: 'Entity updated' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update entity' });
+    }
+});
+
 // POST create entity
 router.post('/entities', authenticateToken, async (req, res) => {
     const { id, name, description, author, lastEdited, properties, entityType } = req.body;
@@ -168,6 +204,26 @@ router.post('/properties', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to add property' });
+    }
+});
+
+// PUT update property
+router.put('/properties/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    const { name, type, unit } = req.body;
+    try {
+        const updates = [];
+        const params = [];
+        if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+        if (type !== undefined) { updates.push('type = ?'); params.push(type); }
+        if (unit !== undefined) { updates.push('unit = ?'); params.push(unit); }
+        if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' });
+        params.push(id);
+        await db.run(`UPDATE properties SET ${updates.join(', ')} WHERE id = ?`, params);
+        res.json({ message: 'Property updated' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to update property' });
     }
 });
 
