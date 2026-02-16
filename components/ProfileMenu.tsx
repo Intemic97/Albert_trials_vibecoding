@@ -209,8 +209,8 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
     const splitContainerRef = useRef<HTMLDivElement>(null);
     const workspaceTriggerRef = useRef<HTMLButtonElement>(null);
 
-    // Calculate position for fixed positioning
-    const [menuPosition, setMenuPosition] = useState<{ top: number; left?: number; right?: number } | null>(null);
+    // Calculate position for fixed positioning (top o bottom para que no tape nada)
+    const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; left?: number; right?: number; maxHeight?: number } | null>(null);
 
     const MENU_WIDTH_PX = 240; // w-60
 
@@ -222,32 +222,24 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
         if (isOpen && anchorEl) {
             const rect = anchorEl.getBoundingClientRect();
             const windowHeight = window.innerHeight;
-            const menuHeight = view === 'organizations' ? 220 : 281; // main: altura real del menú para quedar colindante
-            
-            let position: { top: number; left?: number; right?: number };
-            let top: number;
             let left: number;
-            const gapPx = 0; // colindante: borde inferior del menú = borde superior del botón
+            if (menuPlacement === 'top-left') left = rect.left;
+            else if (menuPlacement === 'top-right') left = Math.max(8, rect.right - MENU_WIDTH_PX);
+            else if (menuPlacement === 'bottom-left') left = Math.max(8, rect.left);
+            else left = rect.right + 8;
 
-            // top-right / top-left: menú encima del trigger, colindando (sin hueco)
+            // top-right / top-left: menú encima del trigger; usar bottom para que el borde inferior toque el botón y nunca tape lo de abajo
             if (menuPlacement === 'top-right' || menuPlacement === 'top-left') {
-                top = rect.top - menuHeight - gapPx;
-                left = menuPlacement === 'top-left' ? rect.left : Math.max(8, rect.right - MENU_WIDTH_PX);
-                top = Math.max(8, top);
-                if (top + menuHeight > windowHeight - 16) {
-                    top = Math.min(rect.top - menuHeight - gapPx, windowHeight - menuHeight - 16);
-                }
-                position = { left, top };
+                const bottomPx = windowHeight - rect.top; // borde inferior del menú = borde superior del trigger
+                const maxHeight = rect.top - 8; // no salirse por arriba del viewport
+                setMenuPosition({ bottom: bottomPx, left, maxHeight });
             } else {
-                // bottom-right / bottom-left: menú al lado del trigger (comportamiento anterior)
-                left = menuPlacement === 'bottom-left' ? Math.max(8, rect.left) : rect.right + 8;
-                top = rect.bottom - menuHeight;
+                const menuHeight = view === 'organizations' ? 220 : 320;
+                let top = rect.bottom - menuHeight;
                 if (top < 8) top = 8;
                 if (top + menuHeight > windowHeight - 16) top = windowHeight - menuHeight - 16;
-                position = { left, top: Math.max(8, top) };
+                setMenuPosition({ left, top: Math.max(8, top) });
             }
-            
-            setMenuPosition(position);
         } else {
             setMenuPosition(null);
         }
@@ -314,11 +306,13 @@ export const ProfileMenu: React.FC<ProfileMenuProps> = ({ onNavigate, triggerCon
             {isOpen && menuPosition && createPortal(
                 <div 
                     ref={menuRef}
-                    className="fixed w-60 bg-[var(--sidebar-bg)] rounded-lg border border-[var(--sidebar-border)] py-2 z-[99999] overflow-hidden text-sm font-sans pointer-events-auto transition-colors duration-200 shadow-xl"
+                    className="fixed w-60 bg-[var(--sidebar-bg)] rounded-lg border border-[var(--sidebar-border)] py-2 z-[99999] overflow-y-auto overflow-x-hidden text-sm font-sans pointer-events-auto transition-colors duration-200 shadow-xl"
                     style={{
-                        top: `${menuPosition.top}px`,
+                        ...(menuPosition.top !== undefined ? { top: `${menuPosition.top}px` } : {}),
+                        ...(menuPosition.bottom !== undefined ? { bottom: `${menuPosition.bottom}px` } : {}),
                         ...(menuPosition.left !== undefined ? { left: `${menuPosition.left}px` } : {}),
-                        ...(menuPosition.right !== undefined ? { right: `${menuPosition.right}px` } : {})
+                        ...(menuPosition.right !== undefined ? { right: `${menuPosition.right}px` } : {}),
+                        ...(menuPosition.maxHeight !== undefined ? { maxHeight: `${menuPosition.maxHeight}px` } : {})
                     }}
                 >
 

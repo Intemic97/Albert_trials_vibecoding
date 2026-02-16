@@ -857,16 +857,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                             </div>
                             
                             {/* View toggle */}
-                            <div className="flex items-center border border-[var(--border-light)] rounded-lg overflow-hidden">
+                            <div className="flex items-center border border-[var(--accent-primary)] rounded-lg overflow-hidden">
                                 <button
                                     onClick={() => setViewMode('grid')}
-                                    className={`p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[var(--bg-selected)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+                                    className={`p-1.5 transition-colors ${viewMode === 'grid' ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
                                 >
                                     <GridFour size={16} weight="light" />
                                 </button>
                                 <button
                                     onClick={() => setViewMode('list')}
-                                    className={`p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[var(--bg-selected)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+                                    className={`p-1.5 transition-colors ${viewMode === 'list' ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
                                 >
                                     <List size={16} weight="light" />
                                 </button>
