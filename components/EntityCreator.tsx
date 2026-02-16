@@ -697,14 +697,6 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                     />
                                 </div>
                                 <button
-                                    onClick={() => setShowOptionsPanel(!showOptionsPanel)}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs text-[var(--text-secondary)] transition-colors"
-                                    title="Options (AI, CSV, templates)"
-                                >
-                                    <Sparkle size={13} weight="light" />
-                                    Options
-                                </button>
-                                <button
                                     onClick={handleExportCSV}
                                     className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs text-[var(--text-secondary)] transition-colors"
                                 >
