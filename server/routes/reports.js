@@ -853,7 +853,7 @@ router.put('/reports/:id/sections/:sectionId/workflow-status', authenticateToken
         }
         
         const report = await db.get(
-            'SELECT id, name FROM reports WHERE id = ? AND organizationId = ?',
+            'SELECT id, name, reviewerId, createdBy FROM reports WHERE id = ? AND organizationId = ?',
             [id, req.user.orgId]
         );
         
@@ -863,7 +863,7 @@ router.put('/reports/:id/sections/:sectionId/workflow-status', authenticateToken
         
         // Try by report_section.id first
         let section = await db.get(
-            'SELECT rs.id, ts.title FROM report_sections rs JOIN template_sections ts ON rs.templateSectionId = ts.id WHERE rs.id = ? AND rs.reportId = ?',
+            'SELECT rs.id, rs.workflowStatus as previousStatus, ts.title FROM report_sections rs JOIN template_sections ts ON rs.templateSectionId = ts.id WHERE rs.id = ? AND rs.reportId = ?',
             [sectionId, id]
         );
         
@@ -875,7 +875,7 @@ router.put('/reports/:id/sections/:sectionId/workflow-status', authenticateToken
         } else {
             // Try by templateSectionId
             section = await db.get(
-                'SELECT rs.id, ts.title FROM report_sections rs JOIN template_sections ts ON rs.templateSectionId = ts.id WHERE rs.templateSectionId = ? AND rs.reportId = ?',
+                'SELECT rs.id, rs.workflowStatus as previousStatus, ts.title FROM report_sections rs JOIN template_sections ts ON rs.templateSectionId = ts.id WHERE rs.templateSectionId = ? AND rs.reportId = ?',
                 [sectionId, id]
             );
             if (section) {
@@ -901,10 +901,52 @@ router.put('/reports/:id/sections/:sectionId/workflow-status', authenticateToken
             resourceType: 'report',
             resourceId: id,
             resourceName: report.name,
-            details: { sectionTitle: section.title, newStatus: workflowStatus },
+            details: { sectionTitle: section.title, previousStatus: section.previousStatus, newStatus: workflowStatus },
             ipAddress: req.ip || req.headers['x-forwarded-for'],
             userAgent: req.headers['user-agent']
         });
+
+        // Send platform notifications on status transitions
+        const previousStatus = section.previousStatus || 'draft';
+        const userName = user?.name || req.user.email;
+
+        // Draft → Review: notify the reviewer (if exists and is not the current user)
+        if (previousStatus === 'draft' && workflowStatus === 'review' && report.reviewerId && report.reviewerId !== req.user.sub) {
+            const notifId = generateId();
+            await db.run(
+                `INSERT INTO notifications (id, orgId, userId, type, title, message, link, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    notifId,
+                    req.user.orgId,
+                    report.reviewerId,
+                    'section_review_requested',
+                    `Section ready for review`,
+                    `${userName} moved "${section.title}" to Review in "${report.name}"`,
+                    `/documents/${id}`,
+                    JSON.stringify({ reportId: id, sectionId: section.id, sectionTitle: section.title }),
+                    now
+                ]
+            );
+        }
+
+        // Review → Draft: notify the report creator (if exists and is not the current user)
+        if (previousStatus === 'review' && workflowStatus === 'draft' && report.createdBy && report.createdBy !== req.user.sub) {
+            const notifId = generateId();
+            await db.run(
+                `INSERT INTO notifications (id, orgId, userId, type, title, message, link, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    notifId,
+                    req.user.orgId,
+                    report.createdBy,
+                    'section_returned_to_draft',
+                    `Section returned to Draft`,
+                    `${userName} moved "${section.title}" back to Draft in "${report.name}"`,
+                    `/documents/${id}`,
+                    JSON.stringify({ reportId: id, sectionId: section.id, sectionTitle: section.title }),
+                    now
+                ]
+            );
+        }
         
         res.json({ message: 'Section workflow status updated', workflowStatus });
     } catch (error) {

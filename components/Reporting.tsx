@@ -99,11 +99,6 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; className?: s
     Sparkles
 };
 
-const statusConfig = {
-    draft: { label: 'Draft', color: 'text-amber-500', bg: 'bg-amber-500/15', borderColor: 'border-[var(--border-light)]' },
-    review: { label: 'In Review', color: 'text-[var(--text-primary)]', bg: 'bg-[var(--bg-tertiary)]', borderColor: 'border-[var(--border-light)]' },
-    ready_to_send: { label: 'Ready', color: 'text-emerald-500', bg: 'bg-emerald-500/15', borderColor: 'border-[var(--border-light)]' }
-};
 
 export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onViewChange, view = 'documents' }) => {
     const navigate = useNavigate();
@@ -877,14 +872,13 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                         );
                                     })
                                     .map((report) => {
-                                    const status = statusConfig[report.status];
                                     return (
                                         <div
                                             key={report.id}
                                             onClick={() => navigate(`/documents/${report.id}`)}
                                             className="group relative bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-5 cursor-pointer flex flex-col justify-between min-h-[200px] hover:border-[var(--border-medium)] hover:shadow-sm transition-all"
                                         >
-                                            {/* Header with Status and Actions */}
+                                            {/* Header with Actions */}
                                             <div className="flex items-start justify-between mb-4">
                                                 <div className="flex-1 min-w-0 pr-12">
                                                     <h3 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-secondary)] transition-colors truncate mb-1" style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
@@ -895,10 +889,6 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                                    {/* Status Badge */}
-                                                    <div className={`px-2 py-0.5 text-xs font-medium rounded ${status.bg} ${status.color}`}>
-                                                        {status.label}
-                                                    </div>
                                                     {/* Delete Button */}
                                                     <button
                                                         onClick={(e) => {
@@ -1132,7 +1122,6 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {reports.map((report) => {
-                                    const status = statusConfig[report.status];
                                     return (
                                         <div
                                             key={report.id}
@@ -1147,9 +1136,6 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                                     <p className="text-xs text-[var(--text-tertiary)] truncate">
                                                         {report.templateName}
                                                     </p>
-                                                </div>
-                                                <div className={`px-2 py-0.5 text-xs font-medium rounded ${status.bg} ${status.color}`}>
-                                                    {status.label}
                                                 </div>
                                             </div>
                                             <div className="flex-1 space-y-3">
