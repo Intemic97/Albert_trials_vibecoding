@@ -233,6 +233,13 @@ export interface NodeConfig {
   webhookResponseMode?: 'passthrough' | 'selected' | 'template';
   webhookResponseTemplate?: string; // JSON template with {{field}} placeholders
 
+  // For Schedule trigger nodes:
+  scheduleInterval?: string;
+  scheduleIntervalValue?: string;
+  scheduleIntervalUnit?: string;
+  scheduleEnabled?: boolean;
+  scheduleType?: string;
+
   // Alert configuration
   alerts?: {
     enabled: boolean;

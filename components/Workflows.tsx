@@ -50,7 +50,7 @@ import {
   WorkflowRunnerModal,
   // Hooks
   useWorkflowHistory,
-} from './workflows/index';
+} from './Workflows/index';
 
 // Import extracted config panel components
 import {
@@ -364,6 +364,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     const [configuringStatisticalNodeId, setConfiguringStatisticalNodeId] = useState<string | null>(null);
     const [statisticalMethod, setStatisticalMethod] = useState<'pca' | 'spc' | 'regression' | 'goldenBatch'>('goldenBatch');
     const [goldenBatchId, setGoldenBatchId] = useState<string>('');
+
+    // Access control state
+    const [noAccessWorkflowInfo, setNoAccessWorkflowInfo] = useState<{ workflowId: string; workflowName: string; organizationName: string } | null>(null);
+    const [showNoAccessModal, setShowNoAccessModal] = useState(false);
+    const [isRequestingAccess, setIsRequestingAccess] = useState(false);
 
     // Alert Agent Node State
     const [configuringAlertAgentNodeId, setConfiguringAlertAgentNodeId] = useState<string | null>(null);
@@ -3742,7 +3747,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                             } else if (node.type === 'saveRecords') {
                                                 openSaveRecordsConfig(node.id);
                                             } else if (node.type === 'agent') {
-                                                openAgentConfig(node.id);
+                                                openAlertAgentConfig(node.id);
                                             } else if (node.type === 'llm') {
                                                 openLLMConfig(node.id);
                                             } else if (node.type === 'python') {
@@ -3940,15 +3945,15 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                                     openAddFieldConfig(node.id);
                                                                 } else if (node.type === 'action') {
                                                                     openRenameColumnsConfig(node.id);
-                                                                } else if (node.type === 'saveRecords') {
-                                                                    openSaveConfig(node.id);
-                                                                } else if (node.type === 'llm') {
-                                                                    openLLMConfig(node.id);
-                                                                } else if (node.type === 'python') {
-                                                                    openPythonConfig(node.id);
-                                                                } else if (node.type === 'join') {
-                                                                    openJoinConfig(node.id);
-                                                                } else if (node.type === 'splitColumns') {
+                                                } else if (node.type === 'saveRecords') {
+                                                    openSaveRecordsConfig(node.id);
+                                                } else if (node.type === 'llm') {
+                                                    openLLMConfig(node.id);
+                                                } else if (node.type === 'python') {
+                                                    openPythonConfig(node.id);
+                                                } else if (node.type === 'join') {
+                                                    openJoinConfig(node.id);
+                                                } else if (node.type === 'splitColumns') {
                                                                     openSplitColumnsConfig(node.id);
                                                                 } else if (node.type === 'excelInput') {
                                                                     openExcelConfig(node.id);
@@ -4399,7 +4404,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                 )}
                                                 
                                                 {/* Quick Connect Button - Right Side */}
-                                                {node.type !== 'comment' && (
+                                                {(node.type as string) !== 'comment' && (
                                                     <button
                                                         onMouseDown={(e) => {
                                                             e.stopPropagation();

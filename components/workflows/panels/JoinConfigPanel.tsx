@@ -3,7 +3,7 @@
  * Extracted from Workflows.tsx lines 10793-10971
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
 import { GitBranch, GitMerge, ChatText } from '@phosphor-icons/react';
 
@@ -23,6 +23,34 @@ export const JoinConfigPanel: React.FC<JoinConfigPanelProps> = ({
   const [joinStrategy, setJoinStrategy] = useState(node?.config?.joinStrategy || 'concat');
   const [joinType, setJoinType] = useState(node?.config?.joinType || 'inner');
   const [joinKey, setJoinKey] = useState(node?.config?.joinKey || '');
+
+  // Derive allFields and commonFields from parent nodes' output data
+  const { allFields, commonFields } = useMemo(() => {
+    const parentConns = connections.filter(c => c.toNodeId === nodeId);
+    const fieldSets: Set<string>[] = [];
+
+    for (const conn of parentConns) {
+      const parentNode = nodes.find(n => n.id === conn.fromNodeId);
+      if (parentNode) {
+        let data = parentNode.outputData || parentNode.inputDataA || null;
+        if (parentNode.type === 'splitColumns' && parentNode.outputData) {
+          data = conn.outputType === 'B' ? parentNode.outputData.outputB : parentNode.outputData.outputA;
+        }
+        if (data && Array.isArray(data) && data.length > 0) {
+          fieldSets.push(new Set(Object.keys(data[0])));
+        }
+      }
+    }
+
+    const all = new Set<string>();
+    fieldSets.forEach(s => s.forEach(f => all.add(f)));
+
+    const common = fieldSets.length >= 2
+      ? [...fieldSets[0]].filter(f => fieldSets.every(s => s.has(f)))
+      : [];
+
+    return { allFields: [...all], commonFields: common };
+  }, [nodeId, nodes, connections]);
 
   const handleSave = () => {
     onSave(nodeId, { joinStrategy, joinType, joinKey });
