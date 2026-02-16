@@ -12,7 +12,7 @@ import {
     ArrowLeft, Plus, X, Table as TableIcon, Sparkle, Download,
     TextT, Hash, Calendar, Globe, File, Link as LinkIcon,
     Trash, SpinnerGap, ArrowUp, ListBullets, CheckSquare,
-    MagnifyingGlass, Export
+    MagnifyingGlass, Export, Paperclip, UploadSimple
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -149,6 +149,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const [editingPropName, setEditingPropName] = useState('');
     const [isImporting, setIsImporting] = useState(false);
     const [recordSearch, setRecordSearch] = useState('');
+    const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
 
     // Save entity name to backend (immediate, no debounce)
     const saveNameToBackend = useCallback(async (name: string) => {
@@ -414,6 +415,39 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
             try {
                 await fetch(`${API_BASE}/records/${recordId}`, { method: 'DELETE', credentials: 'include' });
             } catch (e) { console.error('Error deleting record:', e); }
+        }
+    };
+
+    // File upload for file-type properties
+    const handleFileUpload = async (recordId: string, propId: string, file: globalThis.File) => {
+        const uploadKey = `${recordId}-${propId}`;
+        setUploadingFiles(prev => ({ ...prev, [uploadKey]: true }));
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await fetch(`${API_BASE}/upload`, {
+                method: 'POST',
+                body: formData,
+                credentials: 'include',
+            });
+            if (!response.ok) throw new Error('Upload failed');
+            const fileData = await response.json();
+            const fileValue = JSON.stringify(fileData);
+            // Update local state
+            setRecords(prev => prev.map(r =>
+                r.id === recordId ? { ...r, values: { ...r.values, [propId]: fileValue } } : r
+            ));
+            // Auto-save
+            const record = records.find(r => r.id === recordId);
+            if (record) {
+                const updatedRecord = { ...record, values: { ...record.values, [propId]: fileValue } };
+                // Small delay so state is updated
+                setTimeout(() => handleRecordBlur(updatedRecord), 100);
+            }
+        } catch (error) {
+            console.error('Error uploading file:', error);
+        } finally {
+            setUploadingFiles(prev => ({ ...prev, [uploadKey]: false }));
         }
     };
 
@@ -765,22 +799,91 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                 {/* Data rows */}
                                 {filteredRecords.map((record) => (
                                     <div key={record.id} className="flex border-b border-[var(--border-light)] last:border-b-0 hover:bg-[var(--bg-tertiary)]/50 transition-colors group/row min-w-fit">
-                                        {properties.map((prop) => (
-                                            <div
-                                                key={prop.id}
-                                                className="border-r border-[var(--border-light)] last:border-r-0"
-                                                style={{ minWidth: '180px', flex: '1 0 180px' }}
-                                            >
-                                                <input
-                                                    type={prop.type === 'number' ? 'number' : 'text'}
-                                                    value={record.values[prop.id] || ''}
-                                                    onChange={(e) => handleRecordChange(record.id, prop.id, e.target.value)}
-                                                    onBlur={() => handleRecordBlur(record)}
-                                                    placeholder=""
-                                                    className="w-full px-4 py-2.5 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
-                                                />
-                                            </div>
-                                        ))}
+                                        {properties.map((prop) => {
+                                            const uploadKey = `${record.id}-${prop.id}`;
+                                            const isUploading = uploadingFiles[uploadKey];
+
+                                            // File type column
+                                            if (prop.type === 'file') {
+                                                const rawValue = record.values[prop.id];
+                                                let fileData: any = null;
+                                                try {
+                                                    if (rawValue) fileData = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+                                                } catch {}
+
+                                                return (
+                                                    <div
+                                                        key={prop.id}
+                                                        className="border-r border-[var(--border-light)] last:border-r-0 flex items-center px-3"
+                                                        style={{ minWidth: '180px', flex: '1 0 180px' }}
+                                                    >
+                                                        {isUploading ? (
+                                                            <span className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
+                                                                <SpinnerGap size={14} className="animate-spin" />
+                                                                Uploading…
+                                                            </span>
+                                                        ) : fileData?.filename ? (
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <a
+                                                                    href={`${API_BASE}/files/${fileData.filename}/download?originalName=${encodeURIComponent(fileData.originalName || fileData.filename)}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 transition-colors truncate max-w-[140px]"
+                                                                    title={fileData.originalName || fileData.filename}
+                                                                >
+                                                                    <Paperclip size={11} weight="bold" className="shrink-0" />
+                                                                    <span className="truncate">{fileData.originalName || fileData.filename}</span>
+                                                                </a>
+                                                                <label className="p-1 rounded hover:bg-[var(--bg-hover)] cursor-pointer text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors shrink-0">
+                                                                    <UploadSimple size={13} weight="light" />
+                                                                    <input
+                                                                        type="file"
+                                                                        className="hidden"
+                                                                        onChange={(e) => {
+                                                                            const f = e.target.files?.[0];
+                                                                            if (f) handleFileUpload(record.id, prop.id, f);
+                                                                            e.target.value = '';
+                                                                        }}
+                                                                    />
+                                                                </label>
+                                                            </div>
+                                                        ) : (
+                                                            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors py-2">
+                                                                <UploadSimple size={14} weight="light" />
+                                                                Upload file
+                                                                <input
+                                                                    type="file"
+                                                                    className="hidden"
+                                                                    onChange={(e) => {
+                                                                        const f = e.target.files?.[0];
+                                                                        if (f) handleFileUpload(record.id, prop.id, f);
+                                                                        e.target.value = '';
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
+
+                                            // Default: text / number / date / url / etc.
+                                            return (
+                                                <div
+                                                    key={prop.id}
+                                                    className="border-r border-[var(--border-light)] last:border-r-0"
+                                                    style={{ minWidth: '180px', flex: '1 0 180px' }}
+                                                >
+                                                    <input
+                                                        type={prop.type === 'number' ? 'number' : prop.type === 'date' ? 'date' : 'text'}
+                                                        value={record.values[prop.id] || ''}
+                                                        onChange={(e) => handleRecordChange(record.id, prop.id, e.target.value)}
+                                                        onBlur={() => handleRecordBlur(record)}
+                                                        placeholder=""
+                                                        className="w-full px-4 py-2.5 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
+                                                    />
+                                                </div>
+                                            );
+                                        })}
                                         {/* Delete row button */}
                                         <div className="shrink-0 flex items-center justify-center border-l border-[var(--border-light)]" style={{ minWidth: '140px' }}>
                                             <button
