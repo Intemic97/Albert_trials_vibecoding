@@ -198,3 +198,5 @@ export const NodePaletteSidebar: React.FC<NodePaletteSidebarProps> = ({
   );
 };
 
+
+

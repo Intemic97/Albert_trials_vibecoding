@@ -31,6 +31,7 @@ interface TemplateSection {
     generatedContent?: string | null;
     userPrompt?: string | null;
     sectionStatus: 'empty' | 'generated' | 'edited';
+    workflowStatus: 'draft' | 'review' | 'ready_to_send';
     generatedAt?: string | null;
 }
 
@@ -480,24 +481,28 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     const sectionComments = comments.filter(c => c.sectionId === selectedSectionId);
     const openCommentsCount = comments.filter(c => c.status === 'open').length;
 
-    const handleStatusChange = async (newStatus: 'draft' | 'review' | 'ready_to_send') => {
+    const handleSectionWorkflowStatusChange = async (sectionId: string, newStatus: 'draft' | 'review' | 'ready_to_send') => {
         if (!report) return;
         try {
-            const res = await fetch(`${API_BASE}/reports/${report.id}/status`, {
+            const res = await fetch(`${API_BASE}/reports/${report.id}/sections/${sectionId}/workflow-status`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: newStatus }),
+                body: JSON.stringify({ workflowStatus: newStatus }),
                 credentials: 'include'
             });
             if (res.ok) {
-                setReport({ ...report, status: newStatus });
-                // Refresh audit trail if panel is open
+                setReport({
+                    ...report,
+                    sections: report.sections.map(s =>
+                        s.id === sectionId ? { ...s, workflowStatus: newStatus } : s
+                    )
+                });
                 if (showAuditTrail) {
                     fetchAuditTrail();
                 }
             }
         } catch (error) {
-            console.error('Error updating status:', error);
+            console.error('Error updating section workflow status:', error);
         }
     };
 
@@ -538,6 +543,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
             'add_comment': 'Added comment',
             'resolve_comment': 'Resolved comment',
             'reopen_comment': 'Reopened comment',
+            'section_status_change': 'Section status changed',
         };
         return labels[action] || action;
     };
@@ -564,6 +570,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
         switch (action) {
             case 'create': return <Plus size={14} weight="bold" />;
             case 'status_change': return <ArrowRight size={14} weight="bold" />;
+            case 'section_status_change': return <ArrowRight size={14} weight="bold" />;
             case 'update': return <PencilSimple size={14} weight="bold" />;
             case 'generate_content': return <Sparkle size={14} weight="bold" />;
             case 'add_comment': return <ChatCircle size={14} weight="bold" />;
@@ -577,6 +584,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
         switch (action) {
             case 'create': return 'bg-emerald-500';
             case 'status_change': return 'bg-[var(--accent-primary)]';
+            case 'section_status_change': return 'bg-[var(--accent-primary)]';
             case 'update': return 'bg-blue-500';
             case 'generate_content': return 'bg-purple-500';
             case 'add_comment': return 'bg-amber-500';
@@ -996,17 +1004,17 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
     // Compute highlighted HTML - this will update when relevant state changes
     const highlightedHtml = getHighlightedContent();
     
-    // Check if all parent sections have generated content
-    const allSectionsComplete = parentSections.every(s => 
-        s.sectionStatus === 'generated' || s.sectionStatus === 'edited'
-    );
-    const completedSectionsCount = parentSections.filter(s => 
-        s.sectionStatus === 'generated' || s.sectionStatus === 'edited'
-    ).length;
-
     const getSectionStatus = (section: TemplateSection) => {
+        const ws = section.workflowStatus || 'draft';
+        if (ws === 'ready_to_send') {
+            return { icon: PaperPlaneTilt, color: 'text-emerald-500' };
+        }
+        if (ws === 'review') {
+            return { icon: Eye, color: 'text-[var(--accent-primary)]' };
+        }
+        // draft
         if (section.sectionStatus === 'generated' || section.sectionStatus === 'edited') {
-            return { icon: CheckCircle, color: 'text-emerald-500' };
+            return { icon: CheckCircle, color: 'text-amber-500' };
         }
         return { icon: Circle, color: 'text-slate-300' };
     };
@@ -1069,72 +1077,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                         </div>
                     </div>
 
-                    {/* Status Progress */}
-                    <div className="flex items-center gap-2 mb-3 p-2.5 bg-[var(--bg-tertiary)]/70 border border-[var(--border-light)] rounded-xl">
-                        <span className="text-xs text-[var(--text-secondary)] mr-1.5 uppercase tracking-wide">Status</span>
-                        {(['draft', 'review', 'ready_to_send'] as const).map((status, idx) => {
-                            const config = statusConfig[status];
-                            const StatusIcon = config.icon;
-                            const isActive = report.status === status;
-                            const currentStatusIndex = ['draft', 'review', 'ready_to_send'].indexOf(report.status);
-                            const isPast = currentStatusIndex > idx;
-                            // Line should be green if we've reached or passed that stage
-                            const isLineComplete = currentStatusIndex >= idx;
-                            
-                            // Determine if button is disabled and why
-                            let isDisabled = false;
-                            let disabledReason = '';
-                            
-                            if (status === 'review' && !allSectionsComplete && report.status === 'draft') {
-                                isDisabled = true;
-                                disabledReason = `Complete all sections first (${completedSectionsCount}/${parentSections.length})`;
-                            } else if (status === 'ready_to_send') {
-                                if (report.status === 'draft') {
-                                    isDisabled = true;
-                                    disabledReason = 'The document needs to be reviewed first';
-                                } else if (report.reviewerId && user?.id !== report.reviewerId) {
-                                    isDisabled = true;
-                                    disabledReason = 'Only the assigned reviewer can mark as ready';
-                                } else if (openCommentsCount > 0) {
-                                    isDisabled = true;
-                                    disabledReason = `Resolve all comments first (${openCommentsCount} open)`;
-                                }
-                            }
-                            
-                            return (
-                                <React.Fragment key={status}>
-                                    {idx > 0 && (
-                                        <div className={`flex-1 h-0.5 ${isLineComplete ? 'bg-[var(--accent-primary)]' : 'bg-[var(--bg-selected)]'}`} />
-                                    )}
-                                    <div className="relative group">
-                                        <button
-                                            onClick={() => !isDisabled && handleStatusChange(status)}
-                                            disabled={isDisabled}
-                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                                                isDisabled
-                                                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed'
-                                                    : isActive 
-                                                        ? `${config.bg} ${config.color} ring-2 ring-offset-2 ring-[var(--accent-primary)]/30`
-                                                        : isPast
-                                                            ? 'bg-emerald-500/15 text-emerald-500'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-selected)] hover:text-[var(--text-primary)] cursor-pointer'
-                                            }`}
-                                        >
-                                            <StatusIcon size={16} />
-                                            {config.label}
-                                        </button>
-                                        {/* Tooltip for disabled buttons */}
-                                        {isDisabled && disabledReason && (
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-[var(--bg-card)] text-[var(--text-primary)] text-xs rounded-lg border border-[var(--border-light)] shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                                {disabledReason}
-                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[var(--bg-card)]" />
-                                            </div>
-                                        )}
-                                    </div>
-                                </React.Fragment>
-                            );
-                        })}
-                    </div>
+                    {/* Status Progress removed - now per-section */}
 
                     {/* Tabs */}
                     <div className="flex gap-1 border-b border-[var(--border-light)] -mb-px">
@@ -1142,21 +1085,17 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                             { id: 'preview' as const, label: 'Preview', icon: Eye },
                             { id: 'context' as const, label: 'Context', icon: UploadSimple, badge: report.contexts.length },
                             { id: 'generate' as const, label: 'Generate', icon: Sparkle },
-                            { id: 'review' as const, label: 'Review', icon: ChatCircle, badge: openCommentsCount, disabled: report.status !== 'review' }
+                            { id: 'review' as const, label: 'Review', icon: ChatCircle, badge: openCommentsCount }
                         ].map(tab => {
                             const TabIcon = tab.icon;
-                            const isDisabled = 'disabled' in tab && tab.disabled;
                             return (
                                 <div key={tab.id} className="relative group">
                                     <button
-                                        onClick={() => !isDisabled && setActiveTab(tab.id)}
-                                        disabled={isDisabled}
+                                        onClick={() => setActiveTab(tab.id)}
                                         className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                                            isDisabled
-                                                ? 'border-transparent text-[var(--text-tertiary)] cursor-not-allowed'
-                                                : activeTab === tab.id
-                                                    ? 'border-[var(--accent-primary)] text-[var(--accent-primary)]'
-                                                    : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                                            activeTab === tab.id
+                                                ? 'border-[var(--accent-primary)] text-[var(--accent-primary)]'
+                                                : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                                         }`}
                                     >
                                         <TabIcon size={18} />
@@ -1167,13 +1106,6 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             </span>
                                         )}
                                     </button>
-                                    {/* Tooltip for disabled Review tab */}
-                                    {isDisabled && tab.id === 'review' && (
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-[var(--bg-card)] text-[var(--text-primary)] text-xs rounded-lg border border-[var(--border-light)] shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                            {report.status === 'draft' ? 'Change status to Review first' : 'Document is ready to send'}
-                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[var(--bg-card)]" />
-                                        </div>
-                                    )}
                                 </div>
                             );
                         })}
@@ -1377,11 +1309,49 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                             <p className="text-sm text-[var(--text-secondary)] mt-1">{section.content}</p>
                                                         )}
                                                     </div>
+                                                    {/* Per-section workflow status */}
                                                     {section.sectionStatus !== 'empty' && (
-                                                        <span className="px-2 py-1 text-xs bg-emerald-500/15 text-emerald-500 rounded-full flex items-center gap-1">
-                                                            <CheckCircle size={12} weight="light" />
-                                                            Content ready
-                                                        </span>
+                                                        <div className="flex items-center gap-1">
+                                                            {(['draft', 'review', 'ready_to_send'] as const).map((ws, wsIdx) => {
+                                                                const wsConfig = statusConfig[ws];
+                                                                const WsIcon = wsConfig.icon;
+                                                                const currentWs = section.workflowStatus || 'draft';
+                                                                const isActiveWs = currentWs === ws;
+                                                                const currentWsIdx = ['draft', 'review', 'ready_to_send'].indexOf(currentWs);
+                                                                const isPastWs = currentWsIdx > wsIdx;
+                                                                
+                                                                // Disable if trying to skip steps
+                                                                const sectionOpenComments = comments.filter(c => c.sectionId === section.id && c.status === 'open').length;
+                                                                let wsDisabled = false;
+                                                                if (ws === 'ready_to_send' && currentWs === 'draft') wsDisabled = true;
+                                                                if (ws === 'ready_to_send' && sectionOpenComments > 0) wsDisabled = true;
+
+                                                                return (
+                                                                    <React.Fragment key={ws}>
+                                                                        {wsIdx > 0 && (
+                                                                            <div className={`w-4 h-px ${isPastWs || isActiveWs ? 'bg-[var(--accent-primary)]' : 'bg-[var(--border-light)]'}`} />
+                                                                        )}
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); if (!wsDisabled) handleSectionWorkflowStatusChange(section.id, ws); }}
+                                                                            disabled={wsDisabled}
+                                                                            title={wsDisabled ? (ws === 'ready_to_send' && sectionOpenComments > 0 ? `Resolve ${sectionOpenComments} open comment(s) first` : 'Move to Review first') : wsConfig.label}
+                                                                            className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                                                                                wsDisabled
+                                                                                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed'
+                                                                                    : isActiveWs
+                                                                                        ? `${wsConfig.bg} ${wsConfig.color} ring-1 ring-offset-1 ring-current/20`
+                                                                                        : isPastWs
+                                                                                            ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 cursor-pointer'
+                                                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] cursor-pointer'
+                                                                            }`}
+                                                                        >
+                                                                            <WsIcon size={12} />
+                                                                            {wsConfig.label}
+                                                                        </button>
+                                                                    </React.Fragment>
+                                                                );
+                                                            })}
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <div className="p-6 min-h-[200px]">
@@ -1759,11 +1729,24 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                 <p className="text-sm text-[var(--text-secondary)] mt-1">{selectedSection.content}</p>
                                             )}
                                         </div>
-                                        {report.contexts.length > 0 && (
-                                            <span className="px-2 py-1 text-xs bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] rounded-full">
-                                                {report.contexts.length} context doc{report.contexts.length > 1 ? 's' : ''}
-                                            </span>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            {report.contexts.length > 0 && (
+                                                <span className="px-2 py-1 text-xs bg-[var(--accent-primary)]/15 text-[var(--accent-primary)] rounded-full">
+                                                    {report.contexts.length} context doc{report.contexts.length > 1 ? 's' : ''}
+                                                </span>
+                                            )}
+                                            {selectedSection && (() => {
+                                                const ws = selectedSection.workflowStatus || 'draft';
+                                                const wsConf = statusConfig[ws];
+                                                const WsIcon = wsConf.icon;
+                                                return (
+                                                    <span className={`px-2 py-1 text-xs ${wsConf.bg} ${wsConf.color} rounded-full flex items-center gap-1`}>
+                                                        <WsIcon size={12} />
+                                                        {wsConf.label}
+                                                    </span>
+                                                );
+                                            })()}
+                                        </div>
                                     </div>
 
                                     {selectedSection?.generationRules && (
@@ -1775,21 +1758,33 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     )}
 
                                     {/* Prompt Input */}
-                                    <div className="border border-[var(--border-light)] rounded-lg p-4 bg-[var(--bg-tertiary)]">
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                                            Write your prompt for this section
-                                        </label>
-                                        <PromptInput
-                                            key={selectedSectionId}
-                                            entities={entities}
-                                            companyInfo={companyInfo}
-                                            onGenerate={handleGenerate}
-                                            isGenerating={isGenerating}
-                                            initialValue={selectedSection?.userPrompt || ''}
-                                            placeholder="Describe what you want in this section. Mention @entities to include data..."
-                                            buttonLabel="Generate"
-                                        />
-                                    </div>
+                                    {selectedSection?.workflowStatus === 'ready_to_send' ? (
+                                        <div className="border border-emerald-500/30 rounded-lg p-4 bg-emerald-500/5">
+                                            <div className="flex items-center gap-2 text-emerald-600">
+                                                <PaperPlaneTilt size={18} weight="light" />
+                                                <span className="text-sm font-medium">This section is Ready to Send</span>
+                                            </div>
+                                            <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                                                Change the status back to Draft or Review to edit the prompt or content.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="border border-[var(--border-light)] rounded-lg p-4 bg-[var(--bg-tertiary)]">
+                                            <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+                                                Write your prompt for this section
+                                            </label>
+                                            <PromptInput
+                                                key={selectedSectionId}
+                                                entities={entities}
+                                                companyInfo={companyInfo}
+                                                onGenerate={handleGenerate}
+                                                isGenerating={isGenerating}
+                                                initialValue={selectedSection?.userPrompt || ''}
+                                                placeholder="Describe what you want in this section. Mention @entities to include data..."
+                                                buttonLabel="Generate"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* AI Suggestion Preview */}
@@ -1843,36 +1838,38 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                     </p>
                                                 )}
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                {/* Toggle View/Edit Mode */}
-                                                <button
-                                                    onClick={() => setIsEditMode(!isEditMode)}
-                                                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${
-                                                        isEditMode 
-                                                            ? 'bg-[#256A65]/10 text-[#256A65]' 
-                                                            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-                                                    }`}
-                                                >
-                                                    <PencilSimple size={16} weight="light" />
-                                                    {isEditMode ? 'Editing' : 'Edit'}
-                                                </button>
-                                                <button
-                                                    onClick={handleSaveSection}
-                                                    disabled={isSaving}
-                                                    className="px-3 py-1.5 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
-                                                >
-                                                    {isSaving ? (
-                                                        <SpinnerGap size={16} weight="light" className="animate-spin" />
-                                                    ) : (
-                                                        <FloppyDisk size={16} weight="light" />
-                                                    )}
-                                                    Save
-                                                </button>
-                                            </div>
+                                            {selectedSection?.workflowStatus !== 'ready_to_send' && (
+                                                <div className="flex items-center gap-2">
+                                                    {/* Toggle View/Edit Mode */}
+                                                    <button
+                                                        onClick={() => setIsEditMode(!isEditMode)}
+                                                        className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1 ${
+                                                            isEditMode 
+                                                                ? 'bg-[#256A65]/10 text-[#256A65]' 
+                                                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                                                        }`}
+                                                    >
+                                                        <PencilSimple size={16} weight="light" />
+                                                        {isEditMode ? 'Editing' : 'Edit'}
+                                                    </button>
+                                                    <button
+                                                        onClick={handleSaveSection}
+                                                        disabled={isSaving}
+                                                        className="px-3 py-1.5 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                                                    >
+                                                        {isSaving ? (
+                                                            <SpinnerGap size={16} weight="light" className="animate-spin" />
+                                                        ) : (
+                                                            <FloppyDisk size={16} weight="light" />
+                                                        )}
+                                                        Save
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         <div className="p-6">
-                                            {isEditMode ? (
+                                            {isEditMode && selectedSection?.workflowStatus !== 'ready_to_send' ? (
                                                 <textarea
                                                     value={editingContent}
                                                     onChange={(e) => setEditingContent(e.target.value)}
@@ -1882,10 +1879,14 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                 />
                                             ) : (
                                                 <div 
-                                                    className="min-h-[300px] p-4 border border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)] text-sm whitespace-pre-wrap leading-relaxed cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
+                                                    className={`min-h-[300px] p-4 border border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)] text-sm whitespace-pre-wrap leading-relaxed ${
+                                                        selectedSection?.workflowStatus === 'ready_to_send'
+                                                            ? 'cursor-default'
+                                                            : 'cursor-pointer hover:bg-[var(--bg-hover)] transition-colors'
+                                                    }`}
                                                     dangerouslySetInnerHTML={{ __html: highlightedHtml || editingContent }}
-                                                    onClick={() => setIsEditMode(true)}
-                                                    title="Click to edit"
+                                                    onClick={() => selectedSection?.workflowStatus !== 'ready_to_send' && setIsEditMode(true)}
+                                                    title={selectedSection?.workflowStatus === 'ready_to_send' ? 'Section is locked (Ready to Send)' : 'Click to edit'}
                                                 />
                                             )}
                                         </div>
@@ -2212,16 +2213,30 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                 {selectedSection?.title || 'Select a section'}
                                             </h2>
                                             <p className="text-sm text-[var(--text-secondary)]">
-                                                Select text to add comments • {sectionComments.filter(c => c.status === 'open').length} open comment{sectionComments.filter(c => c.status === 'open').length !== 1 ? 's' : ''}
+                                                {selectedSection?.workflowStatus === 'ready_to_send' 
+                                                    ? 'This section is locked (Ready to Send)'
+                                                    : `Select text to add comments • ${sectionComments.filter(c => c.status === 'open').length} open comment${sectionComments.filter(c => c.status === 'open').length !== 1 ? 's' : ''}`
+                                                }
                                             </p>
                                         </div>
+                                        {selectedSection && (() => {
+                                            const ws = selectedSection.workflowStatus || 'draft';
+                                            const wsConf = statusConfig[ws];
+                                            const WsIcon = wsConf.icon;
+                                            return (
+                                                <span className={`px-2 py-1 text-xs ${wsConf.bg} ${wsConf.color} rounded-full flex items-center gap-1`}>
+                                                    <WsIcon size={12} />
+                                                    {wsConf.label}
+                                                </span>
+                                            );
+                                        })()}
                                         </div>
 
                                     {/* Content Area */}
                                     <div 
                                         ref={contentRef}
-                                        className="p-6 min-h-[400px] prose prose-slate max-w-none cursor-text relative"
-                                        onMouseUp={handleTextSelection}
+                                        className={`p-6 min-h-[400px] prose prose-slate max-w-none relative ${selectedSection?.workflowStatus === 'ready_to_send' ? 'cursor-default' : 'cursor-text'}`}
+                                        onMouseUp={selectedSection?.workflowStatus !== 'ready_to_send' ? handleTextSelection : undefined}
                                     >
                                         {selectedSection?.generatedContent ? (
                                             <div 
@@ -2245,7 +2260,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                         </div>
 
                                     {/* Add Comment Input Panel (appears after clicking Add Comment button) */}
-                                    {showCommentInput && selectedText && (
+                                    {showCommentInput && selectedText && selectedSection?.workflowStatus !== 'ready_to_send' && (
                                         <div className="px-6 py-4 border-t border-[var(--border-light)] bg-[var(--accent-primary)]/10">
                                             <div className="flex items-start gap-3">
                                                 <ChatCircle className="text-[#256A65] mt-1 shrink-0" size={18} weight="light" />
@@ -2712,7 +2727,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                                     {auditLogs.map((log, idx) => {
                                         const details = log.details ? JSON.parse(log.details) : null;
-                                        const isStatusChange = log.action === 'status_change';
+                                        const isStatusChange = log.action === 'status_change' || log.action === 'section_status_change';
                                         const isFirst = idx === 0;
 
                                         return (
@@ -2740,15 +2755,24 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                                                     {/* Status change details */}
                                                     {isStatusChange && details && (
-                                                        <div className="flex items-center gap-2 mt-1.5 mb-1.5">
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                                                                details.previousStatus === 'draft' ? 'bg-amber-500/15 text-amber-500' :
-                                                                details.previousStatus === 'review' ? 'bg-[var(--accent-primary)]/15 text-[var(--accent-primary)]' :
-                                                                'bg-emerald-500/15 text-emerald-500'
-                                                            }`}>
-                                                                {getStatusLabel(details.previousStatus)}
-                                                            </span>
-                                                            <ArrowRight size={12} weight="bold" className="text-[var(--text-secondary)]" />
+                                                        <div className="flex items-center gap-2 mt-1.5 mb-1.5 flex-wrap">
+                                                            {details.sectionTitle && (
+                                                                <span className="text-xs text-[var(--text-secondary)] mr-1">
+                                                                    {details.sectionTitle}:
+                                                                </span>
+                                                            )}
+                                                            {details.previousStatus && (
+                                                                <>
+                                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                                                                        details.previousStatus === 'draft' ? 'bg-amber-500/15 text-amber-500' :
+                                                                        details.previousStatus === 'review' ? 'bg-[var(--accent-primary)]/15 text-[var(--accent-primary)]' :
+                                                                        'bg-emerald-500/15 text-emerald-500'
+                                                                    }`}>
+                                                                        {getStatusLabel(details.previousStatus)}
+                                                                    </span>
+                                                                    <ArrowRight size={12} weight="bold" className="text-[var(--text-secondary)]" />
+                                                                </>
+                                                            )}
                                                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
                                                                 details.newStatus === 'draft' ? 'bg-amber-500/15 text-amber-500' :
                                                                 details.newStatus === 'review' ? 'bg-[var(--accent-primary)]/15 text-[var(--accent-primary)]' :
@@ -2882,11 +2906,11 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
 
     const iconOptions = [
         { value: 'FileText', label: 'Document', Icon: FileText },
-        { value: 'FlaskConical', label: 'Flask', Icon: FlaskConical },
+        { value: 'FlaskConical', label: 'Flask', Icon: Flask },
         { value: 'Clipboard', label: 'Clipboard', Icon: Clipboard },
         { value: 'Wrench', label: 'Wrench', Icon: Wrench },
-        { value: 'AlertTriangle', label: 'Alert', Icon: AlertTriangle },
-        { value: 'Sparkles', label: 'Sparkles', Icon: Sparkles }
+        { value: 'AlertTriangle', label: 'Alert', Icon: Warning },
+        { value: 'Sparkles', label: 'Sparkles', Icon: Sparkle }
     ];
 
     const addSection = () => {

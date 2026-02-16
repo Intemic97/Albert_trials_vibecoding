@@ -167,3 +167,5 @@ export const AIAssistantSidePanel: React.FC<AIAssistantSidePanelProps> = ({
   );
 };
 
+
+

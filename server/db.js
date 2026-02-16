@@ -1107,6 +1107,11 @@ async function initDb() {
     // Indexes might already exist
   }
 
+  // Migration: workflowStatus for report_sections (per-section Draft/Review/Ready to Send)
+  try {
+    await db.exec(`ALTER TABLE report_sections ADD COLUMN workflowStatus TEXT DEFAULT 'draft'`);
+  } catch (e) { /* column exists */ }
+
   return db;
 }
 

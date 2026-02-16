@@ -686,6 +686,7 @@ router.get('/reports/:id', authenticateToken, async (req, res) => {
                 generatedContent: rs?.content || null,
                 userPrompt: rs?.userPrompt || null,
                 sectionStatus: rs?.status || 'empty',
+                workflowStatus: rs?.workflowStatus || 'draft',
                 generatedAt: rs?.generatedAt || null
             };
         });
@@ -836,6 +837,79 @@ router.put('/reports/:id/status', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('Error updating report status:', error);
         res.status(500).json({ error: 'Failed to update status' });
+    }
+});
+
+// Update section workflow status (per-section Draft/Review/Ready to Send)
+router.put('/reports/:id/sections/:sectionId/workflow-status', authenticateToken, async (req, res) => {
+    try {
+        const { id, sectionId } = req.params;
+        const { workflowStatus } = req.body;
+        const now = new Date().toISOString();
+        
+        const validStatuses = ['draft', 'review', 'ready_to_send'];
+        if (!validStatuses.includes(workflowStatus)) {
+            return res.status(400).json({ error: 'Invalid workflow status' });
+        }
+        
+        const report = await db.get(
+            'SELECT id, name FROM reports WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        
+        if (!report) {
+            return res.status(404).json({ error: 'Report not found' });
+        }
+        
+        // Try by report_section.id first
+        let section = await db.get(
+            'SELECT rs.id, ts.title FROM report_sections rs JOIN template_sections ts ON rs.templateSectionId = ts.id WHERE rs.id = ? AND rs.reportId = ?',
+            [sectionId, id]
+        );
+        
+        if (section) {
+            await db.run(
+                'UPDATE report_sections SET workflowStatus = ? WHERE id = ?',
+                [workflowStatus, section.id]
+            );
+        } else {
+            // Try by templateSectionId
+            section = await db.get(
+                'SELECT rs.id, ts.title FROM report_sections rs JOIN template_sections ts ON rs.templateSectionId = ts.id WHERE rs.templateSectionId = ? AND rs.reportId = ?',
+                [sectionId, id]
+            );
+            if (section) {
+                await db.run(
+                    'UPDATE report_sections SET workflowStatus = ? WHERE id = ?',
+                    [workflowStatus, section.id]
+                );
+            } else {
+                return res.status(404).json({ error: 'Section not found' });
+            }
+        }
+        
+        await db.run('UPDATE reports SET updatedAt = ? WHERE id = ?', [now, id]);
+
+        // Log in audit trail
+        const user = await db.get('SELECT name, email FROM users WHERE id = ?', [req.user.sub]);
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: user?.name || req.user.email,
+            userEmail: user?.email || req.user.email,
+            action: 'section_status_change',
+            resourceType: 'report',
+            resourceId: id,
+            resourceName: report.name,
+            details: { sectionTitle: section.title, newStatus: workflowStatus },
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+        
+        res.json({ message: 'Section workflow status updated', workflowStatus });
+    } catch (error) {
+        console.error('Error updating section workflow status:', error);
+        res.status(500).json({ error: 'Failed to update section workflow status' });
     }
 });
 
