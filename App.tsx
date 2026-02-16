@@ -44,7 +44,7 @@ sessionStorage.removeItem('chunk_reload');
 
 // Lazy-loaded components with auto-retry on stale chunk errors
 const Workflows = lazyWithRetry(() => import('./components/Workflows').then(m => ({ default: m.Workflows as any })));
-const WorkflowEditor = lazyWithRetry(() => import('./components/workflows/WorkflowEditor').then(m => ({ default: m.WorkflowEditor as any })));
+const WorkflowEditor = lazyWithRetry(() => import('./components/Workflows/WorkflowEditor').then(m => ({ default: m.WorkflowEditor as any })));
 const ReportEditor = lazyWithRetry(() => import('./components/ReportEditor').then(m => ({ default: m.ReportEditor as any })));
 const Dashboard = lazyWithRetry(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard as any })));
 const Overview = lazyWithRetry(() => import('./components/Overview').then(m => ({ default: m.Overview as any })));
