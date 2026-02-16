@@ -1735,17 +1735,48 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                     {report.contexts.length} context doc{report.contexts.length > 1 ? 's' : ''}
                                                 </span>
                                             )}
-                                            {selectedSection && (() => {
-                                                const ws = selectedSection.workflowStatus || 'draft';
-                                                const wsConf = statusConfig[ws];
-                                                const WsIcon = wsConf.icon;
-                                                return (
-                                                    <span className={`px-2 py-1 text-xs ${wsConf.bg} ${wsConf.color} rounded-full flex items-center gap-1`}>
-                                                        <WsIcon size={12} />
-                                                        {wsConf.label}
-                                                    </span>
-                                                );
-                                            })()}
+                                            {selectedSection && selectedSection.sectionStatus !== 'empty' && (
+                                                <div className="flex items-center gap-1">
+                                                    {(['draft', 'review', 'ready_to_send'] as const).map((ws, wsIdx) => {
+                                                        const wsConfig = statusConfig[ws];
+                                                        const WsIcon = wsConfig.icon;
+                                                        const currentWs = selectedSection.workflowStatus || 'draft';
+                                                        const isActiveWs = currentWs === ws;
+                                                        const currentWsIdx = ['draft', 'review', 'ready_to_send'].indexOf(currentWs);
+                                                        const isPastWs = currentWsIdx > wsIdx;
+                                                        
+                                                        const sectionOpenComments = comments.filter(c => c.sectionId === selectedSection.id && c.status === 'open').length;
+                                                        let wsDisabled = false;
+                                                        if (ws === 'ready_to_send' && currentWs === 'draft') wsDisabled = true;
+                                                        if (ws === 'ready_to_send' && sectionOpenComments > 0) wsDisabled = true;
+
+                                                        return (
+                                                            <React.Fragment key={ws}>
+                                                                {wsIdx > 0 && (
+                                                                    <div className={`w-4 h-px ${isPastWs || isActiveWs ? 'bg-[var(--accent-primary)]' : 'bg-[var(--border-light)]'}`} />
+                                                                )}
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); if (!wsDisabled) handleSectionWorkflowStatusChange(selectedSection.id, ws); }}
+                                                                    disabled={wsDisabled}
+                                                                    title={wsDisabled ? (ws === 'ready_to_send' && sectionOpenComments > 0 ? `Resolve ${sectionOpenComments} open comment(s) first` : 'Move to Review first') : wsConfig.label}
+                                                                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                                                                        wsDisabled
+                                                                            ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed'
+                                                                            : isActiveWs
+                                                                                ? `${wsConfig.bg} ${wsConfig.color} ring-1 ring-offset-1 ring-current/20`
+                                                                                : isPastWs
+                                                                                    ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 cursor-pointer'
+                                                                                    : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] cursor-pointer'
+                                                                    }`}
+                                                                >
+                                                                    <WsIcon size={12} />
+                                                                    {wsConfig.label}
+                                                                </button>
+                                                            </React.Fragment>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -1765,7 +1796,17 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                 <span className="text-sm font-medium">This section is Ready to Send</span>
                                             </div>
                                             <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                                                Change the status back to Draft or Review to edit the prompt or content.
+                                                Change the status back to Draft to edit the prompt or content.
+                                            </p>
+                                        </div>
+                                    ) : selectedSection?.workflowStatus === 'review' ? (
+                                        <div className="border border-[var(--accent-primary)]/30 rounded-lg p-4 bg-[var(--accent-primary)]/5">
+                                            <div className="flex items-center gap-2 text-[var(--accent-primary)]">
+                                                <Eye size={18} weight="light" />
+                                                <span className="text-sm font-medium">This section is in Review</span>
+                                            </div>
+                                            <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                                                Change the status back to Draft to edit the prompt or content.
                                             </p>
                                         </div>
                                     ) : (
@@ -1838,7 +1879,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                     </p>
                                                 )}
                                             </div>
-                                            {selectedSection?.workflowStatus !== 'ready_to_send' && (
+                                            {selectedSection?.workflowStatus === 'draft' && (
                                                 <div className="flex items-center gap-2">
                                                     {/* Toggle View/Edit Mode */}
                                                     <button
@@ -1869,7 +1910,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                         </div>
                                         
                                         <div className="p-6">
-                                            {isEditMode && selectedSection?.workflowStatus !== 'ready_to_send' ? (
+                                            {isEditMode && selectedSection?.workflowStatus === 'draft' ? (
                                                 <textarea
                                                     value={editingContent}
                                                     onChange={(e) => setEditingContent(e.target.value)}
@@ -1880,13 +1921,13 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             ) : (
                                                 <div 
                                                     className={`min-h-[300px] p-4 border border-[var(--border-light)] rounded-lg bg-[var(--bg-tertiary)] text-sm whitespace-pre-wrap leading-relaxed ${
-                                                        selectedSection?.workflowStatus === 'ready_to_send'
-                                                            ? 'cursor-default'
-                                                            : 'cursor-pointer hover:bg-[var(--bg-hover)] transition-colors'
+                                                        selectedSection?.workflowStatus === 'draft'
+                                                            ? 'cursor-pointer hover:bg-[var(--bg-hover)] transition-colors'
+                                                            : 'cursor-default'
                                                     }`}
                                                     dangerouslySetInnerHTML={{ __html: highlightedHtml || editingContent }}
-                                                    onClick={() => selectedSection?.workflowStatus !== 'ready_to_send' && setIsEditMode(true)}
-                                                    title={selectedSection?.workflowStatus === 'ready_to_send' ? 'Section is locked (Ready to Send)' : 'Click to edit'}
+                                                    onClick={() => selectedSection?.workflowStatus === 'draft' && setIsEditMode(true)}
+                                                    title={selectedSection?.workflowStatus === 'draft' ? 'Click to edit' : `Section is locked (${selectedSection?.workflowStatus === 'ready_to_send' ? 'Ready to Send' : 'Review'})`}
                                                 />
                                             )}
                                         </div>
@@ -2219,17 +2260,48 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                 }
                                             </p>
                                         </div>
-                                        {selectedSection && (() => {
-                                            const ws = selectedSection.workflowStatus || 'draft';
-                                            const wsConf = statusConfig[ws];
-                                            const WsIcon = wsConf.icon;
-                                            return (
-                                                <span className={`px-2 py-1 text-xs ${wsConf.bg} ${wsConf.color} rounded-full flex items-center gap-1`}>
-                                                    <WsIcon size={12} />
-                                                    {wsConf.label}
-                                                </span>
-                                            );
-                                        })()}
+                                        {selectedSection && selectedSection.sectionStatus !== 'empty' && (
+                                            <div className="flex items-center gap-1">
+                                                {(['draft', 'review', 'ready_to_send'] as const).map((ws, wsIdx) => {
+                                                    const wsConfig = statusConfig[ws];
+                                                    const WsIcon = wsConfig.icon;
+                                                    const currentWs = selectedSection.workflowStatus || 'draft';
+                                                    const isActiveWs = currentWs === ws;
+                                                    const currentWsIdx = ['draft', 'review', 'ready_to_send'].indexOf(currentWs);
+                                                    const isPastWs = currentWsIdx > wsIdx;
+                                                    
+                                                    const sectionOpenComments = comments.filter(c => c.sectionId === selectedSection.id && c.status === 'open').length;
+                                                    let wsDisabled = false;
+                                                    if (ws === 'ready_to_send' && currentWs === 'draft') wsDisabled = true;
+                                                    if (ws === 'ready_to_send' && sectionOpenComments > 0) wsDisabled = true;
+
+                                                    return (
+                                                        <React.Fragment key={ws}>
+                                                            {wsIdx > 0 && (
+                                                                <div className={`w-4 h-px ${isPastWs || isActiveWs ? 'bg-[var(--accent-primary)]' : 'bg-[var(--border-light)]'}`} />
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); if (!wsDisabled) handleSectionWorkflowStatusChange(selectedSection.id, ws); }}
+                                                                disabled={wsDisabled}
+                                                                title={wsDisabled ? (ws === 'ready_to_send' && sectionOpenComments > 0 ? `Resolve ${sectionOpenComments} open comment(s) first` : 'Move to Review first') : wsConfig.label}
+                                                                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-all ${
+                                                                    wsDisabled
+                                                                        ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed'
+                                                                        : isActiveWs
+                                                                            ? `${wsConfig.bg} ${wsConfig.color} ring-1 ring-offset-1 ring-current/20`
+                                                                            : isPastWs
+                                                                                ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 cursor-pointer'
+                                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] cursor-pointer'
+                                                                }`}
+                                                            >
+                                                                <WsIcon size={12} />
+                                                                {wsConfig.label}
+                                                            </button>
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
                                         </div>
 
                                     {/* Content Area */}
