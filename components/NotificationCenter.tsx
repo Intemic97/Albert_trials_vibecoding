@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
     Bell, BellRinging, X, Check, CheckCircle, WarningCircle, XCircle, Info,
     Trash, Eye, EyeSlash, GearSix, CaretRight, Clock, GitBranch, Database,
-    ChartBar, Lightning, SpinnerGap
+    ChartBar, Lightning, SpinnerGap, ArrowSquareOut
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { generateUUID } from '../utils/uuid';
@@ -84,12 +85,18 @@ interface NotificationCenterProps {
 }
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose, triggerRef }) => {
+    const navigate = useNavigate();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'settings'>('all');
     const [alertConfigs, setAlertConfigs] = useState<AlertConfig[]>([]);
     const panelRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState({ top: 0, left: 0 });
+
+    const handleNavigate = (url: string) => {
+        onClose();
+        navigate(url);
+    };
 
     // Calculate position based on trigger button
     useEffect(() => {
@@ -130,6 +137,21 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isOpen, onClose]);
 
+    const mapNotificationType = (backendType: string): NotificationType => {
+        if (backendType?.includes('error') || backendType?.includes('fail')) return 'error';
+        if (backendType?.includes('warning') || backendType?.includes('deviation')) return 'warning';
+        if (backendType?.includes('success') || backendType?.includes('complete')) return 'success';
+        return 'info';
+    };
+
+    const mapNotificationSource = (backendType: string): NotificationSource => {
+        if (backendType?.includes('workflow')) return 'workflow';
+        if (backendType?.includes('report') || backendType?.includes('document')) return 'system';
+        if (backendType?.includes('data') || backendType?.includes('entity')) return 'data';
+        if (backendType?.includes('alert')) return 'alert';
+        return 'system';
+    };
+
     const fetchNotifications = async () => {
         setIsLoading(true);
         try {
@@ -137,16 +159,22 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
             if (res.ok) {
                 const data = await res.json();
                 setNotifications(Array.isArray(data) ? data.map((n: any) => ({
-                    ...n,
-                    timestamp: new Date(n.timestamp)
+                    id: n.id,
+                    type: n.type ? mapNotificationType(n.type) : (n.type || 'info'),
+                    source: n.source || mapNotificationSource(n.type || ''),
+                    title: n.title || 'Notification',
+                    message: n.message || '',
+                    timestamp: new Date(n.createdAt || n.timestamp || Date.now()),
+                    read: n.isRead !== undefined ? Boolean(n.isRead) : Boolean(n.read),
+                    actionUrl: n.link || n.actionUrl || undefined,
+                    metadata: n.metadata ? (typeof n.metadata === 'string' ? JSON.parse(n.metadata) : n.metadata) : undefined,
                 })) : []);
             } else {
-                // Mock data for demo
-                setNotifications(getMockNotifications());
+                setNotifications([]);
             }
         } catch (error) {
             console.error('Error fetching notifications:', error);
-            setNotifications(getMockNotifications());
+            setNotifications([]);
         } finally {
             setIsLoading(false);
         }
@@ -159,10 +187,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                 const data = await res.json();
                 setAlertConfigs(Array.isArray(data) ? data : []);
             } else {
-                setAlertConfigs(getMockAlertConfigs());
+                setAlertConfigs([]);
             }
         } catch (error) {
-            setAlertConfigs(getMockAlertConfigs());
+            setAlertConfigs([]);
         }
     };
 
@@ -208,7 +236,6 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
     };
 
     const clearAll = async () => {
-        if (!confirm('Clear all notifications?')) return;
         setNotifications([]);
         
         try {
@@ -352,6 +379,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
                                 notification={notification}
                                 onMarkAsRead={() => markAsRead(notification.id)}
                                 onDelete={() => deleteNotification(notification.id)}
+                                onNavigate={handleNavigate}
                             />
                         ))}
                     </div>
@@ -389,12 +417,14 @@ interface NotificationItemProps {
     notification: Notification;
     onMarkAsRead: () => void;
     onDelete: () => void;
+    onNavigate?: (url: string) => void;
 }
 
 const NotificationItem: React.FC<NotificationItemProps> = ({
     notification,
     onMarkAsRead,
-    onDelete
+    onDelete,
+    onNavigate
 }) => {
     const getIcon = () => {
         switch (notification.type) {
@@ -436,11 +466,11 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
             <div className="flex gap-3">
                 <div className="shrink-0 mt-0.5">{getIcon()}</div>
                 <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start justify-between gap-2">
                         <p className={`text-sm ${notification.read ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)] font-medium'}`}>
                             {notification.title}
                         </p>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                             {!notification.read && (
                                 <button
                                     onClick={onMarkAsRead}
@@ -471,6 +501,23 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
                         <span className="text-[10px] text-[var(--text-tertiary)]">
                             {timeAgo(notification.timestamp)}
                         </span>
+                        {notification.actionUrl && onNavigate && (
+                            <>
+                                <span className="text-[10px] text-[var(--text-tertiary)]">•</span>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!notification.read) onMarkAsRead();
+                                        onNavigate(notification.actionUrl!);
+                                    }}
+                                    className="flex items-center gap-0.5 text-[10px] text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] font-medium transition-colors"
+                                    title="Go to page"
+                                >
+                                    <ArrowSquareOut size={10} weight="bold" />
+                                    Open
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -568,11 +615,10 @@ export const useNotificationCenter = () => {
                 const data = await res.json();
                 setUnreadCount(data.count || 0);
             } else {
-                // Mock count
-                setUnreadCount(2);
+                setUnreadCount(0);
             }
         } catch (error) {
-            setUnreadCount(2);
+            setUnreadCount(0);
         }
     };
 
