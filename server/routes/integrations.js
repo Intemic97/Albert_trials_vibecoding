@@ -84,7 +84,7 @@ router.post('/mysql/query', authenticateToken, async (req, res) => {
     }
 });
 
-// Send Email Endpoint
+// Send Email Endpoint — uses Resend by default, falls back to SMTP if configured
 router.post('/email/send', authenticateToken, async (req, res) => {
     const { to, subject, body, smtpHost, smtpPort, smtpUser, smtpPass } = req.body;
 
@@ -92,35 +92,21 @@ router.post('/email/send', authenticateToken, async (req, res) => {
         return res.status(400).json({ error: 'Recipient email is required' });
     }
 
-    if (!smtpUser || !smtpPass) {
-        return res.status(400).json({ error: 'SMTP credentials are required. Configure SMTP settings in the node.' });
-    }
-
     try {
-        const nodemailer = require('nodemailer');
-
-        // Create transporter with user-provided SMTP settings
-        const transporter = nodemailer.createTransport({
-            host: smtpHost || 'smtp.gmail.com',
-            port: parseInt(smtpPort) || 587,
-            secure: parseInt(smtpPort) === 465, // true for 465, false for other ports
-            auth: {
-                user: smtpUser,
-                pass: smtpPass
-            }
-        });
-
-        // Send email
-        const info = await transporter.sendMail({
-            from: smtpUser,
-            to: to,
+        const { sendEmail } = require('../utils/emailService');
+        const result = await sendEmail({
+            to,
             subject: subject || '(No subject)',
             text: body || '',
-            html: body ? body.replace(/\n/g, '<br>') : ''
+            html: body ? body.replace(/\n/g, '<br>') : '',
+            smtp: (smtpUser && smtpPass) ? { host: smtpHost, port: smtpPort, user: smtpUser, pass: smtpPass } : undefined,
         });
 
-        console.log('Email sent:', info.messageId);
-        res.json({ success: true, messageId: info.messageId });
+        if (result.success) {
+            res.json({ success: true, messageId: result.messageId, provider: result.provider });
+        } else {
+            res.status(500).json({ error: result.error || 'Failed to send email' });
+        }
     } catch (error) {
         console.error('Email send error:', error);
         res.status(500).json({ error: error.message || 'Failed to send email' });

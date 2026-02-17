@@ -1150,30 +1150,29 @@ class WorkflowExecutor {
         const config = node.config || {};
         const { emailTo, emailSubject, emailBody, emailSmtpHost, emailSmtpPort, emailSmtpUser, emailSmtpPass } = config;
 
-        if (!emailTo || !emailSmtpUser || !emailSmtpPass) {
-            throw new Error('Email configuration incomplete');
+        if (!emailTo) {
+            throw new Error('Email recipient not configured');
         }
 
         try {
-            const nodemailer = require('nodemailer');
-            const transporter = nodemailer.createTransport({
-                host: emailSmtpHost || 'smtp.gmail.com',
-                port: parseInt(emailSmtpPort) || 587,
-                secure: parseInt(emailSmtpPort) === 465,
-                auth: { user: emailSmtpUser, pass: emailSmtpPass }
-            });
-
-            await transporter.sendMail({
-                from: emailSmtpUser,
+            const { sendEmail } = require('./utils/emailService');
+            const result = await sendEmail({
                 to: emailTo,
                 subject: emailSubject || '(No subject)',
                 text: emailBody || '',
-                html: emailBody ? emailBody.replace(/\n/g, '<br>') : ''
+                html: emailBody ? emailBody.replace(/\n/g, '<br>') : '',
+                smtp: (emailSmtpUser && emailSmtpPass)
+                    ? { host: emailSmtpHost, port: emailSmtpPort, user: emailSmtpUser, pass: emailSmtpPass }
+                    : undefined,
             });
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to send email');
+            }
 
             return {
                 success: true,
-                message: `Email sent to ${emailTo}`,
+                message: `Email sent to ${emailTo} via ${result.provider}`,
                 outputData: inputData
             };
         } catch (error) {
@@ -1750,6 +1749,33 @@ class WorkflowExecutor {
         await this.updateExecutionStatus('paused', {
             currentNodeId: node.id
         });
+
+        // Send platform notification to assigned user
+        const assignedUserId = node.config?.assignedUserId;
+        const nodeLabel = node.config?.customName || node.label || 'Human Approval';
+        if (assignedUserId && this.organizationId) {
+            try {
+                const crypto = require('crypto');
+                const notifId = crypto.randomUUID();
+                const now = new Date().toISOString();
+                await this.db.run(
+                    `INSERT INTO notifications (id, orgId, userId, type, title, message, link, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        notifId,
+                        this.organizationId,
+                        assignedUserId,
+                        'approval_required',
+                        'Approval required',
+                        `"${nodeLabel}" step is waiting for your approval.`,
+                        this.workflow?.id ? `/workflow/${this.workflow.id}` : null,
+                        JSON.stringify({ workflowId: this.workflow?.id, nodeId: node.id }),
+                        now
+                    ]
+                );
+            } catch (e) {
+                console.warn('[HumanApproval] Failed to create notification:', e.message);
+            }
+        }
 
         return {
             success: true,

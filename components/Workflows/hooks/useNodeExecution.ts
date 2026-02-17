@@ -30,6 +30,8 @@ export interface NodeExecutionDeps {
   setIsRunning: (v: boolean) => void;
   /** Current workflow ID */
   currentWorkflowId: string | null;
+  /** Current workflow name */
+  workflowName: string;
   /** Save workflow before execution */
   saveWorkflow: () => Promise<void>;
   /** Set waiting approval node id (for human-in-the-loop) */
@@ -61,6 +63,7 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
       nodes, connections, entities,
       setNodes, updateNodeAndBroadcast,
       setWaitingApprovalNodeId, setPendingApprovalData,
+      currentWorkflowId, workflowName,
     } = depsRef.current;
 
     const node = nodes.find(n => n.id === nodeId);
@@ -755,15 +758,18 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
                 }
                 return r;
               };
-              const emailData = {
+              const emailData: Record<string, any> = {
                 to: replaceVariables(node.config.emailTo, inputData),
                 subject: replaceVariables(node.config.emailSubject || '', inputData),
                 body: replaceVariables(node.config.emailBody || '', inputData),
-                smtpHost: node.config.emailSmtpHost || 'smtp.gmail.com',
-                smtpPort: node.config.emailSmtpPort || '587',
-                smtpUser: node.config.emailSmtpUser,
-                smtpPass: node.config.emailSmtpPass
               };
+              // Only include SMTP override if user explicitly configured it
+              if (node.config.emailSmtpUser && node.config.emailSmtpPass) {
+                emailData.smtpHost = node.config.emailSmtpHost || 'smtp.gmail.com';
+                emailData.smtpPort = node.config.emailSmtpPort || '587';
+                emailData.smtpUser = node.config.emailSmtpUser;
+                emailData.smtpPass = node.config.emailSmtpPass;
+              }
               const response = await fetch(`${API_BASE}/email/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -771,8 +777,9 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
                 credentials: 'include'
               });
               if (response.ok) {
+                const respData = await response.json();
                 nodeData = inputData || [{ emailSent: true, to: emailData.to }];
-                result = `Email sent to ${emailData.to}`;
+                result = `Email sent to ${emailData.to}` + (respData.provider ? ` via ${respData.provider}` : '');
               } else {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Failed to send email');
@@ -1068,6 +1075,55 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
           }
           updateNodeAndBroadcast(nodeId, { status: 'waiting' as const, inputData });
           setWaitingApprovalNodeId(nodeId);
+
+          // --- Send notification to the assigned user ---
+          {
+            const channel = node.config.notificationChannel || 'platform';
+            const shouldPlatform = channel === 'platform' || channel === 'both';
+            const shouldEmail = channel === 'email' || channel === 'both';
+            const nodeLabel = node.config.customName || node.label || 'Human Approval';
+            const wfName = workflowName || 'Untitled Workflow';
+
+            if (shouldPlatform) {
+              try {
+                await fetch(`${API_BASE}/notifications`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({
+                    userId: node.config.assignedUserId,
+                    type: 'approval_required',
+                    title: 'Approval required',
+                    message: `"${nodeLabel}" step in workflow "${wfName}" is waiting for your approval.`,
+                    link: currentWorkflowId ? `/workflow/${currentWorkflowId}` : undefined,
+                    metadata: { workflowId: currentWorkflowId, nodeId, workflowName: wfName },
+                  }),
+                });
+              } catch (e) {
+                console.warn('Failed to send platform notification:', e);
+              }
+            }
+
+            if (shouldEmail) {
+              try {
+                await fetch(`${API_BASE}/workflow/notify-approval-email`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  credentials: 'include',
+                  body: JSON.stringify({
+                    assignedUserId: node.config.assignedUserId,
+                    assignedUserName: node.config.assignedUserName,
+                    nodeLabel,
+                    workflowId: currentWorkflowId,
+                    workflowName: wfName,
+                  }),
+                });
+              } catch (e) {
+                console.warn('Failed to send email notification:', e);
+              }
+            }
+          }
+
           await new Promise<void>((resolve) => {
             setPendingApprovalData({ inputData, resolve });
           });

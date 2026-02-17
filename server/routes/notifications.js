@@ -141,6 +141,26 @@ module.exports = function({ db }) {
         }
     });
 
+    // Create a notification (for internal use, e.g. workflow human approval)
+    router.post('/notifications', authenticateToken, async (req, res) => {
+        try {
+            const { userId, type, title, message, link, metadata } = req.body;
+            if (!userId || !title) {
+                return res.status(400).json({ error: 'userId and title are required' });
+            }
+            const id = generateId();
+            const now = new Date().toISOString();
+            await db.run(
+                `INSERT INTO notifications (id, orgId, userId, type, title, message, link, metadata, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [id, req.user.orgId, userId, type || 'info', title, message || '', link || null, JSON.stringify(metadata || {}), now]
+            );
+            res.status(201).json({ id, createdAt: now });
+        } catch (error) {
+            console.error('Create notification error:', error);
+            res.status(500).json({ error: 'Failed to create notification' });
+        }
+    });
+
     // ==================== OT ALERTS ====================
 
     // Get OT alerts

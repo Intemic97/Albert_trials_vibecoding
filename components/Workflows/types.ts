@@ -96,6 +96,7 @@ export interface NodeConfig {
   assignedUserName?: string;
   assignedUserPhoto?: string;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
+  notificationChannel?: 'platform' | 'email' | 'both';
   // For join nodes:
   joinStrategy?: 'concat' | 'mergeByKey';
   joinType?: 'inner' | 'outer';

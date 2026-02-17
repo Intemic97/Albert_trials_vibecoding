@@ -1086,6 +1086,69 @@ router.post('/pending-approvals/:id/reject', authenticateToken, async (req, res)
     }
 });
 
+// Notify assigned user via email for human approval (uses Resend)
+router.post('/workflow/notify-approval-email', authenticateToken, async (req, res) => {
+    try {
+        const { assignedUserId, assignedUserName, nodeLabel, workflowId, workflowName } = req.body;
+        if (!assignedUserId) {
+            return res.status(400).json({ error: 'assignedUserId is required' });
+        }
+
+        // Look up user's email
+        const targetUser = await db.get('SELECT email FROM users WHERE id = ?', [assignedUserId]);
+        if (!targetUser || !targetUser.email) {
+            return res.status(404).json({ error: 'User email not found' });
+        }
+
+        // If workflowName not provided, try to fetch it from DB
+        let wfName = workflowName;
+        if (!wfName && workflowId) {
+            const wf = await db.get('SELECT name FROM workflows WHERE id = ?', [workflowId]);
+            wfName = wf?.name || 'Workflow';
+        }
+        wfName = wfName || 'Workflow';
+
+        const APP_URL = process.env.APP_URL || 'http://localhost:5173';
+        const workflowLink = workflowId ? `${APP_URL}/workflow/${workflowId}` : APP_URL;
+
+        const { sendEmail } = require('../utils/emailService');
+        const result = await sendEmail({
+            to: targetUser.email,
+            subject: `Approval required: ${nodeLabel || 'Workflow step'} — ${wfName}`,
+            html: `
+                <div style="font-family: 'Inter', Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 20px;">
+                    <div style="text-align: center; margin-bottom: 28px;">
+                        <h1 style="color: #0d9488; margin: 0; font-size: 22px;">Approval Required</h1>
+                    </div>
+                    <p style="color: #374151; font-size: 15px; line-height: 1.6;">
+                        Hi ${assignedUserName || 'there'},
+                    </p>
+                    <p style="color: #374151; font-size: 15px; line-height: 1.6;">
+                        The step <strong>"${nodeLabel || 'Human Approval'}"</strong> in workflow
+                        <strong>"${wfName}"</strong> is waiting for your approval.
+                    </p>
+                    <div style="text-align: center; margin: 28px 0;">
+                        <a href="${workflowLink}" style="display: inline-block; padding: 12px 28px; background-color: #0d9488; color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px;">
+                            Open Workflow
+                        </a>
+                    </div>
+                    <p style="color: #6b7280; font-size: 13px; line-height: 1.5; text-align: center;">
+                        Or copy this link into your browser:<br/>
+                        <a href="${workflowLink}" style="color: #0d9488; word-break: break-all;">${workflowLink}</a>
+                    </p>
+                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+                    <p style="font-size: 12px; color: #9ca3af; text-align: center;">This is an automated notification from Intemic.</p>
+                </div>
+            `,
+        });
+
+        res.json({ sent: result.success, provider: result.provider, error: result.error });
+    } catch (error) {
+        console.error('Error sending approval email:', error);
+        res.status(500).json({ error: 'Failed to send approval email' });
+    }
+});
+
 // HTTP Proxy Endpoint
 
     return router;

@@ -138,19 +138,30 @@ export const EmailConfigPanel: React.FC<EmailConfigPanelProps> = ({
                     </div>
                 </div>
 
-                {/* SMTP Settings (collapsible) */}
+                {/* Info: Resend is the default */}
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-teal-50/60 dark:bg-teal-900/20 border border-teal-200/50 dark:border-teal-700/30">
+                    <EnvelopeSimple size={16} weight="bold" className="text-teal-600 mt-0.5 flex-shrink-0" />
+                    <p className="text-[11px] text-teal-800 dark:text-teal-200 leading-relaxed">
+                        Emails are sent via <strong>Resend</strong> automatically. No extra configuration needed.
+                    </p>
+                </div>
+
+                {/* SMTP Settings (optional override, collapsible) */}
                 <div className="border border-[var(--border-light)] rounded-lg">
                     <button
                         type="button"
                         onClick={() => setShowEmailSmtpSettings(!showEmailSmtpSettings)}
-                        className="w-full px-4 py-2 flex items-center justify-between text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
+                        className="w-full px-4 py-2 flex items-center justify-between text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg"
                     >
-                        <span>⚙️ SMTP Settings</span>
-                        <span>{showEmailSmtpSettings ? '▲' : '▼'}</span>
+                        <span>Advanced: custom SMTP override (optional)</span>
+                        <CaretDown size={12} className={`transition-transform ${showEmailSmtpSettings ? 'rotate-180' : ''}`} />
                     </button>
 
                     {showEmailSmtpSettings && (
                         <div className="p-4 border-t border-[var(--border-light)] space-y-3">
+                            <p className="text-[10px] text-[var(--text-tertiary)] mb-2">
+                                Only fill these if you want to override Resend with your own SMTP server.
+                            </p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
@@ -200,9 +211,6 @@ export const EmailConfigPanel: React.FC<EmailConfigPanelProps> = ({
                                     placeholder="••••••••••••"
                                     className="w-full px-3 py-1.5 text-xs text-[var(--text-primary)] border border-[var(--border-light)] rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                                 />
-                                <p className="text-[10px] text-[var(--text-secondary)] mt-1">
-                                    For Gmail, use an App Password (not your regular password)
-                                </p>
                             </div>
                         </div>
                     )}

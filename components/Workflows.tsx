@@ -2143,6 +2143,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         isRunning,
         setIsRunning,
         currentWorkflowId,
+        workflowName,
         saveWorkflow,
         setWaitingApprovalNodeId,
         setPendingApprovalData,
