@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
@@ -12,11 +13,16 @@ import { Entity, EntityType, ENTITY_TYPE_OPTIONS } from '../types';
 import { EntityCard } from './EntityCard';
 import { PageHeader } from './PageHeader';
 import { Breadcrumbs, BreadcrumbItem, FolderTree, FolderNode } from './ui';
-import { API_BASE } from '../config';
+import { api } from '../src/api';
+import type { KnowledgeFolderDto } from '../src/api';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../hooks/useNotifications';
 import { ToastContainer } from './ui/Toast';
 import { KnowledgeGraph } from './KnowledgeGraph';
+import { useBulkEntitySelection } from '../hooks/useBulkEntitySelection';
+import { useDestructiveConfirm } from '../hooks/useDestructiveConfirm';
+import { BulkActionsBar } from './knowledge-base/BulkActionsBar';
+import { MoveEntitiesModal } from './knowledge-base/MoveEntitiesModal';
 
 interface KnowledgeBaseProps {
     entities: Entity[];
@@ -52,6 +58,7 @@ type ViewMode = 'grid' | 'list';
 type SortBy = 'name' | 'date' | 'type';
 
 export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNavigate, onEntityCreated }) => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { notifications, removeNotification, success, error: showError, warning } = useNotifications(3000);
     const location = useLocation();
@@ -80,6 +87,8 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const [newEntityName, setNewEntityName] = useState('');
     const [newEntityDescription, setNewEntityDescription] = useState('');
     const [newEntityType, setNewEntityType] = useState<EntityType>('generic');
+    const [createEntityLoading, setCreateEntityLoading] = useState(false);
+    const [createEntityError, setCreateEntityError] = useState<string | null>(null);
     const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
     
     // Upload state
@@ -113,7 +122,9 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
     // Bulk selection (entities only)
-    const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set());
+    const bulkSelection = useBulkEntitySelection();
+    const { selectedEntityIds, toggleEntitySelection, selectAllInView, clearSelection: clearEntitySelection, isSelected, allInViewSelected } = bulkSelection;
+    const { confirmDestructive, DestructiveConfirmDialog } = useDestructiveConfirm();
     const [showMoveModal, setShowMoveModal] = useState(false);
     const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
@@ -134,11 +145,8 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const fetchFolders = async () => {
         setIsLoadingFolders(true);
         try {
-            const res = await fetch(`${API_BASE}/knowledge/folders`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setFolders(Array.isArray(data) ? data : []);
-            }
+            const data = await api.get<KnowledgeFolderDto[]>('knowledge/folders');
+            setFolders(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error fetching folders:', error);
             setFolders([]);
@@ -150,11 +158,8 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const fetchDocuments = async () => {
         setIsLoadingDocuments(true);
         try {
-            const res = await fetch(`${API_BASE}/knowledge/documents`, { credentials: 'include' });
-            if (res.ok) {
-                const data = await res.json();
-                setDocuments(Array.isArray(data) ? data : []);
-            }
+            const data = await api.get<Document[]>('knowledge/documents');
+            setDocuments(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Error fetching documents:', error);
             setDocuments([]);
@@ -266,24 +271,14 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         };
 
         try {
-            const res = await fetch(`${API_BASE}/knowledge/folders`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newFolder),
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                setNewFolderName('');
-                setNewFolderDescription('');
-                setNewFolderColor('#3b82f6');
-                setIsCreatingFolder(false);
-                setParentFolderForNew(null);
-                await fetchFolders();
-                success('Folder created');
-            } else {
-                showError('Failed to create folder');
-            }
+            await api.post('knowledge/folders', newFolder);
+            setNewFolderName('');
+            setNewFolderDescription('');
+            setNewFolderColor('#3b82f6');
+            setIsCreatingFolder(false);
+            setParentFolderForNew(null);
+            await fetchFolders();
+            success('Folder created');
         } catch (error) {
             console.error('Error creating folder:', error);
             showError('Failed to create folder');
@@ -291,23 +286,15 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     };
 
     const handleDeleteFolder = async (folder: Folder) => {
-        if (!confirm(`¿Estás seguro de que quieres borrar la carpeta «${folder.name}»? El contenido se moverá a la carpeta superior.`)) return;
-
+        const ok = await confirmDestructive({ title: t('knowledgeBase.confirmDeleteFolder', { name: folder.name }) });
+        if (!ok) return;
         try {
-            const res = await fetch(`${API_BASE}/knowledge/folders/${folder.id}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                if (currentFolderId === folder.id) {
-                    setCurrentFolderId(folder.parentId || null);
-                }
-                await fetchFolders();
-                success('Folder deleted');
-            } else {
-                showError('Failed to delete folder');
+            await api.delete(`knowledge/folders/${folder.id}`);
+            if (currentFolderId === folder.id) {
+                setCurrentFolderId(folder.parentId || null);
             }
+            await fetchFolders();
+            success('Folder deleted');
         } catch (error) {
             console.error('Error deleting folder:', error);
             showError('Failed to delete folder');
@@ -316,24 +303,14 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
 
     const handleUpdateFolder = async (folder: Folder) => {
         try {
-            const res = await fetch(`${API_BASE}/knowledge/folders/${folder.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: folder.name,
-                    description: folder.description,
-                    color: folder.color,
-                    parentId: folder.parentId
-                }),
-                credentials: 'include'
+            await api.put(`knowledge/folders/${folder.id}`, {
+                name: folder.name,
+                description: folder.description,
+                color: folder.color,
+                parentId: folder.parentId
             });
-
-            if (res.ok) {
-                setEditingFolder(null);
-                await fetchFolders();
-            } else {
-                showError('Failed to update folder');
-            }
+            setEditingFolder(null);
+            await fetchFolders();
         } catch (error) {
             console.error('Error updating folder:', error);
             showError('Failed to update folder');
@@ -347,24 +324,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         );
 
         try {
-            // Remove from current folder if exists
             if (currentFolder) {
-                await fetch(`${API_BASE}/knowledge/folders/${currentFolder.id}/remove`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: itemType, itemId }),
-                    credentials: 'include'
-                });
+                await api.post(`knowledge/folders/${currentFolder.id}/remove`, { type: itemType, itemId });
             }
-
-            // Add to target folder if not root
             if (targetFolderId) {
-                await fetch(`${API_BASE}/knowledge/folders/${targetFolderId}/add`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ type: itemType, itemId }),
-                    credentials: 'include'
-                });
+                await api.post(`knowledge/folders/${targetFolderId}/add`, { type: itemType, itemId });
             }
 
             await fetchFolders();
@@ -388,46 +352,38 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             properties: []
         };
 
+        setCreateEntityLoading(true);
+        setCreateEntityError(null);
         try {
-            const res = await fetch(`${API_BASE}/entities`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newEntity),
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                // If in a folder, add entity to it
-                if (currentFolderId) {
-                    const data = await res.json();
-                    await handleMoveToFolder('entity', data.id || newEntity.id, currentFolderId);
-                }
-                
-                setNewEntityName('');
-                setNewEntityDescription('');
-                setNewEntityType('generic');
-                setIsCreatingEntity(false);
-                
-                // Save current folder and reload
-                if (currentFolderId) {
-                    sessionStorage.setItem('kb_currentFolder', currentFolderId);
-                }
-                window.location.reload();
+            const data = await api.post<{ id?: string }>('entities', newEntity);
+            if (currentFolderId) {
+                await handleMoveToFolder('entity', data?.id || newEntity.id, currentFolderId);
             }
+            setNewEntityName('');
+            setNewEntityDescription('');
+            setNewEntityType('generic');
+            setIsCreatingEntity(false);
+            if (currentFolderId) {
+                sessionStorage.setItem('kb_currentFolder', currentFolderId);
+            }
+            window.location.reload();
         } catch (error) {
             console.error('Error creating entity:', error);
-            showError('Failed to create entity');
+            const msg = error && typeof (error as { message?: string }).message === 'string'
+                ? (error as { message: string }).message
+                : 'Failed to create entity';
+            setCreateEntityError(msg);
+            showError(msg);
+        } finally {
+            setCreateEntityLoading(false);
         }
     };
 
     const handleDeleteEntity = async (entity: Entity) => {
-        if (!confirm(`¿Estás seguro de que quieres borrar la entidad «${entity.name}»? Se eliminarán también todos sus registros.`)) return;
-
+        const ok = await confirmDestructive({ title: t('knowledgeBase.confirmDeleteEntity', { name: entity.name }) });
+        if (!ok) return;
         try {
-            await fetch(`${API_BASE}/entities/${entity.id}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
+            await api.delete(`entities/${entity.id}`);
             // Save current folder and reload
             if (currentFolderId) {
                 sessionStorage.setItem('kb_currentFolder', currentFolderId);
@@ -439,24 +395,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         }
     };
 
-    const toggleEntitySelection = (entityId: string) => {
-        setSelectedEntityIds(prev => {
-            const next = new Set(prev);
-            if (next.has(entityId)) next.delete(entityId);
-            else next.add(entityId);
-            return next;
-        });
-    };
-
-    const selectAllEntitiesInView = () => {
-        const ids = currentFolderItems.entities.map(e => e.id);
-        setSelectedEntityIds(prev => {
-            const allSelected = ids.length > 0 && ids.every(id => prev.has(id));
-            return allSelected ? new Set() : new Set(ids);
-        });
-    };
-
-    const clearEntitySelection = () => setSelectedEntityIds(new Set());
+    const selectAllEntitiesInView = () => selectAllInView(currentFolderItems.entities.map((e) => e.id));
 
     const handleBulkMove = async (targetFolderId: string | null) => {
         const ids = Array.from(selectedEntityIds);
@@ -466,20 +405,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             for (const entityId of ids) {
                 const currentFolder = folders.find(f => f.entityIds.includes(entityId));
                 if (currentFolder) {
-                    await fetch(`${API_BASE}/knowledge/folders/${currentFolder.id}/remove`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ type: 'entity', itemId: entityId }),
-                        credentials: 'include'
-                    });
+                    await api.post(`knowledge/folders/${currentFolder.id}/remove`, { type: 'entity', itemId: entityId });
                 }
                 if (targetFolderId) {
-                    await fetch(`${API_BASE}/knowledge/folders/${targetFolderId}/add`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ type: 'entity', itemId: entityId }),
-                        credentials: 'include'
-                    });
+                    await api.post(`knowledge/folders/${targetFolderId}/add`, { type: 'entity', itemId: entityId });
                 }
             }
             await fetchFolders();
@@ -496,11 +425,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const handleBulkDelete = async () => {
         const ids = Array.from(selectedEntityIds);
         if (ids.length === 0) return;
-        if (!confirm(`¿Estás seguro de que quieres borrar ${ids.length} entidad(es)? Se eliminarán también todos sus registros. Esta acción no se puede deshacer.`)) return;
+        const ok = await confirmDestructive({ title: t('knowledgeBase.confirmBulkDeleteEntities', { count: ids.length }) });
+        if (!ok) return;
         setBulkActionLoading(true);
         try {
             for (const entityId of ids) {
-                await fetch(`${API_BASE}/entities/${entityId}`, { method: 'DELETE', credentials: 'include' });
+                await api.delete(`entities/${entityId}`);
             }
             if (currentFolderId) sessionStorage.setItem('kb_currentFolder', currentFolderId);
             clearEntitySelection();
@@ -524,23 +454,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 formData.append('folderId', currentFolderId);
             }
 
-            const res = await fetch(`${API_BASE}/knowledge/documents`, {
-                method: 'POST',
-                body: formData,
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                await fetchDocuments();
-                await fetchFolders();
-                if (documentFileInputRef.current) {
-                    documentFileInputRef.current.value = '';
-                }
-                success('Document uploaded');
-            } else {
-                const errorData = await res.json();
-                showError('Failed to upload document', errorData.error);
+            await api.request('knowledge/documents', { method: 'POST', body: formData });
+            await fetchDocuments();
+            await fetchFolders();
+            if (documentFileInputRef.current) {
+                documentFileInputRef.current.value = '';
             }
+            success('Document uploaded');
         } catch (error) {
             console.error('Error uploading document:', error);
             showError('Failed to upload document');
@@ -550,20 +470,12 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     };
 
     const handleDeleteDocument = async (docId: string) => {
-        if (!confirm('¿Estás seguro de que quieres borrar este documento?')) return;
-
+        const ok = await confirmDestructive({ title: t('knowledgeBase.confirmDeleteDocument') });
+        if (!ok) return;
         try {
-            const res = await fetch(`${API_BASE}/knowledge/documents/${docId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                await fetchDocuments();
-                success('Document deleted');
-            } else {
-                showError('Failed to delete document');
-            }
+            await api.delete(`knowledge/documents/${docId}`);
+            await fetchDocuments();
+            success('Document deleted');
         } catch (error) {
             console.error('Error deleting document:', error);
             showError('Failed to delete document');
@@ -574,20 +486,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         if (!doc?.id || extractingDocId) return;
         setExtractingDocId(doc.id);
         try {
-            const res = await fetch(`${API_BASE}/knowledge/documents/${doc.id}/extract-structured`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ mode: 'auto' })
-            });
-
-            const contentType = res.headers.get('content-type') || '';
-            const raw = await res.text();
-            const data = contentType.includes('application/json') && raw ? JSON.parse(raw) : {};
-
-            if (!res.ok) {
-                throw new Error(data?.error || 'Failed to extract structured data');
-            }
+            const data = await api.post<{ structuredExtraction?: { stats?: { extractedItems?: number }; extractions?: unknown[]; provider?: string }; reused?: boolean }>(
+                `knowledge/documents/${doc.id}/extract-structured`,
+                { mode: 'auto' }
+            );
 
             const extractedItems =
                 data?.structuredExtraction?.stats?.extractedItems ??
@@ -616,9 +518,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         setTableRows([]);
         setDocumentPreviewText(null);
         try {
-            const res = await fetch(`${API_BASE}/knowledge/documents/${doc.id}`, { credentials: 'include' });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data?.error || 'Failed to load document');
+            const data = await api.get<{ extractedText?: string; metadata?: { structuredExtraction?: { extractions?: unknown[]; extractedParameters?: unknown[] } }; error?: string }>(`knowledge/documents/${doc.id}`);
             const rawText = typeof data.extractedText === 'string' ? data.extractedText.trim() : '';
             setDocumentPreviewText(rawText || null);
             const meta = data.metadata || {};
@@ -661,14 +561,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         if (!documentForTableView?.id) return;
         setTableLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/knowledge/documents/${documentForTableView.id}/extract-structured`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ mode: 'auto' })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data?.error || 'Extraction failed');
+            const data = await api.post<{ structuredExtraction?: { extractions?: unknown[]; extractedParameters?: unknown[] }; error?: string }>(
+                `knowledge/documents/${documentForTableView.id}/extract-structured`,
+                { mode: 'auto' }
+            );
             const raw = data?.structuredExtraction;
             const extractions = Array.isArray(raw?.extractions) ? raw.extractions : Array.isArray(raw?.extractedParameters) ? raw.extractedParameters : [];
             const rows: Record<string, string | number>[] = extractions.map((item: { extraction_class?: string; extraction_text?: string; attributes?: Record<string, unknown> }) => {
@@ -701,14 +597,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         if (!documentForTableView?.id || !tableAssistantInstruction.trim()) return;
         setTableAssistantLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/knowledge/documents/${documentForTableView.id}/extract-with-instruction`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ instruction: tableAssistantInstruction.trim() })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data?.error || 'Extraction failed');
+            const data = await api.post<{ structuredExtraction?: { extractions?: unknown[] }; error?: string }>(
+                `knowledge/documents/${documentForTableView.id}/extract-with-instruction`,
+                { instruction: tableAssistantInstruction.trim() }
+            );
             const raw = data?.structuredExtraction;
             const extractions = Array.isArray(raw?.extractions) ? raw.extractions : [];
             const rows: Record<string, string | number>[] = extractions.map((item: { extraction_class?: string; extraction_text?: string; attributes?: Record<string, unknown> }) => {
@@ -786,16 +678,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 properties,
                 folderId: currentFolderId || undefined
             };
-            const createRes = await fetch(`${API_BASE}/entities`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(newEntity)
-            });
-            if (!createRes.ok) {
-                const err = await createRes.json().catch(() => ({}));
-                throw new Error(err.message || 'Failed to create entity');
-            }
+            await api.post('entities', newEntity);
             const BATCH = 50;
             for (let i = 0; i < rows.length; i += BATCH) {
                 const batch = rows.slice(i, i + BATCH);
@@ -804,16 +687,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                     headers.forEach((h) => { rec[h] = row[h] ?? ''; });
                     return rec;
                 });
-                const recRes = await fetch(`${API_BASE}/entities/${entityId}/records`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify(records)
-                });
-                if (!recRes.ok) {
-                    const err = await recRes.json().catch(() => ({}));
-                    throw new Error(err.message || 'Failed to add records');
-                }
+                await api.post(`entities/${entityId}/records`, records);
             }
             success(`Entity "${entityName}" created with ${rows.length} records`);
             handleCloseTableView();
@@ -962,34 +836,17 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 folderId: currentFolderId || undefined
             };
 
-            const createRes = await fetch(`${API_BASE}/entities`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(newEntity)
-            });
+            await api.post('entities', newEntity);
 
-            if (!createRes.ok) {
-                throw new Error('Failed to create entity');
-            }
-
-            // Import records in batches (only included columns)
             const batchSize = 50;
             for (let i = 0; i < importPreviewData.length; i += batchSize) {
                 const batch = importPreviewData.slice(i, i + batchSize);
-                
                 for (const row of batch) {
                     const filteredRow: Record<string, string> = {};
                     includedColumns.forEach(col => {
                         filteredRow[col.name] = row[col.name] || '';
                     });
-                    
-                    await fetch(`${API_BASE}/entities/${entityId}/records`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify(filteredRow)
-                    });
+                    await api.post(`entities/${entityId}/records`, filteredRow);
                 }
             }
 
@@ -1181,35 +1038,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         </div>
                         </div>
                         {/* Bulk actions bar (entities) */}
-                        {selectedEntityIds.size > 0 && (
-                            <div className="flex items-center gap-3 px-6 py-2 bg-[var(--accent-primary)]/10 border-t border-[var(--accent-primary)]/20">
-                                <span className="text-sm font-medium text-[var(--text-primary)]">
-                                    {selectedEntityIds.size} entidad(es) seleccionada(s)
-                                </span>
-                                <button
-                                    onClick={() => setShowMoveModal(true)}
-                                    disabled={bulkActionLoading}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] disabled:opacity-50"
-                                >
-                                    <Folder size={14} weight="light" />
-                                    Mover
-                                </button>
-                                <button
-                                    onClick={handleBulkDelete}
-                                    disabled={bulkActionLoading}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-500/20 disabled:opacity-50"
-                                >
-                                    <Trash size={14} weight="light" />
-                                    Borrar
-                                </button>
-                                <button
-                                    onClick={clearEntitySelection}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-                                >
-                                    Desmarcar
-                                </button>
-                            </div>
-                        )}
+                        <BulkActionsBar
+                            selectedCount={selectedEntityIds.size}
+                            onMove={() => setShowMoveModal(true)}
+                            onDelete={handleBulkDelete}
+                            onClear={clearEntitySelection}
+                            loading={bulkActionLoading}
+                        />
                     </div>
 
                     {/* Content */}
@@ -1332,16 +1167,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                 type="button"
                                                 onClick={(e) => { e.stopPropagation(); selectAllEntitiesInView(); }}
                                                 className="flex items-center gap-2 rounded p-0.5 hover:bg-[var(--bg-hover)]"
-                                                title={currentFolderItems.entities.every(e => selectedEntityIds.has(e.id)) ? 'Desmarcar todas' : 'Seleccionar todas'}
+                                                title={allInViewSelected(currentFolderItems.entities.map((e) => e.id)) ? t('knowledgeBase.deselectAll') : t('knowledgeBase.selectAll')}
                                             >
-                                                {currentFolderItems.entities.every(e => selectedEntityIds.has(e.id)) ? (
+                                                {allInViewSelected(currentFolderItems.entities.map((e) => e.id)) ? (
                                                     <CheckSquare size={16} weight="fill" className="text-[var(--accent-primary)]" />
                                                 ) : (
                                                     <span className="w-4 h-4 rounded border border-[var(--border-light)] bg-transparent" />
                                                 )}
                                             </button>
                                             <Database size={12} weight="light" />
-                                            Entities ({currentFolderItems.entities.length})
+                                            {t('knowledgeBase.entitiesCount', { count: currentFolderItems.entities.length })}
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                             {currentFolderItems.entities.map((entity) => (
@@ -1357,9 +1192,9 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                         type="button"
                                                         onClick={(e) => { e.stopPropagation(); toggleEntitySelection(entity.id); }}
                                                         className="absolute top-2 left-2 z-10 p-1 rounded bg-[var(--bg-card)]/90 border border-[var(--border-light)] hover:bg-[var(--bg-hover)]"
-                                                        title={selectedEntityIds.has(entity.id) ? 'Desmarcar' : 'Seleccionar'}
+                                                        title={isSelected(entity.id) ? t('knowledgeBase.deselectAll') : t('knowledgeBase.selectAll')}
                                                     >
-                                                        {selectedEntityIds.has(entity.id) ? (
+                                                        {isSelected(entity.id) ? (
                                                             <CheckSquare size={14} weight="fill" className="text-[var(--accent-primary)]" />
                                                         ) : (
                                                             <span className="block w-3.5 h-3.5 rounded border border-[var(--border-light)] bg-transparent" />
@@ -1476,16 +1311,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                             type="button"
                                             onClick={(e) => { e.stopPropagation(); selectAllEntitiesInView(); }}
                                             className="flex items-center gap-2 rounded p-0.5 hover:bg-[var(--bg-hover)]"
-                                            title={currentFolderItems.entities.every(e => selectedEntityIds.has(e.id)) ? 'Desmarcar todas' : 'Seleccionar todas'}
+                                            title={allInViewSelected(currentFolderItems.entities.map((e) => e.id)) ? 'Desmarcar todas' : 'Seleccionar todas'}
                                         >
-                                            {currentFolderItems.entities.every(e => selectedEntityIds.has(e.id)) ? (
+                                            {allInViewSelected(currentFolderItems.entities.map((e) => e.id)) ? (
                                                 <CheckSquare size={14} weight="fill" className="text-[var(--accent-primary)]" />
                                             ) : (
                                                 <span className="block w-3.5 h-3.5 rounded border border-[var(--border-light)] bg-transparent" />
                                             )}
                                         </button>
                                         <Database size={12} weight="light" />
-                                        Entities ({currentFolderItems.entities.length})
+                                        {t('knowledgeBase.entitiesCount', { count: currentFolderItems.entities.length })}
                                     </div>
                                 )}
                                 {currentFolderItems.entities.map((entity) => (
@@ -1501,7 +1336,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                             onClick={(e) => { e.stopPropagation(); toggleEntitySelection(entity.id); }}
                                             className="shrink-0 p-0.5 rounded hover:bg-[var(--bg-tertiary)]"
                                         >
-                                            {selectedEntityIds.has(entity.id) ? (
+                                            {isSelected(entity.id) ? (
                                                 <CheckSquare size={18} weight="fill" className="text-[var(--accent-primary)]" />
                                             ) : (
                                                 <span className="block w-[18px] h-[18px] rounded border border-[var(--border-light)] bg-transparent" />
@@ -1580,49 +1415,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
 
             {/* Move entities modal (bulk) */}
             {showMoveModal && selectedEntityIds.size > 0 && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => !bulkActionLoading && setShowMoveModal(false)}>
-                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-base font-medium text-[var(--text-primary)]">Mover entidades</h2>
-                            <button onClick={() => !bulkActionLoading && setShowMoveModal(false)} className="p-1 hover:bg-[var(--bg-hover)] rounded-lg">
-                                <X size={18} weight="light" className="text-[var(--text-secondary)]" />
-                            </button>
-                        </div>
-                        <p className="text-xs text-[var(--text-secondary)] mb-3">
-                            {selectedEntityIds.size} entidad(es) seleccionada(s). Elige carpeta destino:
-                        </p>
-                        <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
-                            <button
-                                type="button"
-                                onClick={() => handleBulkMove(null)}
-                                disabled={bulkActionLoading}
-                                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
-                            >
-                                <House size={18} weight="light" className="text-[var(--text-tertiary)]" />
-                                Raíz (sin carpeta)
-                            </button>
-                            {folders.map((folder) => (
-                                <button
-                                    key={folder.id}
-                                    type="button"
-                                    onClick={() => handleBulkMove(folder.id)}
-                                    disabled={bulkActionLoading}
-                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
-                                >
-                                    <Folder size={18} weight="light" style={{ color: folder.color || '#6b7280' }} />
-                                    <span className="truncate">{folder.name}</span>
-                                </button>
-                            ))}
-                        </div>
-                        {bulkActionLoading && (
-                            <div className="mt-3 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-                                <SpinnerGap size={14} weight="light" className="animate-spin" />
-                                Moviendo…
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <MoveEntitiesModal
+                    folders={folders.map((f) => ({ id: f.id, name: f.name, color: f.color }))}
+                    selectedCount={selectedEntityIds.size}
+                    onMove={handleBulkMove}
+                    onClose={() => setShowMoveModal(false)}
+                    loading={bulkActionLoading}
+                />
             )}
+
+            <DestructiveConfirmDialog />
 
             {/* Create Folder Modal */}
             {isCreatingFolder && (
@@ -1712,7 +1514,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                     </p>
                                 )}
                             </div>
-                            <button onClick={() => { setIsCreatingEntity(false); resetImportState(); }} className="p-1 hover:bg-[var(--bg-hover)] rounded-lg">
+                            <button onClick={() => { setIsCreatingEntity(false); resetImportState(); setCreateEntityError(null); }} className="p-1 hover:bg-[var(--bg-hover)] rounded-lg">
                                 <X size={18} weight="light" className="text-[var(--text-secondary)]" />
                             </button>
                         </div>
@@ -1810,20 +1612,34 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                     )}
                                 </div>
                                 
+                                {createEntityError && (
+                                    <div className="mt-4 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-600 dark:text-red-400 flex items-center justify-between gap-2">
+                                        <span>{createEntityError}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setCreateEntityError(null); handleCreateEntity(); }}
+                                            className="shrink-0 px-2 py-1 text-xs font-medium bg-red-500/20 hover:bg-red-500/30 rounded transition-colors"
+                                        >
+                                            {t('common.retry')}
+                                        </button>
+                                    </div>
+                                )}
                                 <div className="flex justify-end gap-2 mt-6">
                                     <button
-                                        onClick={() => { setIsCreatingEntity(false); resetImportState(); }}
+                                        onClick={() => { setIsCreatingEntity(false); resetImportState(); setCreateEntityError(null); }}
                                         className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                                        disabled={createEntityLoading}
                                     >
-                                        Cancel
+                                        {t('common.cancel')}
                                     </button>
                                     {uploadMode === 'manual' && (
                                         <button
                                             onClick={handleCreateEntity}
-                                            disabled={!newEntityName.trim()}
-                                            className="px-4 py-2 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            disabled={!newEntityName.trim() || createEntityLoading}
+                                            className="px-4 py-2 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                         >
-                                            Create
+                                            {createEntityLoading && <SpinnerGap size={16} weight="bold" className="animate-spin" />}
+                                            {createEntityLoading ? t('common.loading') : t('common.create')}
                                         </button>
                                     )}
                                 </div>

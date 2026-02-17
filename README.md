@@ -48,10 +48,11 @@ A modern data management application combining entity modeling, AI-powered repor
 
 3. **Configure environment variables**
    
-   Create or edit the `.env` file in the root directory:
+   Create or edit the `.env` file in the root directory (or `server/.env` for the API). Minimum for development:
    ```env
    OPENAI_API_KEY=your-openai-api-key-here
    ```
+   For **production**, see **[docs/RUNBOOK.md](docs/RUNBOOK.md)** for required variables (JWT_SECRET, CORS_ORIGINS, ENCRYPTION_KEY) and the pre-deploy checklist.
 
 4. **(Optional) Seed the database**
    
@@ -146,17 +147,33 @@ Analyze the capacity of @Facilities/Factories and identify any bottlenecks in @E
 
 ## 📝 Available Scripts
 
-- `npm run dev` - Start Vite development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run server` - Start backend API server
-- `npm run seed` - Seed database with initial data
+- `npm run dev` - Arrancar frontend (Vite)
+- `npm run build` - Build para producción
+- `npm run preview` - Vista previa del build
+- `npm run server` - Arrancar API (Express)
+- `npm run seed` - Poblar BD con datos iniciales
+- `npm run migrate-tables` - Crear tablas faltantes (`data_connections`, `standards`, etc.)
 
 ## 🔐 Environment Variables
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `OPENAI_API_KEY` | OpenAI API key for AI reporting | Yes (for AI features) |
+| `OPENAI_API_KEY` | OpenAI API key for AI reporting | Sí (para funciones AI) |
+| `JWT_SECRET` | Secreto para JWTs (producción) | **Sí en producción** |
+| `CORS_ORIGINS` | Orígenes permitidos (producción) | **Sí en producción** |
+| `ENCRYPTION_KEY` | Clave para cifrado de campos sensibles | Si usas cifrado |
+
+**Producción:** variables obligatorias, checklist pre-deploy y buenas prácticas → **[docs/RUNBOOK.md](docs/RUNBOOK.md)**.
+
+## 📚 Documentación
+
+| Documento | Contenido |
+|-----------|-----------|
+| **[RUNBOOK.md](docs/RUNBOOK.md)** | Variables de entorno obligatorias, checklist pre-deploy, revisión de rutas (auth + orgId). |
+| **[UX_PATTERNS.md](docs/UX_PATTERNS.md)** | Patrones de UX: confirmaciones destructivas (ConfirmDialog), carga/error y reintentar en flujos críticos. |
+| **[SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md)** | Roadmap de seguridad (SOC 2, GDPR, ISO 27001), módulos en `server/security/`. |
+| **[CONTEXTO_PLATAFORMA.md](docs/CONTEXTO_PLATAFORMA.md)** | Contexto general de la plataforma. |
+| **[PROMPT_GPT_CREAR_PAQUETE_CASO_DE_USO.md](docs/PROMPT_GPT_CREAR_PAQUETE_CASO_DE_USO.md)** | Cómo crear paquetes de caso de uso para importar. |
 
 ## 📦 Building for Production
 
@@ -183,6 +200,21 @@ Stop all running instances of the server before running `npm run seed`
 
 ### OpenAI API errors
 Verify your API key is correctly set in the `.env` file and has sufficient credits
+
+## 📋 Resumen del proyecto
+
+**Qué es:** Aplicación de gestión de datos (entidades, propiedades, registros), Base de Conocimiento con carpetas/documentos, workflows, dashboards, reportes AI e integraciones. Multi-tenant por organización; autenticación JWT.
+
+**Stack:** Frontend React 19 + TypeScript + Vite + Tailwind; backend Express + SQLite; seguridad en `server/security/` (RBAC, cifrado, GDPR, SSO).
+
+**Mejoras recientes (seguridad y UX):**
+- **Runbook:** Variables de entorno obligatorias en producción (JWT_SECRET, CORS_ORIGINS, ENCRYPTION_KEY), checklist pre-deploy y criterios de rutas (authenticateToken, filtro por organizationId).
+- **Confirmaciones destructivas:** Unificadas con `ConfirmDialog` y hook `useDestructiveConfirm` (Knowledge Base: borrar carpeta, entidad, documento, borrado masivo).
+- **Flujos críticos:** Patrón documentado en `docs/UX_PATTERNS.md` (spinner + mensaje, error + Reintentar). Aplicado en “Crear entidad” (loading, error, botón Reintentar).
+- **Revisión de rutas:** RUNBOOK actualizado con estado de rutas (entities, knowledge, dataConnections, dashboards, workflows, ai con auth + orgId; excepciones webhook/run-public; recomendaciones para `/files/:filename` y properties).
+- **i18n:** Español por defecto; claves `knowledgeBase.*` y `common.retry`; API client unificado en `api/` con tipos compartidos.
+
+**Arranque rápido:** `npm install` → configurar `.env` (ver RUNBOOK para producción) → `npm run server` + `npm run dev`.
 
 ## 📄 License
 

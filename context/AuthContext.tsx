@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { API_BASE } from '../config';
+import { api, API_UNAUTHORIZED_EVENT } from '../src/api';
+import type { AuthMeResponse } from '../src/api';
 import i18n from '../src/i18n';
 
 interface User {
@@ -45,6 +46,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
+        const onUnauthorized = () => {
+            setUser(null);
+            setOrganizations([]);
+        };
+        window.addEventListener(API_UNAUTHORIZED_EVENT, onUnauthorized);
+        return () => window.removeEventListener(API_UNAUTHORIZED_EVENT, onUnauthorized);
+    }, []);
+
+    useEffect(() => {
         if (user?.locale && i18n.language !== user.locale) {
             i18n.changeLanguage(user.locale);
         }
@@ -52,17 +62,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const checkAuth = async () => {
         try {
-            const res = await fetch(`${API_BASE}/auth/me`, {
-                credentials: 'include'
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setUser(data.user);
-                fetchOrganizations();
-            } else {
-                setUser(null);
-                setOrganizations([]);
-            }
+            const data = await api.get<AuthMeResponse>('auth/me');
+            setUser(data.user);
+            fetchOrganizations();
         } catch (error) {
             console.error('Auth check failed:', error);
             setUser(null);
@@ -73,18 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchOrganizations = async () => {
         try {
-            const res = await fetch(`${API_BASE}/auth/organizations`, {
-                credentials: 'include'
-            });
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    setOrganizations(data);
-                } else {
-                    console.error('Expected array from organizations API, got:', data);
-                    setOrganizations([]);
-                }
-            }
+            const data = await api.get<Organization[]>('auth/organizations');
+            setOrganizations(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Failed to fetch organizations:', error);
             setOrganizations([]);
@@ -98,32 +90,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const logout = async () => {
         try {
-            await fetch(`${API_BASE}/auth/logout`, {
-                method: 'POST',
-                credentials: 'include'
-            });
-            setUser(null);
-            setOrganizations([]);
+            await api.post('auth/logout');
         } catch (error) {
             console.error('Logout failed:', error);
+        } finally {
+            setUser(null);
+            setOrganizations([]);
         }
     };
 
     const switchOrganization = async (orgId: string) => {
         try {
-            const res = await fetch(`${API_BASE}/auth/switch-org`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orgId }),
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                // Reload the page to reset all application state (entities, etc.) with the new context
-                window.location.reload();
-            } else {
-                console.error('Failed to switch organization');
-            }
+            await api.post('auth/switch-org', { orgId });
+            window.location.reload();
         } catch (error) {
             console.error('Switch organization error:', error);
         }
@@ -131,19 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const updateProfile = async (updates: { name?: string; companyRole?: string; profilePhoto?: string; locale?: 'es' | 'en' }): Promise<boolean> => {
         try {
-            const res = await fetch(`${API_BASE}/profile`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updates),
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setUser(data.user);
-                return true;
-            }
-            return false;
+            const data = await api.put<{ user: User }>('profile', updates);
+            setUser(data.user);
+            return true;
         } catch (error) {
             console.error('Update profile error:', error);
             return false;
@@ -152,18 +121,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const completeOnboarding = async (data: { role: string; industry: string; useCase: string; source: string }): Promise<boolean> => {
         try {
-            const res = await fetch(`${API_BASE}/auth/onboarding`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
-                credentials: 'include'
-            });
-
-            if (res.ok) {
-                setUser(prev => prev ? { ...prev, onboardingCompleted: true } : null);
-                return true;
-            }
-            return false;
+            await api.post('auth/onboarding', data);
+            setUser(prev => prev ? { ...prev, onboardingCompleted: true } : null);
+            return true;
         } catch (error) {
             console.error('Complete onboarding error:', error);
             return false;

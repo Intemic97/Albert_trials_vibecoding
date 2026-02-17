@@ -8,6 +8,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTableVirtualization } from '../hooks/useTableVirtualization';
+import { OptionsPanelAttachSection } from './entity-creator/OptionsPanelAttachSection';
 import {
     ArrowLeft, Plus, X, Table as TableIcon, Sparkle, Download,
     TextT, Hash, Calendar, Globe, File, Link as LinkIcon,
@@ -115,9 +117,6 @@ const TEMPLATES = [
 
 const genId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-// Table virtualization when many rows
-const TABLE_ROW_HEIGHT_PX = 40;
-const VIRTUAL_TABLE_THRESHOLD = 80;
 
 interface EntityCreatorProps {
     entityId: string;
@@ -130,7 +129,6 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const { user } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const addPropBtnRef = useRef<HTMLDivElement>(null);
-    const tableScrollRef = useRef<HTMLDivElement>(null);
     const nameDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const latestNameRef = useRef<string>(''); // Track latest name for flush on unmount
     const savedNameRef = useRef<string>('');   // Track last saved name to detect pending changes
@@ -160,8 +158,6 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const [editingPropName, setEditingPropName] = useState('');
     const [isImporting, setIsImporting] = useState(false);
     const [recordSearch, setRecordSearch] = useState('');
-    const [tableScrollTop, setTableScrollTop] = useState(0);
-    const [tableContainerHeight, setTableContainerHeight] = useState(500);
     const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
     const [activeSelectCell, setActiveSelectCell] = useState<string | null>(null); // "recordId-propId"
     const [selectFilter, setSelectFilter] = useState('');
@@ -1131,17 +1127,8 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         : records;
 
     // Virtualization: only render visible rows when many records
-    const useVirtual = filteredRecords.length > VIRTUAL_TABLE_THRESHOLD;
-    const virtualStart = useVirtual ? Math.max(0, Math.floor(tableScrollTop / TABLE_ROW_HEIGHT_PX) - 3) : 0;
-    const virtualVisibleCount = useVirtual ? Math.ceil(tableContainerHeight / TABLE_ROW_HEIGHT_PX) + 6 : filteredRecords.length;
-    const virtualEnd = useVirtual ? Math.min(filteredRecords.length, virtualStart + virtualVisibleCount) : filteredRecords.length;
+    const { useVirtual, startIndex: virtualStart, endIndex: virtualEnd, rowHeightPx: TABLE_ROW_HEIGHT_PX, handleScroll: handleTableScroll } = useTableVirtualization(filteredRecords.length);
     const rowsToRender = useVirtual ? filteredRecords.slice(virtualStart, virtualEnd) : filteredRecords;
-
-    const handleTableScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-        const el = e.currentTarget;
-        setTableScrollTop(el.scrollTop);
-        setTableContainerHeight(el.clientHeight);
-    }, []);
 
     if (loading) {
         return (
@@ -1226,7 +1213,6 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                         {/* Table */}
                         <div className="px-12 pb-8">
                             <div
-                                ref={tableScrollRef}
                                 onScroll={handleTableScroll}
                                 className="overflow-x-auto rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] shadow-sm"
                                 style={{ maxHeight: '60vh', overflowY: 'auto' }}
@@ -1953,50 +1939,14 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
 
                         {/* Attach dataset + hint + Templates: al crear entidad nueva (sin propiedades o solo la columna por defecto) */}
                         {(properties.length === 0 || (isNew && properties.length <= 1)) && (
-                            <>
-                                <div className="space-y-1 mb-4">
-                                    <button
-                                        onClick={() => fileInputRef.current?.click()}
-                                        disabled={isImporting}
-                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left disabled:opacity-50 border border-[var(--border-light)]"
-                                    >
-                                        {isImporting ? (
-                                            <SpinnerGap size={18} className="animate-spin text-[var(--text-tertiary)]" />
-                                        ) : (
-                                            <Download size={18} weight="light" className="text-[var(--text-tertiary)]" />
-                                        )}
-                                        Attach dataset
-                                    </button>
-                                    {csvMessage && (
-                                        <p className={`text-[11px] px-1 ${csvMessage.type === 'error' ? 'text-red-500' : 'text-[var(--text-secondary)]'}`}>
-                                            {csvMessage.text}
-                                        </p>
-                                    )}
-                                </div>
-                                {datasetAttachedHint && (
-                                    <div className="mb-4 p-3 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30">
-                                        <p className="text-xs text-[var(--text-primary)]">{datasetAttachedHint}</p>
-                                        <p className="text-[11px] text-[var(--text-secondary)] mt-1">Describe above what you want and the AI will do it.</p>
-                                    </div>
-                                )}
-                                <div className="mb-5">
-                                    <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2 px-1">Templates</p>
-                                    <div className="space-y-1">
-                                        {TEMPLATES.map(template => (
-                                            <button
-                                                key={template.id}
-                                                onClick={() => handleApplyTemplate(template)}
-                                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left"
-                                            >
-                                                <span className={`w-7 h-7 ${template.iconBg} rounded-md flex items-center justify-center`}>
-                                                    {React.createElement(template.icon, { size: 16, weight: 'light' })}
-                                                </span>
-                                                {template.name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </>
+                            <OptionsPanelAttachSection
+                                onAttachClick={() => fileInputRef.current?.click()}
+                                isImporting={isImporting}
+                                csvMessage={csvMessage}
+                                datasetAttachedHint={datasetAttachedHint}
+                                templates={TEMPLATES}
+                                onApplyTemplate={handleApplyTemplate}
+                            />
                         )}
 
                         {/* Hidden file input */}

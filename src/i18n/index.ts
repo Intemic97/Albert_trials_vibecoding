@@ -8,7 +8,7 @@ const LANG_STORAGE_KEY = 'platform_language';
 const getInitialLanguage = (): 'es' | 'en' => {
   const stored = localStorage.getItem(LANG_STORAGE_KEY);
   if (stored === 'es' || stored === 'en') return stored;
-  return 'en';
+  return 'es';
 };
 
 i18n
@@ -19,7 +19,7 @@ i18n
       en: { translation: en },
     },
     lng: getInitialLanguage(),
-    fallbackLng: 'en',
+    fallbackLng: 'es',
     interpolation: { escapeValue: false },
   });
 
