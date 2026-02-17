@@ -1420,6 +1420,92 @@ Guidelines:
     }
 });
 
+// Entity AI command: interpret natural language to modify data (add column, add records, create entity, etc.)
+router.post('/entity-ai-command', authenticateToken, async (req, res) => {
+    try {
+        const { message, context } = req.body;
+        if (!message || typeof message !== 'string') {
+            return res.status(400).json({ error: 'message is required' });
+        }
+
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const ctx = context || {};
+        const entityName = ctx.entityName || 'this entity';
+        const properties = Array.isArray(ctx.properties) ? ctx.properties : [];
+        const propList = properties.map(p => `${p.name} (${p.type || 'text'})`).join(', ') || 'none';
+        const recordCount = typeof ctx.recordCount === 'number' ? ctx.recordCount : 0;
+        const sampleRecords = Array.isArray(ctx.sampleRecords) ? ctx.sampleRecords.slice(0, 5) : [];
+
+        const systemPrompt = `You are an assistant that helps users structure and edit their data (entities = tables, properties = columns, records = rows).
+
+Current context:
+- Entity name: ${entityName}
+- Columns (properties): ${propList}
+- Number of existing rows: ${recordCount}
+${sampleRecords.length ? `- Sample row keys: ${Object.keys(sampleRecords[0] || {}).join(', ')}` : ''}
+
+You must respond with a JSON object that has exactly two keys:
+1. "actions": an array of actions to perform (can be empty [] if the request is not about changing data).
+2. "summary": a short human-readable sentence describing what was done (e.g. "Added column X." or "Added 3 records.").
+
+Allowed action types (use only these):
+
+- "replace_schema": Replace the whole table structure. Use when the user wants a new schema from scratch (e.g. "make this a product table").
+  { "type": "replace_schema", "name": "Entity Name", "properties": [ { "name": "Name", "type": "text" }, { "name": "Price", "type": "number", "unit": "€" } ] }
+  Always include a "Name" property first. Property "type" must be one of: text, number, date, url, file, select, multi-select, relation.
+
+- "add_column": Add one new column to the current table.
+  { "type": "add_column", "name": "Column Name", "dataType": "text" }
+  "dataType" must be one of: text, number, date, url, file, select, multi-select, relation.
+
+- "add_records": Add rows to the current table. Keys in each record must match existing property names (case-insensitive).
+  { "type": "add_records", "records": [ { "Name": "Item 1", "Status": "Active" }, ... ] }
+
+- "create_entity": Create a brand new table (entity) with its own columns and optionally rows. Use when the user asks to "create a new table" or "new entity".
+  { "type": "create_entity", "name": "New Table Name", "properties": [ { "name": "Name", "type": "text" }, ... ], "records": [ { "Name": "Row 1" }, ... ] }
+  "records" is optional. Always include at least one property (e.g. "Name" as text).
+
+If the user message cannot be interpreted as a data change (e.g. greeting, unclear), return { "actions": [], "summary": "No changes made." }.
+Output ONLY valid JSON, no markdown, no code block, no explanation.`;
+
+        const userContent = sampleRecords.length
+            ? `User said: ${message}\n\nSample data (first row): ${JSON.stringify(sampleRecords[0])}`
+            : `User said: ${message}`;
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userContent }
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.3
+        });
+
+        const raw = completion.choices[0].message.content;
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (e) {
+            return res.status(500).json({ error: 'Invalid AI response', raw: raw.slice(0, 200) });
+        }
+
+        const actions = Array.isArray(parsed.actions) ? parsed.actions : [];
+        const summary = typeof parsed.summary === 'string' ? parsed.summary : 'Done';
+
+        res.json({ actions, summary });
+    } catch (error) {
+        console.error('Error in entity-ai-command:', error);
+        res.status(500).json({ error: 'Failed to process command' });
+    }
+});
+
 // Dashboard Management Endpoints
 
     return router;

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, useParams, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { TopNav } from './components/TopNav';
@@ -1692,6 +1692,7 @@ function AuthenticatedApp() {
                                 setActiveEntityId(entityId);
                                 navigate(`/database/${entityId}`);
                             }}
+                            onEntityCreated={fetchEntities}
                         />
                     } />
                     <Route path="/database/new" element={
@@ -1699,7 +1700,7 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/database/:entityId" element={
                     <div data-tutorial="database-content" className="contents">
-                        <EntityCreatorRoute onEntityChanged={fetchEntities} />
+                        <EntityCreatorRoute onEntityChanged={fetchEntities} key={location.pathname} />
                     </div>
                     } />
                 </Routes>

@@ -13,7 +13,7 @@ import {
     TextT, Hash, Calendar, Globe, File, Link as LinkIcon,
     Trash, SpinnerGap, ArrowUp, ListBullets, CheckSquare,
     MagnifyingGlass, Export, Paperclip, UploadSimple,
-    ArrowSquareOut
+    ArrowSquareOut, Package, Gear, Wrench, Warning, CurrencyDollar
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -44,13 +44,13 @@ const PROPERTY_TYPES = [
     { value: 'multi-select', label: 'Multi-select', icon: CheckSquare, color: 'text-indigo-500 bg-indigo-500/10' },
 ];
 
-// Suggested templates
+// Suggested templates (icon = Phosphor component, no emojis)
 const TEMPLATES = [
     {
         id: 'product',
         name: 'Product',
-        icon: '📦',
-        iconBg: 'bg-blue-100',
+        icon: Package,
+        iconBg: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
         properties: [
             { name: 'Name', type: 'text' },
             { name: 'SKU', type: 'text' },
@@ -62,8 +62,8 @@ const TEMPLATES = [
     {
         id: 'process',
         name: 'Process',
-        icon: '⚙️',
-        iconBg: 'bg-emerald-100',
+        icon: Gear,
+        iconBg: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
         properties: [
             { name: 'Name', type: 'text' },
             { name: 'Description', type: 'text' },
@@ -75,8 +75,8 @@ const TEMPLATES = [
     {
         id: 'equipment',
         name: 'Equipment',
-        icon: '🔧',
-        iconBg: 'bg-amber-100',
+        icon: Wrench,
+        iconBg: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
         properties: [
             { name: 'Name', type: 'text' },
             { name: 'Model', type: 'text' },
@@ -88,8 +88,8 @@ const TEMPLATES = [
     {
         id: 'deviation',
         name: 'Deviation',
-        icon: '⚠️',
-        iconBg: 'bg-red-100',
+        icon: Warning,
+        iconBg: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
         properties: [
             { name: 'Title', type: 'text' },
             { name: 'Description', type: 'text' },
@@ -101,8 +101,8 @@ const TEMPLATES = [
     {
         id: 'financials',
         name: 'Financials',
-        icon: '💰',
-        iconBg: 'bg-violet-100',
+        icon: CurrencyDollar,
+        iconBg: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
         properties: [
             { name: 'Name', type: 'text' },
             { name: 'Amount', type: 'number' },
@@ -115,6 +115,10 @@ const TEMPLATES = [
 
 const genId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+// Table virtualization when many rows
+const TABLE_ROW_HEIGHT_PX = 40;
+const VIRTUAL_TABLE_THRESHOLD = 80;
+
 interface EntityCreatorProps {
     entityId: string;
     isNew?: boolean; // if true, show the options panel on first load
@@ -126,6 +130,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const { user } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const addPropBtnRef = useRef<HTMLDivElement>(null);
+    const tableScrollRef = useRef<HTMLDivElement>(null);
     const nameDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const latestNameRef = useRef<string>(''); // Track latest name for flush on unmount
     const savedNameRef = useRef<string>('');   // Track last saved name to detect pending changes
@@ -147,11 +152,16 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const [newPropType, setNewPropType] = useState('text');
     const [aiPrompt, setAiPrompt] = useState('');
     const [aiError, setAiError] = useState<string | null>(null);
+    const [aiLastSummary, setAiLastSummary] = useState<string | null>(null);
+    const [datasetAttachedHint, setDatasetAttachedHint] = useState<string | null>(null);
+    const [csvMessage, setCsvMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
     const [editingPropId, setEditingPropId] = useState<string | null>(null);
     const [editingPropName, setEditingPropName] = useState('');
     const [isImporting, setIsImporting] = useState(false);
     const [recordSearch, setRecordSearch] = useState('');
+    const [tableScrollTop, setTableScrollTop] = useState(0);
+    const [tableContainerHeight, setTableContainerHeight] = useState(500);
     const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
     const [activeSelectCell, setActiveSelectCell] = useState<string | null>(null); // "recordId-propId"
     const [selectFilter, setSelectFilter] = useState('');
@@ -606,57 +616,160 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         }
     };
 
-    // AI: Generate schema from description
+    // Build context for entity AI: current table structure + sample rows (by property name)
+    const buildEntityContext = useCallback(() => {
+        const nameById: Record<string, string> = {};
+        properties.forEach(p => { nameById[p.id] = p.name; });
+        const sampleRecords = records.slice(0, 3).map(r => {
+            const o: Record<string, string> = {};
+            Object.entries(r.values).forEach(([propId, val]) => {
+                const name = nameById[propId];
+                if (name) o[name] = val;
+            });
+            return o;
+        });
+        return {
+            entityName: entityName || 'Untitled',
+            properties: properties.map(p => ({ name: p.name, type: p.type })),
+            recordCount: records.length,
+            sampleRecords
+        };
+    }, [entityName, properties, records]);
+
+    // AI: Interpret natural language and run actions (add column, add records, create entity, replace schema)
     const handleAIGenerate = async () => {
         if (!aiPrompt.trim()) return;
+        setAiError(null);
+        setAiLastSummary(null);
+        setDatasetAttachedHint(null);
         setIsGeneratingAI(true);
         try {
-            const res = await fetch(`${API_BASE}/generate-entity-schema`, {
+            const res = await fetch(`${API_BASE}/entity-ai-command`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ description: aiPrompt.trim() })
+                body: JSON.stringify({
+                    message: aiPrompt.trim(),
+                    context: buildEntityContext()
+                })
             });
 
-            if (res.ok) {
-                const data = await res.json();
-                if (data.name) {
-                    handleNameChange(data.name);
-                }
-                if (data.properties && Array.isArray(data.properties)) {
-                    // Delete existing properties first
-                    for (const prop of properties) {
-                        try { await fetch(`${API_BASE}/properties/${prop.id}`, { method: 'DELETE', credentials: 'include' }); } catch {}
-                    }
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                setAiError(data?.error || 'Failed to process. Please try again.');
+                return;
+            }
 
-                    // Create new properties
-                    const aiProps: CreatorProperty[] = [];
-                    for (const p of data.properties) {
-                        const propId = `prop-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-                        const propType = p.type || 'text';
-                        const prop: CreatorProperty = { id: propId, name: p.name || 'Untitled', type: propType, unit: p.unit };
-                        aiProps.push(prop);
-                        try {
+            const actions = Array.isArray(data.actions) ? data.actions : [];
+            const summary = typeof data.summary === 'string' ? data.summary : '';
+
+            for (const action of actions) {
+                const type = action.type;
+                if (type === 'replace_schema') {
+                    if (action.name) handleNameChange(action.name);
+                    if (action.properties && action.properties.length > 0) {
+                        for (const prop of properties) {
+                            try { await fetch(`${API_BASE}/properties/${prop.id}`, { method: 'DELETE', credentials: 'include' }); } catch {}
+                        }
+                        const aiProps: CreatorProperty[] = [];
+                        for (const p of action.properties) {
+                            const propId = `prop-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                            const propType = (p.type || 'text') as string;
+                            const prop: CreatorProperty = { id: propId, name: p.name || 'Untitled', type: propType, unit: p.unit };
+                            aiProps.push(prop);
                             await fetch(`${API_BASE}/properties`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 credentials: 'include',
-                                body: JSON.stringify({ id: propId, entityId, name: prop.name, type: prop.type, defaultValue: '', unit: prop.unit }),
+                                body: JSON.stringify({ id: propId, entityId, name: prop.name, type: prop.type, defaultValue: '', unit: prop.unit || '' })
                             });
-                        } catch {}
+                        }
+                        setProperties(aiProps);
                     }
-                    setProperties(aiProps);
                     onEntityChanged?.();
+                } else if (type === 'add_column') {
+                    const name = action.name || 'New column';
+                    const dataType = (action as { dataType?: string }).dataType || 'text';
+                    const propId = `prop-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+                    const newProp: CreatorProperty = { id: propId, name, type: dataType };
+                    await fetch(`${API_BASE}/properties`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ id: propId, entityId, name, type: newProp.type, defaultValue: '' })
+                    });
+                    setProperties(prev => [...prev, newProp]);
+                    onEntityChanged?.();
+                } else if (type === 'add_records' && Array.isArray(action.records) && action.records.length > 0) {
+                    const recRes = await fetch(`${API_BASE}/entities/${entityId}/records`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(action.records)
+                    });
+                    if (recRes.ok) {
+                        const recsRes = await fetch(`${API_BASE}/entities/${entityId}/records`, { credentials: 'include' });
+                        if (recsRes.ok) {
+                            const recsData = await recsRes.json();
+                            const recordsWithValues = (recsData || []).map((rec: { id: string; values: Record<string, string> }) => ({
+                                id: rec.id,
+                                values: rec.values || {},
+                                isNew: false
+                            }));
+                            setRecords(recordsWithValues);
+                        }
+                    }
+                    onEntityChanged?.();
+                } else if (type === 'create_entity' && action.name) {
+                    const newId = `entity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    const entityProps = Array.isArray(action.properties) && action.properties.length > 0
+                        ? action.properties
+                        : [{ name: 'Name', type: 'text' }];
+                    const propIds = entityProps.map((_, i) => `prop-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 5)}`);
+                    const newEntity = {
+                        id: newId,
+                        name: action.name,
+                        description: 'Created from Entity Creator',
+                        author: user?.email ?? undefined,
+                        lastEdited: new Date().toISOString(),
+                        properties: entityProps.map((p, i) => ({
+                            id: propIds[i],
+                            name: p.name || 'Name',
+                            type: p.type || 'text',
+                            defaultValue: ''
+                        })),
+                        folderId: undefined
+                    };
+                    const createRes = await fetch(`${API_BASE}/entities`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(newEntity)
+                    });
+                    if (!createRes.ok) throw new Error('Failed to create entity');
+                    const recordsToAdd = Array.isArray(action.records) ? action.records : [];
+                    if (recordsToAdd.length > 0) {
+                        await fetch(`${API_BASE}/entities/${newId}/records`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify(recordsToAdd)
+                        });
+                    }
+                    setAiPrompt('');
+                    setAiLastSummary(summary || `Created table "${action.name}".`);
+                    onEntityChanged?.();
+                    navigate(`/entities/${newId}`);
+                    setShowOptionsPanel(false);
+                    return;
                 }
-                setAiPrompt('');
-                setShowOptionsPanel(false);
-            } else {
-                const errData = await res.json().catch(() => null);
-                console.error('AI generation failed:', res.status, errData);
-                setAiError(errData?.error || 'Failed to generate schema. Please try again.');
             }
+
+            setAiPrompt('');
+            setAiLastSummary(summary || 'Done.');
+            if (actions.some((a: { type: string }) => a.type === 'replace_schema')) setShowOptionsPanel(false);
         } catch (error) {
-            console.error('AI generation error:', error);
+            console.error('AI command error:', error);
             setAiError('Connection error. Please try again.');
         } finally {
             setIsGeneratingAI(false);
@@ -702,13 +815,27 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         onEntityChanged?.();
     };
 
-    // CSV Import
+    // CSV Import con validación y mensajes claros
     const handleCSVImport = async (file: File) => {
         setIsImporting(true);
+        setCsvMessage(null);
         try {
-            const text = await file.text();
-            const lines = text.split('\n').filter(l => l.trim());
-            if (lines.length < 1) return;
+            let text: string;
+            try {
+                text = await file.text();
+            } catch {
+                setCsvMessage({ type: 'error', text: 'No se pudo leer el archivo. Guárdalo como CSV con codificación UTF-8.' });
+                return;
+            }
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+            if (lines.length < 1) {
+                setCsvMessage({ type: 'error', text: 'El archivo está vacío.' });
+                return;
+            }
+            if (lines.length === 1) {
+                setCsvMessage({ type: 'error', text: 'Solo hay cabecera; no hay filas de datos.' });
+                return;
+            }
 
             const parseCSVLine = (line: string): string[] => {
                 const result: string[] = [];
@@ -716,15 +843,31 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                 let inQuotes = false;
                 for (const char of line) {
                     if (char === '"') { inQuotes = !inQuotes; }
-                    else if (char === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+                    else if ((char === ',' || char === ';') && !inQuotes) { result.push(current.trim()); current = ''; }
                     else { current += char; }
                 }
                 result.push(current.trim());
                 return result;
             };
 
-            const headers = parseCSVLine(lines[0]).map(h => h.replace(/^["']|["']$/g, ''));
+            const headers = parseCSVLine(lines[0]).map(h => h.replace(/^["']|["']$/g, '')).filter(Boolean);
+            if (headers.length === 0) {
+                setCsvMessage({ type: 'error', text: 'No se detectaron columnas. Use comas o punto y coma como separador y UTF-8.' });
+                return;
+            }
             const dataLines = lines.slice(1);
+            const expectedCols = headers.length;
+            const badRows = dataLines
+                .map((line, i) => ({ i: i + 2, cols: parseCSVLine(line).length }))
+                .filter(({ cols }) => cols !== expectedCols);
+            if (badRows.length > 0) {
+                const first = badRows[0];
+                setCsvMessage({
+                    type: 'error',
+                    text: `Filas con distinto número de columnas (ej. fila ${first.i}: ${first.cols} en lugar de ${expectedCols}). Revisa el CSV.`
+                });
+                return;
+            }
 
             // Delete old properties and create new ones from CSV
             for (const prop of properties) {
@@ -783,10 +926,16 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
             if (!entityName || entityName === 'Untitled') {
                 handleNameChange(file.name.replace(/\.[^/.]+$/, ''));
             }
-            setShowOptionsPanel(false);
+            const rowCount = Math.min(dataLines.length, 200);
+            setDatasetAttachedHint(`Dataset attached: ${headers.length} columns, ${rowCount} rows. What do you want to do with it? (e.g. keep as is, add columns, filter, create another table)`);
+            setCsvMessage({ type: 'success', text: `Importadas ${rowCount} filas y ${headers.length} columnas.` });
             onEntityChanged?.();
         } catch (error) {
             console.error('CSV parse error:', error);
+            setCsvMessage({
+                type: 'error',
+                text: error instanceof Error ? error.message : 'Error al importar. Comprueba que el archivo sea un CSV válido (UTF-8, separado por comas o punto y coma).'
+            });
         } finally {
             setIsImporting(false);
         }
@@ -981,6 +1130,19 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         ? records.filter(r => Object.values(r.values).some(v => v?.toLowerCase().includes(recordSearch.toLowerCase())))
         : records;
 
+    // Virtualization: only render visible rows when many records
+    const useVirtual = filteredRecords.length > VIRTUAL_TABLE_THRESHOLD;
+    const virtualStart = useVirtual ? Math.max(0, Math.floor(tableScrollTop / TABLE_ROW_HEIGHT_PX) - 3) : 0;
+    const virtualVisibleCount = useVirtual ? Math.ceil(tableContainerHeight / TABLE_ROW_HEIGHT_PX) + 6 : filteredRecords.length;
+    const virtualEnd = useVirtual ? Math.min(filteredRecords.length, virtualStart + virtualVisibleCount) : filteredRecords.length;
+    const rowsToRender = useVirtual ? filteredRecords.slice(virtualStart, virtualEnd) : filteredRecords;
+
+    const handleTableScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        const el = e.currentTarget;
+        setTableScrollTop(el.scrollTop);
+        setTableContainerHeight(el.clientHeight);
+    }, []);
+
     if (loading) {
         return (
             <div className="flex flex-col h-full bg-[var(--bg-primary)] items-center justify-center">
@@ -1045,6 +1207,13 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                     />
                                 </div>
                                 <button
+                                    onClick={() => setShowOptionsPanel(true)}
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] rounded-lg text-xs text-white transition-colors"
+                                >
+                                    <Sparkle size={13} weight="duotone" />
+                                    AI assistant
+                                </button>
+                                <button
                                     onClick={handleExportCSV}
                                     className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] rounded-lg text-xs text-[var(--text-secondary)] transition-colors"
                                 >
@@ -1056,7 +1225,12 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
 
                         {/* Table */}
                         <div className="px-12 pb-8">
-                            <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-sm overflow-x-auto">
+                            <div
+                                ref={tableScrollRef}
+                                onScroll={handleTableScroll}
+                                className="overflow-x-auto rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] shadow-sm"
+                                style={{ maxHeight: '60vh', overflowY: 'auto' }}
+                            >
                                 <table className="w-full border-collapse" style={{ minWidth: `${properties.length * 180 + 50}px` }}>
                                     <colgroup>
                                         {properties.map(prop => (
@@ -1064,8 +1238,8 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                         ))}
                                         <col style={{ width: '50px', minWidth: '50px' }} />
                                     </colgroup>
-                                    {/* Header row */}
-                                    <thead>
+                                    {/* Header row (sticky when table is scrollable) */}
+                                    <thead className="sticky top-0 z-10 bg-[var(--bg-tertiary)] shadow-[0_1px_0_0_var(--border-light)]">
                                         <tr className="bg-[var(--bg-tertiary)]">
                                             {properties.map((prop) => {
                                                 const typeConf = getTypeConfig(prop.type);
@@ -1119,10 +1293,19 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                             </th>
                                         </tr>
                                     </thead>
-                                    {/* Data rows */}
+                                    {/* Data rows (virtualized when many rows) */}
                                     <tbody>
-                                        {filteredRecords.map((record) => (
-                                            <tr key={record.id} className="border-b border-[var(--border-light)] last:border-b-0 hover:bg-[var(--bg-tertiary)]/50 transition-colors group/row">
+                                        {useVirtual && virtualStart > 0 && (
+                                            <tr aria-hidden style={{ height: virtualStart * TABLE_ROW_HEIGHT_PX }}>
+                                                <td colSpan={properties.length + 1} className="p-0 border-0" />
+                                            </tr>
+                                        )}
+                                        {rowsToRender.map((record) => (
+                                            <tr
+                                                key={record.id}
+                                                style={useVirtual ? { height: TABLE_ROW_HEIGHT_PX } : undefined}
+                                                className="border-b border-[var(--border-light)] last:border-b-0 hover:bg-[var(--bg-tertiary)]/50 transition-colors group/row"
+                                            >
                                                 {properties.map((prop) => {
                                                     const uploadKey = `${record.id}-${prop.id}`;
                                                     const isUploading = uploadingFiles[uploadKey];
@@ -1555,6 +1738,11 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                 </td>
                                             </tr>
                                         ))}
+                                        {useVirtual && virtualEnd < filteredRecords.length && (
+                                            <tr aria-hidden style={{ height: (filteredRecords.length - virtualEnd) * TABLE_ROW_HEIGHT_PX }}>
+                                                <td colSpan={properties.length + 1} className="p-0 border-0" />
+                                            </tr>
+                                        )}
                                     </tbody>
                                     {/* Add row */}
                                     <tfoot>
@@ -1730,7 +1918,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                 <textarea
                                     value={aiPrompt}
                                     onChange={(e) => { setAiPrompt(e.target.value); if (aiError) setAiError(null); }}
-                                    placeholder="Describe what you want to build..."
+                                    placeholder={datasetAttachedHint ? "What do you want to do with this dataset? (e.g. keep as is, add a column, filter rows…)" : "Add column, add rows, create table…"}
                                     rows={2}
                                     className="flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none resize-none placeholder:text-[var(--text-tertiary)]"
                                     onKeyDown={(e) => {
@@ -1755,42 +1943,61 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                             {aiError && (
                                 <p className="mt-1.5 text-[11px] text-red-500">{aiError}</p>
                             )}
+                            {aiLastSummary && (
+                                <p className="mt-1.5 text-[11px] text-[var(--text-secondary)]">{aiLastSummary}</p>
+                            )}
                         </div>
+                        <p className="text-[10px] text-[var(--text-tertiary)] mb-2 px-0.5">
+                            Examples: &quot;Add a column X&quot;, &quot;Add 3 rows: …&quot;, &quot;Create a new table called Orders&quot;
+                        </p>
 
-                        {/* Quick actions */}
-                        <div className="space-y-1 mb-5">
-                            <button
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isImporting}
-                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left disabled:opacity-50"
-                            >
-                                {isImporting ? (
-                                    <SpinnerGap size={18} className="animate-spin text-[var(--text-tertiary)]" />
-                                ) : (
-                                    <Download size={18} weight="light" className="text-[var(--text-tertiary)]" />
-                                )}
-                                Import CSV
-                            </button>
-                        </div>
-
-                        {/* Suggested templates */}
-                        <div className="mb-5">
-                            <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2 px-1">Templates</p>
-                            <div className="space-y-1">
-                                {TEMPLATES.map(template => (
+                        {/* Attach dataset + hint + Templates: al crear entidad nueva (sin propiedades o solo la columna por defecto) */}
+                        {(properties.length === 0 || (isNew && properties.length <= 1)) && (
+                            <>
+                                <div className="space-y-1 mb-4">
                                     <button
-                                        key={template.id}
-                                        onClick={() => handleApplyTemplate(template)}
-                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isImporting}
+                                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left disabled:opacity-50 border border-[var(--border-light)]"
                                     >
-                                        <span className={`w-7 h-7 ${template.iconBg} rounded-md flex items-center justify-center text-sm`}>
-                                            {template.icon}
-                                        </span>
-                                        {template.name}
+                                        {isImporting ? (
+                                            <SpinnerGap size={18} className="animate-spin text-[var(--text-tertiary)]" />
+                                        ) : (
+                                            <Download size={18} weight="light" className="text-[var(--text-tertiary)]" />
+                                        )}
+                                        Attach dataset
                                     </button>
-                                ))}
-                            </div>
-                        </div>
+                                    {csvMessage && (
+                                        <p className={`text-[11px] px-1 ${csvMessage.type === 'error' ? 'text-red-500' : 'text-[var(--text-secondary)]'}`}>
+                                            {csvMessage.text}
+                                        </p>
+                                    )}
+                                </div>
+                                {datasetAttachedHint && (
+                                    <div className="mb-4 p-3 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30">
+                                        <p className="text-xs text-[var(--text-primary)]">{datasetAttachedHint}</p>
+                                        <p className="text-[11px] text-[var(--text-secondary)] mt-1">Describe above what you want and the AI will do it.</p>
+                                    </div>
+                                )}
+                                <div className="mb-5">
+                                    <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2 px-1">Templates</p>
+                                    <div className="space-y-1">
+                                        {TEMPLATES.map(template => (
+                                            <button
+                                                key={template.id}
+                                                onClick={() => handleApplyTemplate(template)}
+                                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors text-left"
+                                            >
+                                                <span className={`w-7 h-7 ${template.iconBg} rounded-md flex items-center justify-center`}>
+                                                    {React.createElement(template.icon, { size: 16, weight: 'light' })}
+                                                </span>
+                                                {template.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
                         {/* Hidden file input */}
                         <input

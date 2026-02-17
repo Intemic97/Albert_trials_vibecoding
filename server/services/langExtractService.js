@@ -77,7 +77,7 @@ function runHeuristicExtraction(text) {
   };
 }
 
-function runLangExtractPython(text, maxChars = 12000, timeoutMs = 20000) {
+function runLangExtractPython(text, maxChars = 60000, timeoutMs = 60000) {
   return new Promise((resolve, reject) => {
     const scriptPath = path.resolve(__dirname, '..', 'langextract', 'extract_structured.py');
     const python = spawn('python3', [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -122,7 +122,7 @@ function runLangExtractPython(text, maxChars = 12000, timeoutMs = 20000) {
 
 async function extractStructuredFromText(text, options = {}) {
   const mode = options.mode || 'auto';
-  const maxChars = Number(options.maxChars || 12000);
+  const maxChars = Number(options.maxChars || 60000);
 
   if (!text || !String(text).trim()) {
     throw new Error('No hay texto para extraer.');

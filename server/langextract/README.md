@@ -1,15 +1,16 @@
 # LangExtract Integration (Knowledge Base)
 
-This folder contains the first integration step for structured extraction from Knowledge Base documents.
+This folder contains the integration of [Google LangExtract](https://github.com/google/langextract) for structured extraction from Knowledge Base documents and **converting documents to table**.
 
 ## What was added
 
 - Node service: `server/services/langExtractService.js`
-- Python bridge script: `server/langextract/extract_structured.py`
+- Python bridge script: `server/langextract/extract_structured.py` (uses `langextract` library)
 - API endpoint:
   - `POST /api/knowledge/documents/:id/extract-structured`
-- UI action in Knowledge Base document cards/list:
-  - "Extract structured data" button per document
+- UI in Knowledge Base:
+  - **"Extract structured data"** button per document (runs LangExtract/heuristic)
+  - **"Convert to table"** (table icon): opens a modal with extractions as a data table and **Export CSV**
 
 ## Endpoint behavior
 

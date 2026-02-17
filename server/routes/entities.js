@@ -134,7 +134,7 @@ router.post('/entities', authenticateToken, async (req, res) => {
             for (const prop of properties) {
                 await db.run(
                     'INSERT INTO properties (id, entityId, name, type, defaultValue, relatedEntityId, unit) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [prop.id, id, prop.name, prop.type, prop.defaultValue, prop.relatedEntityId, prop.unit]
+                    [prop.id, id, prop.name, prop.type || 'text', prop.defaultValue ?? '', prop.relatedEntityId ?? null, prop.unit ?? null]
                 );
             }
         }
@@ -281,10 +281,16 @@ router.get('/entities/:id/records', authenticateToken, async (req, res) => {
     }
 });
 
-// POST /api/entities/:id/records - Create record with property names (for workflows)
+// POST /api/entities/:id/records - Create record(s) with property names (single object or array for batch)
 router.post('/entities/:id/records', authenticateToken, async (req, res) => {
     const { id: entityId } = req.params;
-    const recordData = req.body; // Data with property names as keys
+    let body = req.body;
+    // Support both raw array and { records: [] }
+    if (body && typeof body === 'object' && !Array.isArray(body) && Array.isArray(body.records)) {
+        body = body.records;
+    }
+    const isBatch = Array.isArray(body);
+    const recordsToCreate = isBatch ? body : [body];
 
     try {
         // Verify entity belongs to user's organization
@@ -295,48 +301,45 @@ router.post('/entities/:id/records', authenticateToken, async (req, res) => {
 
         // Get entity properties to map names to IDs
         const properties = await db.all('SELECT id, name, type FROM properties WHERE entityId = ?', [entityId]);
-        
-        // Create name -> property mapping (case-insensitive)
         const propertyMap = {};
         properties.forEach(prop => {
             propertyMap[prop.name.toLowerCase()] = prop;
         });
 
-        // Create the record
-        const recordId = Math.random().toString(36).substr(2, 9);
-        const createdAt = new Date().toISOString();
+        const createdIds = [];
 
-        await db.run(
-            'INSERT INTO records (id, entityId, createdAt) VALUES (?, ?, ?)',
-            [recordId, entityId, createdAt]
-        );
+        for (const recordData of recordsToCreate) {
+            if (!recordData || typeof recordData !== 'object' || Array.isArray(recordData)) continue;
 
-        // Map property names to IDs and save values
-        let savedFields = 0;
-        let skippedFields = [];
-        
-        for (const [key, val] of Object.entries(recordData)) {
-            // Skip internal fields
-            if (key === 'id' || key === 'createdAt' || key === 'entityId') continue;
-            
-            const prop = propertyMap[key.toLowerCase()];
-            if (prop) {
-                const valueId = Math.random().toString(36).substr(2, 9);
-                await db.run(
-                    'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
-                    [valueId, recordId, prop.id, String(val)]
-                );
-                savedFields++;
-            } else {
-                skippedFields.push(key);
+            const recordId = Math.random().toString(36).substr(2, 9);
+            const createdAt = new Date().toISOString();
+
+            await db.run(
+                'INSERT INTO records (id, entityId, createdAt) VALUES (?, ?, ?)',
+                [recordId, entityId, createdAt]
+            );
+            createdIds.push(recordId);
+
+            for (const [key, val] of Object.entries(recordData)) {
+                if (key === 'id' || key === 'createdAt' || key === 'entityId') continue;
+                const prop = propertyMap[key.toLowerCase()];
+                if (prop) {
+                    const valueId = Math.random().toString(36).substr(2, 9);
+                    await db.run(
+                        'INSERT INTO record_values (id, recordId, propertyId, value) VALUES (?, ?, ?, ?)',
+                        [valueId, recordId, prop.id, String(val)]
+                    );
+                }
             }
         }
 
-        res.status(201).json({ 
-            message: 'Record created', 
-            id: recordId,
-            savedFields,
-            skippedFields: skippedFields.length > 0 ? skippedFields : undefined
+        if (isBatch) {
+            return res.status(201).json({ message: 'Records created', created: createdIds.length, ids: createdIds });
+        }
+        res.status(201).json({
+            message: 'Record created',
+            id: createdIds[0],
+            savedFields: createdIds.length ? Object.keys(recordsToCreate[0] || {}).filter(k => !['id', 'createdAt', 'entityId'].includes(k)).length : 0
         });
     } catch (error) {
         console.error(error);
@@ -490,6 +493,71 @@ router.delete('/records/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Entity AI command (also registered here so /api/entity-ai-command is always available)
+router.post('/entity-ai-command', authenticateToken, async (req, res) => {
+    try {
+        const { message, context } = req.body;
+        if (!message || typeof message !== 'string') {
+            return res.status(400).json({ error: 'message is required' });
+        }
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(500).json({ error: 'OpenAI API Key not configured' });
+        }
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const ctx = context || {};
+        const entityName = ctx.entityName || 'this entity';
+        const properties = Array.isArray(ctx.properties) ? ctx.properties : [];
+        const propList = properties.map(p => `${p.name} (${p.type || 'text'})`).join(', ') || 'none';
+        const recordCount = typeof ctx.recordCount === 'number' ? ctx.recordCount : 0;
+        const sampleRecords = Array.isArray(ctx.sampleRecords) ? ctx.sampleRecords.slice(0, 5) : [];
+        const systemPrompt = `You are an assistant that helps users structure and edit their data (entities = tables, properties = columns, records = rows).
+
+Current context:
+- Entity name: ${entityName}
+- Columns (properties): ${propList}
+- Number of existing rows: ${recordCount}
+${sampleRecords.length ? `- Sample row keys: ${Object.keys(sampleRecords[0] || {}).join(', ')}` : ''}
+
+You must respond with a JSON object that has exactly two keys:
+1. "actions": an array of actions to perform (can be empty [] if the request is not about changing data).
+2. "summary": a short human-readable sentence describing what was done.
+
+Allowed action types:
+- "replace_schema": { "type": "replace_schema", "name": "Entity Name", "properties": [ { "name": "Name", "type": "text" }, ... ] }
+- "add_column": { "type": "add_column", "name": "Column Name", "dataType": "text" }
+- "add_records": { "type": "add_records", "records": [ { "Name": "Item 1", "Status": "Active" }, ... ] }
+- "create_entity": { "type": "create_entity", "name": "New Table Name", "properties": [ ... ], "records": [ ... ] (optional) }
+
+If the user message cannot be interpreted as a data change, return { "actions": [], "summary": "No changes made." }.
+Output ONLY valid JSON, no markdown, no explanation.`;
+        const userContent = sampleRecords.length
+            ? `User said: ${message}\n\nSample data (first row): ${JSON.stringify(sampleRecords[0])}`
+            : `User said: ${message}`;
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userContent }
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.3
+        });
+        const raw = completion.choices[0].message.content;
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (e) {
+            return res.status(500).json({ error: 'Invalid AI response', raw: raw?.slice(0, 200) });
+        }
+        const actions = Array.isArray(parsed.actions) ? parsed.actions : [];
+        const summary = typeof parsed.summary === 'string' ? parsed.summary : 'Done';
+        res.json({ actions, summary });
+    } catch (error) {
+        console.error('Error in entity-ai-command:', error);
+        res.status(500).json({ error: 'Failed to process command' });
+    }
+});
 
     return router;
 };

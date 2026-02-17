@@ -298,7 +298,7 @@ router.post('/knowledge/documents/:id/relate', authenticateToken, async (req, re
 // Structured extraction for a knowledge document (LangExtract + fallback)
 router.post('/knowledge/documents/:id/extract-structured', authenticateToken, async (req, res) => {
     try {
-        const { force = false, mode = 'auto', maxChars = 12000 } = req.body || {};
+        const { force = false, mode = 'auto', maxChars = 60000 } = req.body || {};
 
         const doc = await db.get(
             `SELECT id, name, extractedText, metadata
@@ -324,10 +324,13 @@ router.post('/knowledge/documents/:id/extract-structured', authenticateToken, as
             });
         }
 
-        const structuredExtraction = await extractStructuredFromText(doc.extractedText, {
+        let structuredExtraction = await extractStructuredFromText(doc.extractedText, {
             mode,
             maxChars
         });
+        if (structuredExtraction.extractedParameters && !structuredExtraction.extractions) {
+            structuredExtraction = { ...structuredExtraction, extractions: structuredExtraction.extractedParameters };
+        }
 
         const mergedMetadata = {
             ...currentMetadata,
@@ -372,6 +375,69 @@ router.post('/knowledge/documents/:id/extract-structured', authenticateToken, as
             error: 'Failed to extract structured data',
             details: error.message
         });
+    }
+});
+
+// AI-assisted extraction: focus or filter by natural language instruction (e.g. "solo datos de sensores")
+router.post('/knowledge/documents/:id/extract-with-instruction', authenticateToken, async (req, res) => {
+    try {
+        const { instruction } = req.body || {};
+        if (!instruction || typeof instruction !== 'string' || !instruction.trim()) {
+            return res.status(400).json({ error: 'instruction is required' });
+        }
+        if (!process.env.OPENAI_API_KEY) {
+            return res.status(503).json({ error: 'OpenAI API Key not configured' });
+        }
+
+        const doc = await db.get(
+            'SELECT id, name, extractedText FROM knowledge_documents WHERE id = ? AND organizationId = ?',
+            [req.params.id, req.user.orgId]
+        );
+        if (!doc) return res.status(404).json({ error: 'Document not found' });
+        const text = doc.extractedText && String(doc.extractedText).trim();
+        if (!text) return res.status(400).json({ error: 'Document has no extracted text' });
+
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const truncated = text.length > 45000 ? text.slice(0, 45000) + '\n[... texto truncado ...]' : text;
+
+        const systemPrompt = `You extract structured data from document text. The user will give an instruction to focus or filter what to extract (e.g. "solo datos de sensores", "solo parámetros de proceso", "solo límites de calidad", "sensor data only").
+Output a JSON object with a single key "extractions" whose value is an array of objects. Each object must have:
+- "extraction_class": string (short category, e.g. process_parameter, sensor_data, quality_limit)
+- "extraction_text": string (the exact or summarized text fragment)
+- "attributes": object with string keys and string/number values (e.g. parameter, value, unit, sensor_id)
+Use the user instruction to decide what to extract and how to name extraction_class and attributes. Output ONLY valid JSON, no markdown.`;
+
+        const completion = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `Instruction: ${instruction.trim()}\n\nDocument text:\n${truncated}` }
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.3
+        });
+
+        const raw = completion.choices[0].message.content;
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (e) {
+            return res.status(500).json({ error: 'Invalid AI response', raw: raw?.slice(0, 200) });
+        }
+        const extractions = Array.isArray(parsed.extractions) ? parsed.extractions : [];
+
+        res.json({
+            success: true,
+            structuredExtraction: {
+                provider: 'openai-instruction',
+                generatedAt: new Date().toISOString(),
+                extractions
+            }
+        });
+    } catch (error) {
+        console.error('Error in extract-with-instruction:', error);
+        res.status(500).json({ error: 'Failed to extract with instruction', details: error.message });
     }
 });
 

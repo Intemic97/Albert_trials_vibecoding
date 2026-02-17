@@ -1107,6 +1107,48 @@ async function initDb() {
     // Indexes might already exist
   }
 
+  // data_connections table (used by dataConnections routes and OT)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS data_connections (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT,
+      description TEXT,
+      config TEXT,
+      status TEXT DEFAULT 'inactive',
+      lastTestedAt TEXT,
+      lastError TEXT,
+      createdBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+
+  // standards table (used by dataConnections/standards routes)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS standards (
+      id TEXT PRIMARY KEY,
+      organizationId TEXT NOT NULL,
+      name TEXT NOT NULL,
+      code TEXT,
+      category TEXT,
+      description TEXT,
+      version TEXT,
+      status TEXT DEFAULT 'active',
+      effectiveDate TEXT,
+      expiryDate TEXT,
+      content TEXT,
+      tags TEXT,
+      relatedEntityIds TEXT DEFAULT '[]',
+      createdBy TEXT,
+      createdAt TEXT,
+      updatedAt TEXT,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+
   // Migration: workflowStatus for report_sections (per-section Draft/Review/Ready to Send)
   try {
     await db.exec(`ALTER TABLE report_sections ADD COLUMN workflowStatus TEXT DEFAULT 'draft'`);

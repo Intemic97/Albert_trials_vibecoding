@@ -151,7 +151,7 @@ router.delete('/standards/:id', authenticateToken, async (req, res) => {
 router.get('/data-connections', authenticateToken, async (req, res) => {
     try {
         const connections = await db.all(
-            `SELECT id, name, type, description, status, lastTestedAt, lastError, createdBy, createdAt, updatedAt 
+            `SELECT id, name, type, description, status, lastTestedAt, lastError, createdBy, createdAt, updatedAt, config 
              FROM data_connections 
              WHERE organizationId = ? 
              ORDER BY updatedAt DESC`,
@@ -159,21 +159,17 @@ router.get('/data-connections', authenticateToken, async (req, res) => {
         );
         
         // Parse config JSON (but don't send sensitive data)
-        const parsedConnections = connections.map(c => {
+        const parsedConnections = (connections || []).map(c => {
             let config = {};
             try {
                 const fullConfig = JSON.parse(c.config || '{}');
-                // Only return non-sensitive config fields
                 config = {
                     type: fullConfig.type,
                     host: fullConfig.host ? '***' : undefined,
                     port: fullConfig.port,
                     database: fullConfig.database ? '***' : undefined,
-                    // Don't send passwords, tokens, etc.
                 };
-            } catch (e) {
-                // Invalid JSON, return empty
-            }
+            } catch (e) {}
             return {
                 ...c,
                 config
@@ -182,6 +178,10 @@ router.get('/data-connections', authenticateToken, async (req, res) => {
         
         res.json(parsedConnections);
     } catch (error) {
+        // If table does not exist yet (e.g. DB created before migration), return empty array
+        if (error && (error.message || '').toLowerCase().includes('no such table')) {
+            return res.json([]);
+        }
         console.error('Error fetching connections:', error);
         res.status(500).json({ error: 'Failed to fetch connections' });
     }

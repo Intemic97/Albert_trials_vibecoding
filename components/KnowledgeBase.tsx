@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
     Database, Plus, MagnifyingGlass, Funnel, X, FileText, Folder, FolderPlus, 
     UploadSimple, Table, SpinnerGap, File, DownloadSimple, Trash, Eye, 
-    Link as LinkIcon, Copy, Check, PencilSimple, Calendar, Tag, CaretRight,
+    Link as LinkIcon, Copy, Check, CheckSquare, PencilSimple, Calendar, Tag, CaretRight,
     FolderOpen, House, GridFour, List, SortAscending, DotsThree, TreeStructure,
-    Factory, Gear, Thermometer, Flask, Lightning, ShieldCheck
+    Factory, Gear, Thermometer, Flask, Lightning, ShieldCheck, Sparkle
 } from '@phosphor-icons/react';
 import { Entity, EntityType, ENTITY_TYPE_OPTIONS } from '../types';
 import { EntityCard } from './EntityCard';
@@ -20,6 +21,7 @@ import { KnowledgeGraph } from './KnowledgeGraph';
 interface KnowledgeBaseProps {
     entities: Entity[];
     onNavigate: (entityId: string) => void;
+    onEntityCreated?: () => void;
 }
 
 interface Folder {
@@ -49,7 +51,7 @@ interface Document {
 type ViewMode = 'grid' | 'list';
 type SortBy = 'name' | 'date' | 'type';
 
-export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNavigate }) => {
+export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNavigate, onEntityCreated }) => {
     const navigate = useNavigate();
     const { notifications, removeNotification, success, error: showError, warning } = useNotifications(3000);
     const location = useLocation();
@@ -88,6 +90,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [extractingDocId, setExtractingDocId] = useState<string | null>(null);
+    const [documentForTableView, setDocumentForTableView] = useState<{ id: string; name: string } | null>(null);
+    const [documentPreviewText, setDocumentPreviewText] = useState<string | null>(null);
+    const [tableRows, setTableRows] = useState<Record<string, string | number>[]>([]);
+    const [tableLoading, setTableLoading] = useState(false);
+    const [creatingEntityFromTable, setCreatingEntityFromTable] = useState(false);
+    const [tableAssistantInstruction, setTableAssistantInstruction] = useState('');
+    const [tableAssistantLoading, setTableAssistantLoading] = useState(false);
     
     // Import preview state
     const [importStep, setImportStep] = useState<'upload' | 'preview' | 'importing'>('upload');
@@ -102,6 +111,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     // Drag state
     const [draggedItem, setDraggedItem] = useState<{ type: 'entity' | 'document' | 'folder'; id: string } | null>(null);
     const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+
+    // Bulk selection (entities only)
+    const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set());
+    const [showMoveModal, setShowMoveModal] = useState(false);
+    const [bulkActionLoading, setBulkActionLoading] = useState(false);
 
     // Load data on mount and restore folder navigation
     useEffect(() => {
@@ -277,7 +291,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     };
 
     const handleDeleteFolder = async (folder: Folder) => {
-        if (!confirm(`Delete "${folder.name}"? Contents will be moved to parent folder.`)) return;
+        if (!confirm(`¿Estás seguro de que quieres borrar la carpeta «${folder.name}»? El contenido se moverá a la carpeta superior.`)) return;
 
         try {
             const res = await fetch(`${API_BASE}/knowledge/folders/${folder.id}`, {
@@ -407,7 +421,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     };
 
     const handleDeleteEntity = async (entity: Entity) => {
-        if (!confirm(`Delete "${entity.name}"? This will also delete all its records.`)) return;
+        if (!confirm(`¿Estás seguro de que quieres borrar la entidad «${entity.name}»? Se eliminarán también todos sus registros.`)) return;
 
         try {
             await fetch(`${API_BASE}/entities/${entity.id}`, {
@@ -422,6 +436,80 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         } catch (error) {
             console.error('Error deleting entity:', error);
             showError('Failed to delete entity');
+        }
+    };
+
+    const toggleEntitySelection = (entityId: string) => {
+        setSelectedEntityIds(prev => {
+            const next = new Set(prev);
+            if (next.has(entityId)) next.delete(entityId);
+            else next.add(entityId);
+            return next;
+        });
+    };
+
+    const selectAllEntitiesInView = () => {
+        const ids = currentFolderItems.entities.map(e => e.id);
+        setSelectedEntityIds(prev => {
+            const allSelected = ids.length > 0 && ids.every(id => prev.has(id));
+            return allSelected ? new Set() : new Set(ids);
+        });
+    };
+
+    const clearEntitySelection = () => setSelectedEntityIds(new Set());
+
+    const handleBulkMove = async (targetFolderId: string | null) => {
+        const ids = Array.from(selectedEntityIds);
+        if (ids.length === 0) return;
+        setBulkActionLoading(true);
+        try {
+            for (const entityId of ids) {
+                const currentFolder = folders.find(f => f.entityIds.includes(entityId));
+                if (currentFolder) {
+                    await fetch(`${API_BASE}/knowledge/folders/${currentFolder.id}/remove`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type: 'entity', itemId: entityId }),
+                        credentials: 'include'
+                    });
+                }
+                if (targetFolderId) {
+                    await fetch(`${API_BASE}/knowledge/folders/${targetFolderId}/add`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type: 'entity', itemId: entityId }),
+                        credentials: 'include'
+                    });
+                }
+            }
+            await fetchFolders();
+            clearEntitySelection();
+            setShowMoveModal(false);
+            success(`${ids.length} entidad(es) movida(s)`);
+        } catch {
+            showError('Error al mover');
+        } finally {
+            setBulkActionLoading(false);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        const ids = Array.from(selectedEntityIds);
+        if (ids.length === 0) return;
+        if (!confirm(`¿Estás seguro de que quieres borrar ${ids.length} entidad(es)? Se eliminarán también todos sus registros. Esta acción no se puede deshacer.`)) return;
+        setBulkActionLoading(true);
+        try {
+            for (const entityId of ids) {
+                await fetch(`${API_BASE}/entities/${entityId}`, { method: 'DELETE', credentials: 'include' });
+            }
+            if (currentFolderId) sessionStorage.setItem('kb_currentFolder', currentFolderId);
+            clearEntitySelection();
+            success(`${ids.length} entidad(es) eliminada(s)`);
+            window.location.reload();
+        } catch {
+            showError('Error al borrar');
+        } finally {
+            setBulkActionLoading(false);
         }
     };
 
@@ -462,7 +550,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
     };
 
     const handleDeleteDocument = async (docId: string) => {
-        if (!confirm('Delete this document?')) return;
+        if (!confirm('¿Estás seguro de que quieres borrar este documento?')) return;
 
         try {
             const res = await fetch(`${API_BASE}/knowledge/documents/${docId}`, {
@@ -517,6 +605,224 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
             showError('Failed to extract structured data', error?.message);
         } finally {
             setExtractingDocId(null);
+        }
+    };
+
+    // Convert document extractions (LangExtract) to table rows for "View as table"
+    const handleViewAsTable = async (doc: Document) => {
+        if (!doc?.id) return;
+        setTableLoading(true);
+        setDocumentForTableView({ id: doc.id, name: doc.name });
+        setTableRows([]);
+        setDocumentPreviewText(null);
+        try {
+            const res = await fetch(`${API_BASE}/knowledge/documents/${doc.id}`, { credentials: 'include' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || 'Failed to load document');
+            const rawText = typeof data.extractedText === 'string' ? data.extractedText.trim() : '';
+            setDocumentPreviewText(rawText || null);
+            const meta = data.metadata || {};
+            const extraction = meta.structuredExtraction;
+            const extractions = Array.isArray(extraction?.extractions) ? extraction.extractions : Array.isArray(extraction?.extractedParameters) ? extraction.extractedParameters : [];
+            if (extractions.length === 0) {
+                setTableRows([]);
+                setTableLoading(false);
+                return;
+            }
+            const rows: Record<string, string | number>[] = extractions.map((item: { extraction_class?: string; extraction_text?: string; attributes?: Record<string, unknown> }) => {
+                const row: Record<string, string | number> = {
+                    type: item.extraction_class ?? '',
+                    text: item.extraction_text ?? '',
+                };
+                const attrs = item.attributes || {};
+                Object.keys(attrs).forEach((k) => {
+                    const v = attrs[k];
+                    row[k] = typeof v === 'object' ? JSON.stringify(v) : String(v ?? '');
+                });
+                return row;
+            });
+            setTableRows(rows);
+        } catch (e: any) {
+            showError('Failed to load document for table', e?.message);
+            setDocumentForTableView(null);
+        } finally {
+            setTableLoading(false);
+        }
+    };
+
+    const handleCloseTableView = () => {
+        setDocumentForTableView(null);
+        setDocumentPreviewText(null);
+        setTableRows([]);
+    };
+
+    // Run extraction from inside the table modal when there's no structured data yet
+    const handleExtractFromTableModal = async () => {
+        if (!documentForTableView?.id) return;
+        setTableLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/knowledge/documents/${documentForTableView.id}/extract-structured`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ mode: 'auto' })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || 'Extraction failed');
+            const raw = data?.structuredExtraction;
+            const extractions = Array.isArray(raw?.extractions) ? raw.extractions : Array.isArray(raw?.extractedParameters) ? raw.extractedParameters : [];
+            const rows: Record<string, string | number>[] = extractions.map((item: { extraction_class?: string; extraction_text?: string; attributes?: Record<string, unknown> }) => {
+                const row: Record<string, string | number> = {
+                    type: item.extraction_class ?? '',
+                    text: item.extraction_text ?? '',
+                };
+                const attrs = item.attributes || {};
+                Object.keys(attrs).forEach((k) => {
+                    const v = attrs[k];
+                    row[k] = typeof v === 'object' ? JSON.stringify(v) : String(v ?? '');
+                });
+                return row;
+            });
+            setTableRows(rows);
+            if (extractions.length) {
+                success(`Extracted ${extractions.length} items`);
+            } else {
+                success('Extraction ran but found 0 items. Try a document with parameters, limits or technical terms, or install LangExtract (pip install langextract) for richer extraction.');
+            }
+        } catch (e: any) {
+            showError('Extraction failed', e?.message);
+        } finally {
+            setTableLoading(false);
+        }
+    };
+
+    // AI assistant: extract/filter table by natural language instruction (e.g. "solo datos de sensores")
+    const handleExtractWithInstruction = async () => {
+        if (!documentForTableView?.id || !tableAssistantInstruction.trim()) return;
+        setTableAssistantLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/knowledge/documents/${documentForTableView.id}/extract-with-instruction`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ instruction: tableAssistantInstruction.trim() })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || 'Extraction failed');
+            const raw = data?.structuredExtraction;
+            const extractions = Array.isArray(raw?.extractions) ? raw.extractions : [];
+            const rows: Record<string, string | number>[] = extractions.map((item: { extraction_class?: string; extraction_text?: string; attributes?: Record<string, unknown> }) => {
+                const row: Record<string, string | number> = {
+                    type: item.extraction_class ?? '',
+                    text: item.extraction_text ?? '',
+                };
+                const attrs = item.attributes || {};
+                Object.keys(attrs).forEach((k) => {
+                    const v = attrs[k];
+                    row[k] = typeof v === 'object' ? JSON.stringify(v) : String(v ?? '');
+                });
+                return row;
+            });
+            setTableRows(rows);
+            if (rows.length) success(`Extraídos ${rows.length} ítems según tu instrucción.`);
+            else success('La IA no encontró datos que coincidan con la instrucción. Prueba otra frase.');
+        } catch (e: any) {
+            showError('Error del asistente', e?.message);
+        } finally {
+            setTableAssistantLoading(false);
+        }
+    };
+
+    const handleExportTableCSV = () => {
+        if (tableRows.length === 0) return;
+        const headers = Array.from(new Set(tableRows.flatMap((r) => Object.keys(r))));
+        const line = (arr: string[]) => arr.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',');
+        const csv = [line(headers), ...tableRows.map((r) => line(headers.map((h) => String(r[h] ?? ''))))].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${documentForTableView?.name || 'document'}-table.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        success('CSV downloaded');
+    };
+
+    // Group table rows by type/extraction_class for multiple tables
+    const tableGroups = useMemo(() => {
+        if (tableRows.length === 0) return [];
+        const typeKey = Object.keys(tableRows[0]).find(
+            (k) => k.toLowerCase() === 'type' || k.toLowerCase() === 'extraction_class'
+        );
+        if (!typeKey) return [{ key: 'default', label: 'Data', rows: tableRows }];
+        const byType: Record<string, Record<string, string | number>[]> = {};
+        tableRows.forEach((row) => {
+            const t = String(row[typeKey] ?? 'Other').trim() || 'Other';
+            if (!byType[t]) byType[t] = [];
+            byType[t].push(row);
+        });
+        return Object.entries(byType).map(([key, rows]) => ({ key, label: key, rows }));
+    }, [tableRows]);
+
+    const handleCreateEntityFromTable = async (rows: Record<string, string | number>[]) => {
+        if (rows.length === 0) return;
+        setCreatingEntityFromTable(true);
+        try {
+            const headers = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+            const entityId = `entity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            const properties = headers.map((col, idx) => ({
+                id: `prop-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 5)}`,
+                name: col,
+                type: 'text' as const,
+                defaultValue: ''
+            }));
+            const entityName = `${documentForTableView?.name || 'Document'} (extracted)`;
+            const newEntity = {
+                id: entityId,
+                name: entityName,
+                description: `Created from document "${documentForTableView?.name || ''}" (${rows.length} records)`,
+                author: user?.name || user?.email?.split('@')[0] || undefined,
+                lastEdited: new Date().toISOString(),
+                properties,
+                folderId: currentFolderId || undefined
+            };
+            const createRes = await fetch(`${API_BASE}/entities`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(newEntity)
+            });
+            if (!createRes.ok) {
+                const err = await createRes.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to create entity');
+            }
+            const BATCH = 50;
+            for (let i = 0; i < rows.length; i += BATCH) {
+                const batch = rows.slice(i, i + BATCH);
+                const records = batch.map((row) => {
+                    const rec: Record<string, string | number> = {};
+                    headers.forEach((h) => { rec[h] = row[h] ?? ''; });
+                    return rec;
+                });
+                const recRes = await fetch(`${API_BASE}/entities/${entityId}/records`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(records)
+                });
+                if (!recRes.ok) {
+                    const err = await recRes.json().catch(() => ({}));
+                    throw new Error(err.message || 'Failed to add records');
+                }
+            }
+            success(`Entity "${entityName}" created with ${rows.length} records`);
+            handleCloseTableView();
+            onEntityCreated?.();
+            onNavigate(entityId);
+        } catch (e) {
+            showError('Create entity failed', e instanceof Error ? e.message : 'Unknown error');
+        } finally {
+            setCreatingEntityFromTable(false);
         }
     };
 
@@ -837,13 +1143,14 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 {/* Main content area */}
                 <div className="flex-1 flex flex-col overflow-hidden">
                     {/* Toolbar */}
-                    <div className="flex items-center justify-between px-6 py-3 border-b border-[var(--border-light)] bg-[var(--bg-primary)]">
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm text-[var(--text-secondary)]">
-                                {searchQuery ? `Found ${totalItems} items` : `${totalItems} items`}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-3">
+                    <div className="flex flex-col border-b border-[var(--border-light)] bg-[var(--bg-primary)]">
+                        <div className="flex items-center justify-between px-6 py-3">
+                            <div className="flex items-center gap-4">
+                                <span className="text-sm text-[var(--text-secondary)]">
+                                    {searchQuery ? `Found ${totalItems} items` : `${totalItems} items`}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-3">
                             {/* Search */}
                             <div className="relative">
                                 <MagnifyingGlass weight="light" className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" size={14} />
@@ -872,6 +1179,37 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 </button>
                             </div>
                         </div>
+                        </div>
+                        {/* Bulk actions bar (entities) */}
+                        {selectedEntityIds.size > 0 && (
+                            <div className="flex items-center gap-3 px-6 py-2 bg-[var(--accent-primary)]/10 border-t border-[var(--accent-primary)]/20">
+                                <span className="text-sm font-medium text-[var(--text-primary)]">
+                                    {selectedEntityIds.size} entidad(es) seleccionada(s)
+                                </span>
+                                <button
+                                    onClick={() => setShowMoveModal(true)}
+                                    disabled={bulkActionLoading}
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-card)] border border-[var(--border-light)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] disabled:opacity-50"
+                                >
+                                    <Folder size={14} weight="light" />
+                                    Mover
+                                </button>
+                                <button
+                                    onClick={handleBulkDelete}
+                                    disabled={bulkActionLoading}
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-red-500/10 text-red-600 hover:bg-red-500/20 border border-red-500/20 disabled:opacity-50"
+                                >
+                                    <Trash size={14} weight="light" />
+                                    Borrar
+                                </button>
+                                <button
+                                    onClick={clearEntitySelection}
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+                                >
+                                    Desmarcar
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Content */}
@@ -990,6 +1328,18 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 {currentFolderItems.entities.length > 0 && (
                                     <div>
                                         <h3 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); selectAllEntitiesInView(); }}
+                                                className="flex items-center gap-2 rounded p-0.5 hover:bg-[var(--bg-hover)]"
+                                                title={currentFolderItems.entities.every(e => selectedEntityIds.has(e.id)) ? 'Desmarcar todas' : 'Seleccionar todas'}
+                                            >
+                                                {currentFolderItems.entities.every(e => selectedEntityIds.has(e.id)) ? (
+                                                    <CheckSquare size={16} weight="fill" className="text-[var(--accent-primary)]" />
+                                                ) : (
+                                                    <span className="w-4 h-4 rounded border border-[var(--border-light)] bg-transparent" />
+                                                )}
+                                            </button>
                                             <Database size={12} weight="light" />
                                             Entities ({currentFolderItems.entities.length})
                                         </h3>
@@ -1001,7 +1351,20 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                     onDragStart={(e) => {
                                                         handleDragStart('entity', entity.id);
                                                     }}
+                                                    className="relative"
                                                 >
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.stopPropagation(); toggleEntitySelection(entity.id); }}
+                                                        className="absolute top-2 left-2 z-10 p-1 rounded bg-[var(--bg-card)]/90 border border-[var(--border-light)] hover:bg-[var(--bg-hover)]"
+                                                        title={selectedEntityIds.has(entity.id) ? 'Desmarcar' : 'Seleccionar'}
+                                                    >
+                                                        {selectedEntityIds.has(entity.id) ? (
+                                                            <CheckSquare size={14} weight="fill" className="text-[var(--accent-primary)]" />
+                                                        ) : (
+                                                            <span className="block w-3.5 h-3.5 rounded border border-[var(--border-light)] bg-transparent" />
+                                                        )}
+                                                    </button>
                                                     <EntityCard
                                                         entity={entity}
                                                         onClick={(e) => {
@@ -1028,9 +1391,17 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                                     key={doc.id}
                                                     draggable
                                                     onDragStart={() => handleDragStart('document', doc.id)}
+                                                    onClick={() => handleViewAsTable(doc)}
                                                     className="group relative bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg p-4 hover:border-[var(--border-medium)] hover:shadow-md transition-all cursor-pointer"
                                                 >
                                                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleViewAsTable(doc); }}
+                                                            className="p-1 hover:bg-[var(--bg-tertiary)] rounded text-[var(--text-secondary)]"
+                                                            title="Ver como tabla"
+                                                        >
+                                                            <Table size={12} weight="light" />
+                                                        </button>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleExtractDocumentStructure(doc); }}
                                                             className="p-1 hover:bg-[var(--bg-tertiary)] rounded text-[var(--text-secondary)]"
@@ -1099,6 +1470,24 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                 ))}
                                 
                                 {/* Entities */}
+                                {currentFolderItems.entities.length > 0 && (
+                                    <div className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); selectAllEntitiesInView(); }}
+                                            className="flex items-center gap-2 rounded p-0.5 hover:bg-[var(--bg-hover)]"
+                                            title={currentFolderItems.entities.every(e => selectedEntityIds.has(e.id)) ? 'Desmarcar todas' : 'Seleccionar todas'}
+                                        >
+                                            {currentFolderItems.entities.every(e => selectedEntityIds.has(e.id)) ? (
+                                                <CheckSquare size={14} weight="fill" className="text-[var(--accent-primary)]" />
+                                            ) : (
+                                                <span className="block w-3.5 h-3.5 rounded border border-[var(--border-light)] bg-transparent" />
+                                            )}
+                                        </button>
+                                        <Database size={12} weight="light" />
+                                        Entities ({currentFolderItems.entities.length})
+                                    </div>
+                                )}
                                 {currentFolderItems.entities.map((entity) => (
                                     <div
                                         key={entity.id}
@@ -1107,7 +1496,18 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         onClick={() => onNavigate(entity.id)}
                                         className="group flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer hover:bg-[var(--bg-hover)] transition-all"
                                     >
-                                        <Database size={20} weight="light" className="text-emerald-500" />
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); toggleEntitySelection(entity.id); }}
+                                            className="shrink-0 p-0.5 rounded hover:bg-[var(--bg-tertiary)]"
+                                        >
+                                            {selectedEntityIds.has(entity.id) ? (
+                                                <CheckSquare size={18} weight="fill" className="text-[var(--accent-primary)]" />
+                                            ) : (
+                                                <span className="block w-[18px] h-[18px] rounded border border-[var(--border-light)] bg-transparent" />
+                                            )}
+                                        </button>
+                                        <Database size={20} weight="light" className="text-emerald-500 shrink-0" />
                                         <span className="flex-1 text-sm text-[var(--text-primary)]">{entity.name}</span>
                                         <span className="text-xs text-[var(--text-tertiary)]">{entity.properties?.length || 0} properties</span>
                                         <div className="opacity-0 group-hover:opacity-100 flex gap-1">
@@ -1124,12 +1524,20 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                                         key={doc.id}
                                         draggable
                                         onDragStart={() => handleDragStart('document', doc.id)}
+                                        onClick={() => handleViewAsTable(doc)}
                                         className="group flex items-center gap-3 px-4 py-3 rounded-lg cursor-pointer hover:bg-[var(--bg-hover)] transition-all"
                                     >
                                         <FileText size={20} weight="light" className="text-blue-500" />
                                         <span className="flex-1 text-sm text-[var(--text-primary)]">{doc.name}</span>
                                         <span className="text-xs text-[var(--text-tertiary)]">{doc.type}</span>
                                         <div className="opacity-0 group-hover:opacity-100 flex gap-1">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleViewAsTable(doc); }}
+                                                className="p-1 hover:bg-[var(--bg-tertiary)] rounded"
+                                                title="Ver como tabla"
+                                            >
+                                                <Table size={14} weight="light" className="text-[var(--text-secondary)]" />
+                                            </button>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); handleExtractDocumentStructure(doc); }}
                                                 className="p-1 hover:bg-[var(--bg-tertiary)] rounded"
@@ -1169,6 +1577,52 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                 className="hidden"
                 onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
             />
+
+            {/* Move entities modal (bulk) */}
+            {showMoveModal && selectedEntityIds.size > 0 && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => !bulkActionLoading && setShowMoveModal(false)}>
+                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-base font-medium text-[var(--text-primary)]">Mover entidades</h2>
+                            <button onClick={() => !bulkActionLoading && setShowMoveModal(false)} className="p-1 hover:bg-[var(--bg-hover)] rounded-lg">
+                                <X size={18} weight="light" className="text-[var(--text-secondary)]" />
+                            </button>
+                        </div>
+                        <p className="text-xs text-[var(--text-secondary)] mb-3">
+                            {selectedEntityIds.size} entidad(es) seleccionada(s). Elige carpeta destino:
+                        </p>
+                        <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+                            <button
+                                type="button"
+                                onClick={() => handleBulkMove(null)}
+                                disabled={bulkActionLoading}
+                                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+                            >
+                                <House size={18} weight="light" className="text-[var(--text-tertiary)]" />
+                                Raíz (sin carpeta)
+                            </button>
+                            {folders.map((folder) => (
+                                <button
+                                    key={folder.id}
+                                    type="button"
+                                    onClick={() => handleBulkMove(folder.id)}
+                                    disabled={bulkActionLoading}
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+                                >
+                                    <Folder size={18} weight="light" style={{ color: folder.color || '#6b7280' }} />
+                                    <span className="truncate">{folder.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                        {bulkActionLoading && (
+                            <div className="mt-3 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                                <SpinnerGap size={14} weight="light" className="animate-spin" />
+                                Moviendo…
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Create Folder Modal */}
             {isCreatingFolder && (
@@ -1601,6 +2055,151 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Document → Table modal (LangExtract extractions as table); render in body so it sits above sidebar */}
+            {documentForTableView && createPortal(
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10002] p-4" onClick={(e) => e.target === e.currentTarget && handleCloseTableView()}>
+                    <div className="bg-[var(--bg-card)] rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col border border-[var(--border-light)]" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-4 border-b border-[var(--border-light)]">
+                            <h2 className="text-base font-medium text-[var(--text-primary)]">
+                                {documentForTableView.name} — Table
+                            </h2>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleExportTableCSV}
+                                    disabled={tableRows.length === 0}
+                                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    <DownloadSimple size={16} weight="light" />
+                                    Export CSV
+                                </button>
+                                <button
+                                    onClick={() => handleCreateEntityFromTable(tableRows)}
+                                    disabled={tableRows.length === 0 || creatingEntityFromTable}
+                                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                    {creatingEntityFromTable ? <SpinnerGap size={16} weight="light" className="animate-spin" /> : <Database size={16} weight="light" />}
+                                    Create entity
+                                </button>
+                                <button onClick={handleCloseTableView} className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg">
+                                    <X size={18} weight="light" className="text-[var(--text-secondary)]" />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-auto p-4 space-y-4">
+                            {/* Document preview: text extracted on upload (used for structured extraction) */}
+                            <div className="rounded-lg border border-[var(--border-light)] overflow-hidden">
+                                <div className="px-3 py-2 bg-[var(--bg-tertiary)] text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+                                    Document preview (text used for extraction)
+                                </div>
+                                <div className="p-3 max-h-64 overflow-y-auto bg-[var(--bg-primary)] text-sm text-[var(--text-primary)] whitespace-pre-wrap custom-scrollbar">
+                                    {documentPreviewText ? (
+                                        documentPreviewText
+                                    ) : (
+                                        <span className="text-[var(--text-tertiary)]">
+                                            No text was extracted from this document on upload. Upload a PDF or TXT so the system can extract text, then &quot;Extract structured data&quot; can run.
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Asistente de IA: extraer/filtrar tabla por instrucción en lenguaje natural */}
+                            <div className="rounded-lg border border-[var(--border-light)] overflow-hidden">
+                                <div className="px-3 py-2 bg-[var(--bg-tertiary)] text-xs font-medium text-[var(--text-secondary)] flex items-center gap-2">
+                                    <Sparkle size={14} weight="duotone" className="text-[var(--accent-primary)]" />
+                                    Asistente de IA
+                                </div>
+                                <div className="p-3 bg-[var(--bg-primary)] space-y-2">
+                                    <p className="text-xs text-[var(--text-tertiary)]">
+                                        Indica qué datos quieres extraer y la IA generará la tabla (ej: &quot;solo datos de sensores&quot;, &quot;solo parámetros de proceso&quot;, &quot;límites de calidad&quot;).
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={tableAssistantInstruction}
+                                            onChange={(e) => setTableAssistantInstruction(e.target.value)}
+                                            placeholder="Ej: solo datos de sensores, parámetros de proceso..."
+                                            className="flex-1 px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                                            onKeyDown={(e) => e.key === 'Enter' && handleExtractWithInstruction()}
+                                            disabled={tableAssistantLoading || !documentPreviewText}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleExtractWithInstruction}
+                                            disabled={tableAssistantLoading || !documentPreviewText || !tableAssistantInstruction.trim()}
+                                            className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                                        >
+                                            {tableAssistantLoading ? (
+                                                <SpinnerGap size={18} weight="light" className="animate-spin" />
+                                            ) : (
+                                                <Sparkle size={18} weight="light" />
+                                            )}
+                                            Generar tabla
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {tableLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <SpinnerGap size={24} weight="light" className="animate-spin text-[var(--text-tertiary)]" />
+                                </div>
+                            ) : tableRows.length === 0 ? (
+                                <div className="py-6 text-center">
+                                    <p className="text-sm text-[var(--text-tertiary)] mb-4">No structured data yet. Run extraction to get a table from the document text above.</p>
+                                    <button
+                                        type="button"
+                                        onClick={handleExtractFromTableModal}
+                                        disabled={tableLoading || !documentPreviewText}
+                                        className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Gear size={18} weight="light" />
+                                        Extract structured data
+                                    </button>
+                                    {!documentPreviewText && (
+                                        <p className="text-xs text-[var(--text-tertiary)] mt-2">Need document text in the preview first.</p>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {tableGroups.map(({ key, label, rows }) => (
+                                        <div key={key} className="rounded-lg border border-[var(--border-light)] overflow-hidden">
+                                            <div className="px-3 py-2 bg-[var(--bg-tertiary)] text-xs font-medium text-[var(--text-secondary)]">
+                                                {label} ({rows.length})
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-sm border-collapse">
+                                                    <thead>
+                                                        <tr className="border-b border-[var(--border-medium)]">
+                                                            {Object.keys(rows[0]).map((col) => (
+                                                                <th key={col} className="text-left py-2 px-3 font-medium text-[var(--text-secondary)] capitalize">
+                                                                    {col}
+                                                                </th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {rows.map((row, idx) => (
+                                                            <tr key={idx} className="border-b border-[var(--border-light)] hover:bg-[var(--bg-hover)]">
+                                                                {Object.keys(rows[0]).map((col) => (
+                                                                    <td key={col} className="py-2 px-3 text-[var(--text-primary)] max-w-[200px] truncate" title={String(row[col] ?? '')}>
+                                                                        {String(row[col] ?? '')}
+                                                                    </td>
+                                                                ))}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );
