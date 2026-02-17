@@ -25,9 +25,9 @@ module.exports = function({ db }) {
                        CASE WHEN nr.id IS NOT NULL THEN 1 ELSE 0 END as isRead
                 FROM notifications n
                 LEFT JOIN notification_reads nr ON n.id = nr.notificationId AND nr.userId = ?
-                WHERE n.orgId = ? OR n.userId = ?
+                WHERE n.userId = ? AND n.orgId = ?
             `;
-            const params = [req.user.id, req.user.orgId, req.user.id];
+            const params = [req.user.id, req.user.id, req.user.orgId];
             
             if (unread === 'true') {
                 query += ' AND nr.id IS NULL';
@@ -55,8 +55,8 @@ module.exports = function({ db }) {
                 SELECT COUNT(*) as count
                 FROM notifications n
                 LEFT JOIN notification_reads nr ON n.id = nr.notificationId AND nr.userId = ?
-                WHERE (n.orgId = ? OR n.userId = ?) AND nr.id IS NULL
-            `, [req.user.id, req.user.orgId, req.user.id]);
+                WHERE n.userId = ? AND n.orgId = ? AND nr.id IS NULL
+            `, [req.user.id, req.user.id, req.user.orgId]);
             
             res.json({ count: result?.count || 0 });
         } catch (error) {
@@ -72,8 +72,8 @@ module.exports = function({ db }) {
                 SELECT n.id
                 FROM notifications n
                 LEFT JOIN notification_reads nr ON n.id = nr.notificationId AND nr.userId = ?
-                WHERE (n.orgId = ? OR n.userId = ?) AND nr.id IS NULL
-            `, [req.user.id, req.user.orgId, req.user.id]);
+                WHERE n.userId = ? AND n.orgId = ? AND nr.id IS NULL
+            `, [req.user.id, req.user.id, req.user.orgId]);
             
             for (const notification of unreadNotifications) {
                 await db.run(
@@ -101,6 +101,43 @@ module.exports = function({ db }) {
         } catch (error) {
             console.error('Mark read error:', error);
             res.status(500).json({ error: 'Failed to mark notification as read' });
+        }
+    });
+
+    // Delete all notifications for user
+    router.delete('/notifications', authenticateToken, async (req, res) => {
+        try {
+            // Delete notifications targeted at this user, or org-wide ones
+            await db.run(
+                'DELETE FROM notifications WHERE (orgId = ? AND userId = ?) OR userId = ?',
+                [req.user.orgId, req.user.id, req.user.id]
+            );
+            // Also clean up any notification_reads for this user
+            await db.run('DELETE FROM notification_reads WHERE userId = ?', [req.user.id]);
+            
+            res.json({ message: 'All notifications cleared' });
+        } catch (error) {
+            console.error('Clear all notifications error:', error);
+            res.status(500).json({ error: 'Failed to clear notifications' });
+        }
+    });
+
+    // Delete single notification
+    router.delete('/notifications/:id', authenticateToken, async (req, res) => {
+        try {
+            const { id } = req.params;
+            // Delete the notification itself (only if it belongs to this user/org)
+            await db.run(
+                'DELETE FROM notifications WHERE id = ? AND (userId = ? OR orgId = ?)',
+                [id, req.user.id, req.user.orgId]
+            );
+            // Also clean up reads
+            await db.run('DELETE FROM notification_reads WHERE notificationId = ?', [id]);
+            
+            res.json({ message: 'Notification deleted' });
+        } catch (error) {
+            console.error('Delete notification error:', error);
+            res.status(500).json({ error: 'Failed to delete notification' });
         }
     });
 

@@ -3,10 +3,19 @@
  * Extracted from Workflows.tsx lines 11548-11681
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { NodeConfigSidePanel } from '../../NodeConfigSidePanel';
-import { Robot, Sparkle, ChatText } from '@phosphor-icons/react';
+import { Robot, Sparkle, ChatText, TextT, Hash, CalendarBlank, ListBullets, X, Plus } from '@phosphor-icons/react';
 import { PromptInput } from '../../PromptInput';
+
+type OutputType = 'text' | 'number' | 'date' | 'enum';
+
+const OUTPUT_TYPES: { value: OutputType; label: string; icon: React.ComponentType<any> }[] = [
+  { value: 'text', label: 'Text', icon: TextT },
+  { value: 'number', label: 'Number', icon: Hash },
+  { value: 'date', label: 'Date', icon: CalendarBlank },
+  { value: 'enum', label: 'Enum (one of)', icon: ListBullets },
+];
 
 interface LLMConfigPanelProps {
   nodeId: string;
@@ -26,9 +35,41 @@ export const LLMConfigPanel: React.FC<LLMConfigPanelProps> = ({
   const [llmContextEntities, setLlmContextEntities] = useState<string[]>(node?.config?.llmContextEntities || []);
   const [llmIncludeInput, setLlmIncludeInput] = useState(node?.config?.llmIncludeInput !== false);
   const [llmProcessingMode, setLlmProcessingMode] = useState<'batch' | 'perRow'>(node?.config?.llmProcessingMode || 'batch');
+  const [outputType, setOutputType] = useState<OutputType>(node?.config?.outputType || 'text');
+  const [enumOptions, setEnumOptions] = useState<string[]>(node?.config?.enumOptions || []);
+  const [newEnumOption, setNewEnumOption] = useState('');
+  const [showOutputDropdown, setShowOutputDropdown] = useState(false);
+  const outputDropdownRef = useRef<HTMLDivElement>(null);
+  const enumInputRef = useRef<HTMLInputElement>(null);
+
+  // Close output dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (outputDropdownRef.current && !outputDropdownRef.current.contains(e.target as Node)) {
+        setShowOutputDropdown(false);
+      }
+    };
+    if (showOutputDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showOutputDropdown]);
+
+  const handleAddEnumOption = () => {
+    const trimmed = newEnumOption.trim();
+    if (trimmed && !enumOptions.includes(trimmed)) {
+      setEnumOptions(prev => [...prev, trimmed]);
+      setNewEnumOption('');
+      enumInputRef.current?.focus();
+    }
+  };
+
+  const handleRemoveEnumOption = (option: string) => {
+    setEnumOptions(prev => prev.filter(o => o !== option));
+  };
 
   const handleSave = () => {
-    onSave(nodeId, { llmPrompt, llmContextEntities, llmIncludeInput, llmProcessingMode });
+    onSave(nodeId, { llmPrompt, llmContextEntities, llmIncludeInput, llmProcessingMode, outputType, enumOptions: outputType === 'enum' ? enumOptions : [] });
     onClose();
   };
 
@@ -96,6 +137,132 @@ export const LLMConfigPanel: React.FC<LLMConfigPanelProps> = ({
                             })()}
                         />
                     </div>
+                </div>
+
+                {/* Output Type */}
+                <div>
+                    <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
+                        Output
+                    </label>
+                    <div className="relative" ref={outputDropdownRef}>
+                        <button
+                            type="button"
+                            onClick={() => setShowOutputDropdown(!showOutputDropdown)}
+                            className="w-full flex items-center justify-between px-3 py-2 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] hover:border-[var(--border-medium)] transition-colors"
+                        >
+                            <span className="flex items-center gap-2">
+                                {(() => {
+                                    const ot = OUTPUT_TYPES.find(t => t.value === outputType);
+                                    const Icon = ot?.icon || TextT;
+                                    return (
+                                        <>
+                                            <Icon size={15} weight="regular" className="text-[var(--text-secondary)]" />
+                                            {ot?.label || 'Text'}
+                                        </>
+                                    );
+                                })()}
+                            </span>
+                            <svg className={`w-3.5 h-3.5 text-[var(--text-tertiary)] transition-transform ${showOutputDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+
+                        {showOutputDropdown && (
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-lg z-50 overflow-hidden">
+                                {OUTPUT_TYPES.map(ot => {
+                                    const Icon = ot.icon;
+                                    const isSelected = outputType === ot.value;
+                                    return (
+                                        <button
+                                            key={ot.value}
+                                            type="button"
+                                            onClick={() => {
+                                                setOutputType(ot.value);
+                                                setShowOutputDropdown(false);
+                                            }}
+                                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors ${
+                                                isSelected
+                                                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-medium'
+                                                    : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+                                            }`}
+                                        >
+                                            <Icon size={15} weight="regular" className="text-[var(--text-secondary)]" />
+                                            {ot.label}
+                                            {isSelected && (
+                                                <span className="ml-auto text-emerald-500">✓</span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Enum Options */}
+                    {outputType === 'enum' && (
+                        <div className="mt-3">
+                            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
+                                Options
+                            </label>
+                            {/* Existing options as tags */}
+                            {enumOptions.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                    {enumOptions.map((opt, idx) => {
+                                        const colors = [
+                                            'bg-blue-100 text-blue-700 border-blue-200',
+                                            'bg-emerald-100 text-emerald-700 border-emerald-200',
+                                            'bg-amber-100 text-amber-700 border-amber-200',
+                                            'bg-purple-100 text-purple-700 border-purple-200',
+                                            'bg-rose-100 text-rose-700 border-rose-200',
+                                            'bg-cyan-100 text-cyan-700 border-cyan-200',
+                                            'bg-orange-100 text-orange-700 border-orange-200',
+                                            'bg-teal-100 text-teal-700 border-teal-200',
+                                        ];
+                                        const colorClass = colors[idx % colors.length];
+                                        return (
+                                            <span
+                                                key={opt}
+                                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${colorClass}`}
+                                            >
+                                                {opt}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveEnumOption(opt)}
+                                                    className="hover:opacity-70 transition-opacity ml-0.5"
+                                                >
+                                                    <X size={10} weight="bold" />
+                                                </button>
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            {/* New option input */}
+                            <div className="flex items-center gap-2">
+                                <input
+                                    ref={enumInputRef}
+                                    type="text"
+                                    value={newEnumOption}
+                                    onChange={(e) => setNewEnumOption(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            handleAddEnumOption();
+                                        }
+                                    }}
+                                    placeholder="Type an option and press Enter..."
+                                    className="flex-1 px-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)]"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleAddEnumOption}
+                                    disabled={!newEnumOption.trim()}
+                                    className="flex items-center gap-1 px-2.5 py-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] hover:bg-[var(--bg-selected)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <Plus size={12} weight="bold" />
+                                    Add
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2 mt-2">

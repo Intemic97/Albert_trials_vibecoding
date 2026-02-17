@@ -80,6 +80,8 @@ async def handle_llm(node: Dict, input_data: Optional[Dict] = None, execution_co
     """Handle LLM/OpenAI node"""
     config_data = node.get("config", {})
     prompt = config_data.get("llmPrompt") or config_data.get("prompt")
+    output_type = config_data.get("outputType", "text")
+    enum_options = config_data.get("enumOptions", [])
     
     if not prompt:
         raise ValueError("No prompt configured for LLM node")
@@ -92,6 +94,16 @@ async def handle_llm(node: Dict, input_data: Optional[Dict] = None, execution_co
     if input_data:
         context = f"\n\nContext data:\n{json.dumps(input_data, indent=2)}"
     
+    # Build output format instruction based on outputType
+    output_instruction = ""
+    if output_type == "number":
+        output_instruction = "\n\nIMPORTANT: Your response MUST be a single numeric value (integer or decimal). Do not include any text, units, or explanation — only the number."
+    elif output_type == "date":
+        output_instruction = "\n\nIMPORTANT: Your response MUST be a single date in ISO 8601 format (YYYY-MM-DD). Do not include any text or explanation — only the date."
+    elif output_type == "enum" and enum_options:
+        options_str = ", ".join(f'"{o}"' for o in enum_options)
+        output_instruction = f"\n\nIMPORTANT: Your response MUST be exactly ONE of these options: {options_str}. Do not include any text or explanation — only one of the listed options exactly as written."
+    
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
             "https://api.openai.com/v1/chat/completions",
@@ -102,7 +114,7 @@ async def handle_llm(node: Dict, input_data: Optional[Dict] = None, execution_co
             json={
                 "model": "gpt-4o-mini",
                 "messages": [
-                    {"role": "user", "content": prompt + context}
+                    {"role": "user", "content": prompt + context + output_instruction}
                 ]
             }
         )
@@ -111,10 +123,29 @@ async def handle_llm(node: Dict, input_data: Optional[Dict] = None, execution_co
         
         llm_response = result["choices"][0]["message"]["content"]
         
+        # Post-process based on output type
+        import re
+        if output_type == "number":
+            cleaned = re.sub(r'[^0-9.\-]', '', llm_response)
+            try:
+                llm_response = str(float(cleaned))
+            except ValueError:
+                pass  # Keep original if can't parse
+        elif output_type == "date":
+            date_match = re.search(r'\d{4}-\d{2}-\d{2}', llm_response)
+            if date_match:
+                llm_response = date_match.group(0)
+        elif output_type == "enum" and enum_options:
+            trimmed = llm_response.strip().strip('"').strip("'")
+            for opt in enum_options:
+                if opt.lower() == trimmed.lower():
+                    llm_response = opt
+                    break
+        
         return {
             "success": True,
             "message": "LLM response generated",
-            "outputData": {"response": llm_response, "inputData": input_data},
+            "outputData": {"response": llm_response, "outputType": output_type, "inputData": input_data},
             "llmResponse": llm_response
         }
 

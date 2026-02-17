@@ -160,6 +160,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const [recordSearch, setRecordSearch] = useState('');
     const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
     const [activeSelectCell, setActiveSelectCell] = useState<string | null>(null); // "recordId-propId"
+    const [selectDropdownPos, setSelectDropdownPos] = useState<{ top: number; left: number; maxHeight: number } | null>(null);
     const [selectFilter, setSelectFilter] = useState('');
     const [newPropRelationId, setNewPropRelationId] = useState(''); // For relation type: which entity to link
     const [newPropTwoWay, setNewPropTwoWay] = useState(false); // Two-way relation checkbox
@@ -1083,6 +1084,27 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         } catch (e) { console.error('Error adding reverse link:', e); }
     }, [entityId]);
 
+    // Open select dropdown and calculate fixed position from the clicked cell
+    const openSelectDropdown = useCallback((cellKey: string, e: React.MouseEvent<HTMLElement>) => {
+        if (activeSelectCell === cellKey) {
+            setActiveSelectCell(null);
+            setSelectDropdownPos(null);
+            return;
+        }
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom - 8;
+        const spaceAbove = rect.top - 8;
+        const dropdownHeight = 260; // approx max height
+        const openBelow = spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove;
+        setSelectDropdownPos({
+            top: openBelow ? rect.bottom + 4 : rect.top - Math.min(dropdownHeight, spaceAbove) - 4,
+            left: Math.min(rect.left, window.innerWidth - 220),
+            maxHeight: openBelow ? Math.min(dropdownHeight, spaceBelow) : Math.min(dropdownHeight, spaceAbove),
+        });
+        setActiveSelectCell(cellKey);
+        setSelectFilter('');
+    }, [activeSelectCell]);
+
     // Collect all unique values used for a select/multi-select property (for dropdown options)
     const getSelectOptions = (propId: string): string[] => {
         const opts = new Set<string>();
@@ -1367,10 +1389,10 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                         const showCreate = selectFilter.trim() && !allOptions.some(o => o.toLowerCase() === selectFilter.trim().toLowerCase());
 
                                                         return (
-                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0 relative">
+                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0">
                                                                 <div
                                                                     className="w-full px-3 py-2 cursor-pointer min-h-[40px] flex items-center"
-                                                                    onClick={() => { setActiveSelectCell(isOpen ? null : cellKey); setSelectFilter(''); }}
+                                                                    onClick={(e) => openSelectDropdown(cellKey, e)}
                                                                 >
                                                                     {currentValue ? (
                                                                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getTagColor(currentValue)}`}>
@@ -1380,10 +1402,13 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                                         <span className="text-xs text-[var(--text-tertiary)] opacity-0 group-hover/row:opacity-100 transition-opacity">Select…</span>
                                                                     )}
                                                                 </div>
-                                                                {isOpen && (
+                                                                {isOpen && selectDropdownPos && (
                                                                     <>
-                                                                        <div className="fixed inset-0 z-30" onClick={() => setActiveSelectCell(null)} />
-                                                                        <div className="absolute top-full left-0 z-40 mt-1 w-52 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl overflow-hidden">
+                                                                        <div className="fixed inset-0 z-[9998]" onClick={() => { setActiveSelectCell(null); setSelectDropdownPos(null); }} />
+                                                                        <div
+                                                                            className="fixed z-[9999] w-52 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl overflow-hidden"
+                                                                            style={{ top: selectDropdownPos.top, left: selectDropdownPos.left }}
+                                                                        >
                                                                             <div className="p-2 border-b border-[var(--border-light)]">
                                                                                 <input
                                                                                     type="text"
@@ -1396,19 +1421,19 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                                                         if (e.key === 'Enter' && selectFilter.trim()) {
                                                                                             handleRecordChange(record.id, prop.id, selectFilter.trim());
                                                                                             setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: selectFilter.trim() } }), 50);
-                                                                                            setActiveSelectCell(null);
+                                                                                            setActiveSelectCell(null); setSelectDropdownPos(null);
                                                                                             setSelectFilter('');
                                                                                         }
                                                                                     }}
                                                                                 />
                                                                             </div>
-                                                                            <div className="max-h-40 overflow-y-auto p-1">
+                                                                            <div style={{ maxHeight: selectDropdownPos.maxHeight - 50 }} className="overflow-y-auto p-1">
                                                                                 {currentValue && (
                                                                                     <button
                                                                                         onClick={() => {
                                                                                             handleRecordChange(record.id, prop.id, '');
                                                                                             setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: '' } }), 50);
-                                                                                            setActiveSelectCell(null);
+                                                                                            setActiveSelectCell(null); setSelectDropdownPos(null);
                                                                                         }}
                                                                                         className="w-full text-left px-2 py-1.5 text-[11px] text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] rounded transition-colors"
                                                                                     >
@@ -1421,7 +1446,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                                                         onClick={() => {
                                                                                             handleRecordChange(record.id, prop.id, opt);
                                                                                             setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: opt } }), 50);
-                                                                                            setActiveSelectCell(null);
+                                                                                            setActiveSelectCell(null); setSelectDropdownPos(null);
                                                                                         }}
                                                                                         className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center gap-2 ${
                                                                                             currentValue === opt ? 'bg-[var(--bg-tertiary)]' : 'hover:bg-[var(--bg-tertiary)]'
@@ -1435,7 +1460,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                                                         onClick={() => {
                                                                                             handleRecordChange(record.id, prop.id, selectFilter.trim());
                                                                                             setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: selectFilter.trim() } }), 50);
-                                                                                            setActiveSelectCell(null);
+                                                                                            setActiveSelectCell(null); setSelectDropdownPos(null);
                                                                                             setSelectFilter('');
                                                                                         }}
                                                                                         className="w-full text-left px-2 py-1.5 rounded text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors flex items-center gap-2"
@@ -1478,10 +1503,10 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                         };
 
                                                         return (
-                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0 relative">
+                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0">
                                                                 <div
                                                                     className="w-full px-3 py-2 cursor-pointer min-h-[40px] flex items-center gap-1 flex-wrap"
-                                                                    onClick={() => { setActiveSelectCell(isOpen ? null : cellKey); setSelectFilter(''); }}
+                                                                    onClick={(e) => openSelectDropdown(cellKey, e)}
                                                                 >
                                                                     {selectedValues.length > 0 ? (
                                                                         selectedValues.map(v => (
@@ -1493,10 +1518,13 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                                         <span className="text-xs text-[var(--text-tertiary)] opacity-0 group-hover/row:opacity-100 transition-opacity">Select…</span>
                                                                     )}
                                                                 </div>
-                                                                {isOpen && (
+                                                                {isOpen && selectDropdownPos && (
                                                                     <>
-                                                                        <div className="fixed inset-0 z-30" onClick={() => setActiveSelectCell(null)} />
-                                                                        <div className="absolute top-full left-0 z-40 mt-1 w-52 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl overflow-hidden">
+                                                                        <div className="fixed inset-0 z-[9998]" onClick={() => { setActiveSelectCell(null); setSelectDropdownPos(null); }} />
+                                                                        <div
+                                                                            className="fixed z-[9999] w-52 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl overflow-hidden"
+                                                                            style={{ top: selectDropdownPos.top, left: selectDropdownPos.left }}
+                                                                        >
                                                                             <div className="p-2 border-b border-[var(--border-light)]">
                                                                                 <input
                                                                                     type="text"
@@ -1513,13 +1541,13 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                                                     }}
                                                                                 />
                                                                             </div>
-                                                                            <div className="max-h-40 overflow-y-auto p-1">
+                                                                            <div style={{ maxHeight: selectDropdownPos.maxHeight - 50 }} className="overflow-y-auto p-1">
                                                                                 {selectedValues.length > 0 && (
                                                                                     <button
                                                                                         onClick={() => {
                                                                                             handleRecordChange(record.id, prop.id, '[]');
                                                                                             setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: '[]' } }), 50);
-                                                                                            setActiveSelectCell(null);
+                                                                                            setActiveSelectCell(null); setSelectDropdownPos(null);
                                                                                         }}
                                                                                         className="w-full text-left px-2 py-1.5 text-[11px] text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] rounded transition-colors"
                                                                                     >
@@ -1602,10 +1630,10 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                         };
 
                                                         return (
-                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0 relative">
+                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0">
                                                                 <div
                                                                     className="w-full px-3 py-2 cursor-pointer min-h-[40px] flex items-center gap-1 flex-wrap"
-                                                                    onClick={() => { setActiveSelectCell(isOpen ? null : cellKey); setSelectFilter(''); }}
+                                                                    onClick={(e) => openSelectDropdown(cellKey, e)}
                                                                 >
                                                                     {selectedIds.length > 0 ? (
                                                                         selectedIds.map(id => {
@@ -1628,10 +1656,13 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                                         <span className="text-xs text-[var(--text-tertiary)] opacity-0 group-hover/row:opacity-100 transition-opacity">Link {entityName}…</span>
                                                                     )}
                                                                 </div>
-                                                                {isOpen && (
+                                                                {isOpen && selectDropdownPos && (
                                                                     <>
-                                                                        <div className="fixed inset-0 z-30" onClick={() => setActiveSelectCell(null)} />
-                                                                        <div className="absolute top-full left-0 z-40 mt-1 w-56 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl overflow-hidden">
+                                                                        <div className="fixed inset-0 z-[9998]" onClick={() => { setActiveSelectCell(null); setSelectDropdownPos(null); }} />
+                                                                        <div
+                                                                            className="fixed z-[9999] w-56 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl overflow-hidden"
+                                                                            style={{ top: selectDropdownPos.top, left: selectDropdownPos.left }}
+                                                                        >
                                                                             <div className="px-2.5 py-2 border-b border-[var(--border-light)]">
                                                                                 <p className="text-[10px] text-[var(--text-tertiary)] font-medium mb-1.5">{entityName}</p>
                                                                                 <input
@@ -1643,13 +1674,13 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                                                     autoFocus
                                                                                 />
                                                                             </div>
-                                                                            <div className="max-h-48 overflow-y-auto p-1">
+                                                                            <div style={{ maxHeight: selectDropdownPos.maxHeight - 60 }} className="overflow-y-auto p-1">
                                                                                 {selectedIds.length > 0 && (
                                                                                     <button
                                                                                         onClick={() => {
                                                                                             handleRecordChange(record.id, prop.id, '[]');
                                                                                             setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: '[]' } }), 50);
-                                                                                            setActiveSelectCell(null);
+                                                                                            setActiveSelectCell(null); setSelectDropdownPos(null);
                                                                                             // Sync reverse: remove all links
                                                                                             if (prop.relatedEntityId && !record.isNew) {
                                                                                                 selectedIds.forEach(id => {
