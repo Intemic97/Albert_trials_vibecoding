@@ -521,8 +521,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             // Generate new unique IDs for nodes and connections
             const idMapping: { [oldId: string]: string } = {};
             
-            // Scale factor to spread out nodes (nodes are larger now)
-            const SPACING_SCALE = 1.4;
+            // Scale factor to spread out nodes (canvas nodes are 320px wide, templates use 200px gaps)
+            const SPACING_SCALE = 2.5;
             
             // Find the minimum x and y to use as origin for scaling
             const minX = Math.min(...template.nodes.map(n => n.x));

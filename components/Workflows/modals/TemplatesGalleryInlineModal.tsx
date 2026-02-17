@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { FlowArrow as Workflow, BookOpen, ShieldCheck as Shield, Lightning as Zap, Calendar, ChartBar as BarChart3, CheckCircle, Eye, Copy, ArrowRight, X } from '@phosphor-icons/react';
 
 interface TemplatesGalleryInlineModalProps {
@@ -50,8 +51,8 @@ export const TemplatesGalleryInlineModal: React.FC<TemplatesGalleryInlineModalPr
     'Quality Assurance': 'text-rose-600'
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => !isCopyingTemplate && onClose()}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={() => !isCopyingTemplate && onClose()}>
       <div className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-light)] shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-5 border-b border-[var(--border-light)] shrink-0">
@@ -178,7 +179,8 @@ export const TemplatesGalleryInlineModal: React.FC<TemplatesGalleryInlineModalPr
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Eye, X, Copy, ArrowRight } from '@phosphor-icons/react';
 
 interface TemplatePreviewModalProps {
@@ -21,8 +22,8 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
 }) => {
   if (!template) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[60] p-4" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[9999] p-4" onClick={onClose}>
       <div className="bg-[var(--bg-card)] rounded-lg border border-[var(--border-light)] shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-5 border-b border-[var(--border-light)] shrink-0">
@@ -172,7 +173,8 @@ export const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
