@@ -146,6 +146,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const [newPropName, setNewPropName] = useState('');
     const [newPropType, setNewPropType] = useState('text');
     const [aiPrompt, setAiPrompt] = useState('');
+    const [aiError, setAiError] = useState<string | null>(null);
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
     const [editingPropId, setEditingPropId] = useState<string | null>(null);
     const [editingPropName, setEditingPropName] = useState('');
@@ -610,7 +611,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         if (!aiPrompt.trim()) return;
         setIsGeneratingAI(true);
         try {
-            const res = await fetch(`${API_BASE}/ai/generate-entity-schema`, {
+            const res = await fetch(`${API_BASE}/generate-entity-schema`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
@@ -647,10 +648,16 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                     setProperties(aiProps);
                     onEntityChanged?.();
                 }
+                setAiPrompt('');
                 setShowOptionsPanel(false);
+            } else {
+                const errData = await res.json().catch(() => null);
+                console.error('AI generation failed:', res.status, errData);
+                setAiError(errData?.error || 'Failed to generate schema. Please try again.');
             }
         } catch (error) {
             console.error('AI generation error:', error);
+            setAiError('Connection error. Please try again.');
         } finally {
             setIsGeneratingAI(false);
         }
@@ -1722,7 +1729,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                 <Sparkle size={16} weight="duotone" className="text-[var(--accent-primary)] mt-0.5 shrink-0" />
                                 <textarea
                                     value={aiPrompt}
-                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                    onChange={(e) => { setAiPrompt(e.target.value); if (aiError) setAiError(null); }}
                                     placeholder="Describe what you want to build..."
                                     rows={2}
                                     className="flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none resize-none placeholder:text-[var(--text-tertiary)]"
@@ -1745,6 +1752,9 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                     )}
                                 </button>
                             </div>
+                            {aiError && (
+                                <p className="mt-1.5 text-[11px] text-red-500">{aiError}</p>
+                            )}
                         </div>
 
                         {/* Quick actions */}
