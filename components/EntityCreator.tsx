@@ -12,7 +12,8 @@ import {
     ArrowLeft, Plus, X, Table as TableIcon, Sparkle, Download,
     TextT, Hash, Calendar, Globe, File, Link as LinkIcon,
     Trash, SpinnerGap, ArrowUp, ListBullets, CheckSquare,
-    MagnifyingGlass, Export, Paperclip, UploadSimple
+    MagnifyingGlass, Export, Paperclip, UploadSimple,
+    ArrowSquareOut
 } from '@phosphor-icons/react';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +23,7 @@ interface CreatorProperty {
     name: string;
     type: string;
     unit?: string;
+    relatedEntityId?: string;
 }
 
 interface CreatorRecord {
@@ -150,6 +152,21 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const [isImporting, setIsImporting] = useState(false);
     const [recordSearch, setRecordSearch] = useState('');
     const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
+    const [activeSelectCell, setActiveSelectCell] = useState<string | null>(null); // "recordId-propId"
+    const [selectFilter, setSelectFilter] = useState('');
+    const [newPropRelationId, setNewPropRelationId] = useState(''); // For relation type: which entity to link
+    const [newPropTwoWay, setNewPropTwoWay] = useState(false); // Two-way relation checkbox
+    const [allEntities, setAllEntities] = useState<{ id: string; name: string }[]>([]);
+    const [relatedRecords, setRelatedRecords] = useState<Record<string, { entityName: string; records: { id: string; displayName: string }[] }>>({}); // relatedEntityId -> records
+
+    // Side panel: peek into a related record
+    const [peekRecord, setPeekRecord] = useState<{
+        recordId: string;
+        relatedEntityId: string;
+        entityName: string;
+        entityProperties: { id: string; name: string; type: string; relatedEntityId?: string }[];
+        values: Record<string, any>;
+    } | null>(null);
 
     // Save entity name to backend (immediate, no debounce)
     const saveNameToBackend = useCallback(async (name: string) => {
@@ -251,6 +268,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                         name: p.name,
                         type: p.type,
                         unit: p.unit,
+                        relatedEntityId: p.relatedEntityId,
                     }));
                 }
                 // Guarantee at least a "Name" column exists
@@ -285,6 +303,102 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         load();
     }, [entityId]);
 
+    // Fetch all entities (for relation property creation and display)
+    useEffect(() => {
+        const fetchAllEntities = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/entities`, { credentials: 'include' });
+                if (res.ok) {
+                    const data = await res.json();
+                    setAllEntities(data.filter((e: any) => e.id !== entityId).map((e: any) => ({ id: e.id, name: e.name })));
+                }
+            } catch (e) { console.error('Error fetching entities:', e); }
+        };
+        fetchAllEntities();
+    }, [entityId]);
+
+    // Fetch related entity records when properties have relation types
+    useEffect(() => {
+        const relationProps = properties.filter(p => p.type === 'relation' && p.relatedEntityId);
+        if (relationProps.length === 0) return;
+
+        const fetchRelated = async () => {
+            const newRelated: Record<string, { entityName: string; records: { id: string; displayName: string }[] }> = {};
+            for (const prop of relationProps) {
+                if (!prop.relatedEntityId || newRelated[prop.relatedEntityId]) continue;
+                try {
+                    const [entityRes, recordsRes] = await Promise.all([
+                        fetch(`${API_BASE}/entities/${prop.relatedEntityId}`, { credentials: 'include' }),
+                        fetch(`${API_BASE}/entities/${prop.relatedEntityId}/records`, { credentials: 'include' }),
+                    ]);
+                    let entityName = 'Unknown';
+                    let relatedProps: any[] = [];
+                    if (entityRes.ok) {
+                        const entityData = await entityRes.json();
+                        entityName = entityData.name || 'Unknown';
+                        relatedProps = entityData.properties || [];
+                    }
+                    let recs: { id: string; displayName: string }[] = [];
+                    if (recordsRes.ok) {
+                        const recordsData = await recordsRes.json();
+                        // Find the "name" or first text property for display
+                        const nameProp = relatedProps.find((p: any) => p.name.toLowerCase() === 'name' || p.name.toLowerCase() === 'title')
+                            || relatedProps.find((p: any) => p.type === 'text')
+                            || relatedProps[0];
+                        recs = recordsData.map((r: any) => ({
+                            id: r.id,
+                            displayName: nameProp ? (r.values?.[nameProp.id] || r.id) : r.id,
+                        }));
+                    }
+                    newRelated[prop.relatedEntityId] = { entityName, records: recs };
+                } catch (e) { console.error('Error fetching related records:', e); }
+            }
+            setRelatedRecords(prev => ({ ...prev, ...newRelated }));
+        };
+        fetchRelated();
+    }, [properties]);
+
+    // Also load related records for peek panel's relation properties
+    useEffect(() => {
+        if (!peekRecord) return;
+        const relationProps = peekRecord.entityProperties.filter(p => p.type === 'relation' && p.relatedEntityId && !relatedRecords[p.relatedEntityId!]);
+        if (relationProps.length === 0) return;
+
+        const fetchPeekRelated = async () => {
+            const newRelated: Record<string, { entityName: string; records: { id: string; displayName: string }[] }> = {};
+            for (const prop of relationProps) {
+                if (!prop.relatedEntityId || newRelated[prop.relatedEntityId]) continue;
+                try {
+                    const [entityRes, recordsRes] = await Promise.all([
+                        fetch(`${API_BASE}/entities/${prop.relatedEntityId}`, { credentials: 'include' }),
+                        fetch(`${API_BASE}/entities/${prop.relatedEntityId}/records`, { credentials: 'include' }),
+                    ]);
+                    let entityName = 'Unknown';
+                    let relatedProps: any[] = [];
+                    if (entityRes.ok) {
+                        const entityData = await entityRes.json();
+                        entityName = entityData.name || 'Unknown';
+                        relatedProps = entityData.properties || [];
+                    }
+                    let recs: { id: string; displayName: string }[] = [];
+                    if (recordsRes.ok) {
+                        const recordsData = await recordsRes.json();
+                        const nameProp = relatedProps.find((p: any) => p.name.toLowerCase() === 'name' || p.name.toLowerCase() === 'title')
+                            || relatedProps.find((p: any) => p.type === 'text')
+                            || relatedProps[0];
+                        recs = recordsData.map((r: any) => ({
+                            id: r.id,
+                            displayName: nameProp ? (r.values?.[nameProp.id] || r.id) : r.id,
+                        }));
+                    }
+                    newRelated[prop.relatedEntityId] = { entityName, records: recs };
+                } catch (e) { console.error('Error fetching peek related records:', e); }
+            }
+            setRelatedRecords(prev => ({ ...prev, ...newRelated }));
+        };
+        fetchPeekRelated();
+    }, [peekRecord, relatedRecords]);
+
     // Auto-save entity name (debounced)
     const handleNameChange = (name: string) => {
         setEntityName(name);
@@ -297,14 +411,23 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
 
     // Add property → save to backend (if no name, use the type label like Notion)
     const handleAddProperty = async () => {
+        if (newPropType === 'relation' && !newPropRelationId) return; // Must select a related entity
         const typeLabel = PROPERTY_TYPES.find(t => t.value === newPropType)?.label || newPropType;
-        const finalName = newPropName.trim() || typeLabel;
+        const relatedEntity = newPropType === 'relation' ? allEntities.find(e => e.id === newPropRelationId) : null;
+        const finalName = newPropName.trim() || (relatedEntity ? relatedEntity.name : typeLabel);
         const propId = `prop-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-        const propType = newPropType === 'select' || newPropType === 'multi-select' ? 'text' : newPropType;
-        const newProp: CreatorProperty = { id: propId, name: finalName, type: propType };
+        const newProp: CreatorProperty = {
+            id: propId,
+            name: finalName,
+            type: newPropType,
+            relatedEntityId: newPropType === 'relation' ? newPropRelationId : undefined,
+        };
+        const isTwoWay = newPropType === 'relation' && newPropTwoWay;
         setProperties(prev => [...prev, newProp]);
         setNewPropName('');
         setNewPropType('text');
+        setNewPropRelationId('');
+        setNewPropTwoWay(false);
         setShowAddProperty(false);
 
         try {
@@ -312,8 +435,35 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ id: propId, entityId, name: newProp.name, type: newProp.type, defaultValue: '' }),
+                body: JSON.stringify({
+                    id: propId,
+                    entityId,
+                    name: newProp.name,
+                    type: newProp.type,
+                    defaultValue: '',
+                    relatedEntityId: newProp.relatedEntityId,
+                }),
             });
+
+            // Create reverse relation in the target entity for two-way
+            if (isTwoWay && newProp.relatedEntityId) {
+                const reversePropId = `prop-${Date.now()}-rev-${Math.random().toString(36).substr(2, 5)}`;
+                const reverseEntityName = entityName.trim() || 'Untitled';
+                await fetch(`${API_BASE}/properties`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        id: reversePropId,
+                        entityId: newProp.relatedEntityId,
+                        name: reverseEntityName,
+                        type: 'relation',
+                        defaultValue: '',
+                        relatedEntityId: entityId,
+                    }),
+                });
+            }
+
             onEntityChanged?.();
         } catch (e) { console.error('Error adding property:', e); }
     };
@@ -478,7 +628,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                     const aiProps: CreatorProperty[] = [];
                     for (const p of data.properties) {
                         const propId = `prop-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-                        const propType = p.type === 'select' || p.type === 'multi-select' ? 'text' : (p.type || 'text');
+                        const propType = p.type || 'text';
                         const prop: CreatorProperty = { id: propId, name: p.name || 'Untitled', type: propType, unit: p.unit };
                         aiProps.push(prop);
                         try {
@@ -513,8 +663,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         const newProps: CreatorProperty[] = [];
         for (const p of template.properties) {
             const propId = `prop-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-            const propType = p.type === 'select' || p.type === 'multi-select' ? 'text' : p.type;
-            const prop: CreatorProperty = { id: propId, name: p.name, type: propType };
+            const prop: CreatorProperty = { id: propId, name: p.name, type: p.type };
             newProps.push(prop);
             try {
                 await fetch(`${API_BASE}/properties`, {
@@ -662,6 +811,160 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
 
     const getTypeConfig = (type: string) => PROPERTY_TYPES.find(t => t.value === type) || PROPERTY_TYPES[0];
 
+    // Open peek panel for a related record
+    const openPeekPanel = useCallback(async (relatedEntityId: string, recordId: string) => {
+        try {
+            const [entityRes, recordsRes] = await Promise.all([
+                fetch(`${API_BASE}/entities/${relatedEntityId}`, { credentials: 'include' }),
+                fetch(`${API_BASE}/entities/${relatedEntityId}/records`, { credentials: 'include' }),
+            ]);
+            if (!entityRes.ok || !recordsRes.ok) return;
+            const entityData = await entityRes.json();
+            const allRecs = await recordsRes.json();
+            const rec = allRecs.find((r: any) => r.id === recordId);
+            if (!rec) return;
+
+            setPeekRecord({
+                recordId,
+                relatedEntityId,
+                entityName: entityData.name || 'Unknown',
+                entityProperties: (entityData.properties || []).map((p: any) => ({
+                    id: p.id,
+                    name: p.name,
+                    type: p.type,
+                    relatedEntityId: p.relatedEntityId,
+                })),
+                values: rec.values || {},
+            });
+        } catch (e) {
+            console.error('Error opening peek panel:', e);
+        }
+    }, []);
+
+    // Sync reverse side of a two-way relation
+    const syncReverseRelation = useCallback(async (
+        relatedEntityId: string,
+        thisRecordId: string,
+        action: 'add' | 'remove'
+    ) => {
+        try {
+            // Find the reverse property in the related entity that points back to this entity
+            const res = await fetch(`${API_BASE}/entities/${relatedEntityId}`, { credentials: 'include' });
+            if (!res.ok) return;
+            const relatedEntity = await res.json();
+            const reverseProps = (relatedEntity.properties || []).filter(
+                (p: any) => p.type === 'relation' && p.relatedEntityId === entityId
+            );
+            if (reverseProps.length === 0) return; // Not a two-way relation
+
+            // Get all records of the related entity that reference thisRecordId
+            const recRes = await fetch(`${API_BASE}/entities/${relatedEntityId}/records`, { credentials: 'include' });
+            if (!recRes.ok) return;
+            const relatedRecordsData = await recRes.json();
+
+            for (const reverseProp of reverseProps) {
+                for (const relatedRec of relatedRecordsData) {
+                    const rawVal = relatedRec.values?.[reverseProp.id] || '[]';
+                    let currentIds: string[] = [];
+                    try { currentIds = JSON.parse(rawVal); if (!Array.isArray(currentIds)) currentIds = rawVal ? [rawVal] : []; } catch { currentIds = rawVal ? [rawVal] : []; }
+
+                    const hasLink = currentIds.includes(thisRecordId);
+
+                    if (action === 'add' && !hasLink) {
+                        // This related record should link back only if it is one of the selected target records
+                        // We handle this per-record below
+                    } else if (action === 'remove' && hasLink) {
+                        const newIds = currentIds.filter(id => id !== thisRecordId);
+                        await fetch(`${API_BASE}/records/${relatedRec.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ values: { [reverseProp.id]: JSON.stringify(newIds) } }),
+                        });
+                    }
+                }
+            }
+        } catch (e) { console.error('Error syncing reverse relation:', e); }
+    }, [entityId]);
+
+    // Add a reverse link in a specific related record
+    const addReverseLink = useCallback(async (
+        relatedEntityId: string,
+        targetRecordId: string,
+        thisRecordId: string
+    ) => {
+        try {
+            const res = await fetch(`${API_BASE}/entities/${relatedEntityId}`, { credentials: 'include' });
+            if (!res.ok) return;
+            const relatedEntity = await res.json();
+            const reverseProps = (relatedEntity.properties || []).filter(
+                (p: any) => p.type === 'relation' && p.relatedEntityId === entityId
+            );
+            if (reverseProps.length === 0) return;
+
+            // Get the target record's current values
+            const recRes = await fetch(`${API_BASE}/entities/${relatedEntityId}/records`, { credentials: 'include' });
+            if (!recRes.ok) return;
+            const records = await recRes.json();
+            const targetRec = records.find((r: any) => r.id === targetRecordId);
+            if (!targetRec) return;
+
+            for (const reverseProp of reverseProps) {
+                const rawVal = targetRec.values?.[reverseProp.id] || '[]';
+                let currentIds: string[] = [];
+                try { currentIds = JSON.parse(rawVal); if (!Array.isArray(currentIds)) currentIds = rawVal ? [rawVal] : []; } catch { currentIds = rawVal ? [rawVal] : []; }
+
+                if (!currentIds.includes(thisRecordId)) {
+                    const newIds = [...currentIds, thisRecordId];
+                    await fetch(`${API_BASE}/records/${targetRec.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ values: { [reverseProp.id]: JSON.stringify(newIds) } }),
+                    });
+                }
+            }
+        } catch (e) { console.error('Error adding reverse link:', e); }
+    }, [entityId]);
+
+    // Collect all unique values used for a select/multi-select property (for dropdown options)
+    const getSelectOptions = (propId: string): string[] => {
+        const opts = new Set<string>();
+        records.forEach(r => {
+            const val = r.values[propId];
+            if (!val) return;
+            // For multi-select, values are stored as JSON array
+            try {
+                const parsed = JSON.parse(val);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach((v: string) => { if (v.trim()) opts.add(v.trim()); });
+                    return;
+                }
+            } catch {}
+            if (val.trim()) opts.add(val.trim());
+        });
+        return Array.from(opts).sort();
+    };
+
+    // Tag color palette for select values
+    const TAG_PALETTE = [
+        'bg-blue-100 text-blue-700',
+        'bg-emerald-100 text-emerald-700',
+        'bg-amber-100 text-amber-700',
+        'bg-purple-100 text-purple-700',
+        'bg-pink-100 text-pink-700',
+        'bg-cyan-100 text-cyan-700',
+        'bg-orange-100 text-orange-700',
+        'bg-indigo-100 text-indigo-700',
+        'bg-rose-100 text-rose-700',
+        'bg-teal-100 text-teal-700',
+    ];
+    const getTagColor = (value: string) => {
+        let hash = 0;
+        for (let i = 0; i < value.length; i++) hash = value.charCodeAt(i) + ((hash << 5) - hash);
+        return TAG_PALETTE[Math.abs(hash) % TAG_PALETTE.length];
+    };
+
     // Filter records by search
     const filteredRecords = recordSearch
         ? records.filter(r => Object.values(r.values).some(v => v?.toLowerCase().includes(recordSearch.toLowerCase())))
@@ -743,173 +1046,653 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                         {/* Table */}
                         <div className="px-12 pb-8">
                             <div className="bg-[var(--bg-card)] border border-[var(--border-light)] rounded-xl shadow-sm overflow-x-auto">
-                                {/* Header row */}
-                                <div className="flex border-b border-[var(--border-light)] bg-[var(--bg-tertiary)] min-w-fit">
-                                    {properties.map((prop) => {
-                                        const typeConf = getTypeConfig(prop.type);
-                                        const TypeIcon = typeConf.icon;
-                                        return (
-                                            <div
-                                                key={prop.id}
-                                                className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide border-r border-[var(--border-light)] last:border-r-0 group relative"
-                                                style={{ minWidth: '180px', flex: '1 0 180px' }}
-                                            >
-                                                <TypeIcon size={14} weight="light" className={typeConf.color.split(' ')[0]} />
-                                                {editingPropId === prop.id ? (
-                                                    <input
-                                                        type="text"
-                                                        value={editingPropName}
-                                                        onChange={(e) => setEditingPropName(e.target.value)}
-                                                        onBlur={finishEditProp}
-                                                        onKeyDown={(e) => { if (e.key === 'Enter') finishEditProp(); }}
-                                                        className="flex-1 bg-transparent border-none outline-none text-xs font-medium text-[var(--text-primary)] uppercase tracking-wide"
-                                                        autoFocus
-                                                    />
-                                                ) : (
-                                                    <span
-                                                        className="cursor-pointer hover:text-[var(--text-primary)] transition-colors"
-                                                        onClick={() => startEditProp(prop)}
-                                                    >
-                                                        {prop.name}
-                                                    </span>
-                                                )}
-                                                {properties.length > 1 && (
-                                                    <button
-                                                        onClick={() => handleRemoveProperty(prop.id)}
-                                                        className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-red-500/10 text-[var(--text-tertiary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                                                    >
-                                                        <X size={12} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                    {/* Add property column */}
-                                    <div className="relative shrink-0 border-l border-[var(--border-light)]" style={{ minWidth: '140px' }} ref={addPropBtnRef}>
-                                        <button
-                                            onClick={() => setShowAddProperty(!showAddProperty)}
-                                            className="flex items-center gap-1.5 px-4 py-2.5 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors w-full h-full"
-                                        >
-                                            <Plus size={14} weight="light" />
-                                            Property
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Data rows */}
-                                {filteredRecords.map((record) => (
-                                    <div key={record.id} className="flex border-b border-[var(--border-light)] last:border-b-0 hover:bg-[var(--bg-tertiary)]/50 transition-colors group/row min-w-fit">
-                                        {properties.map((prop) => {
-                                            const uploadKey = `${record.id}-${prop.id}`;
-                                            const isUploading = uploadingFiles[uploadKey];
-
-                                            // File type column
-                                            if (prop.type === 'file') {
-                                                const rawValue = record.values[prop.id];
-                                                let fileData: any = null;
-                                                try {
-                                                    if (rawValue) fileData = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
-                                                } catch {}
-
+                                <table className="w-full border-collapse" style={{ minWidth: `${properties.length * 180 + 50}px` }}>
+                                    <colgroup>
+                                        {properties.map(prop => (
+                                            <col key={prop.id} style={{ minWidth: '180px', width: `${100 / properties.length}%` }} />
+                                        ))}
+                                        <col style={{ width: '50px', minWidth: '50px' }} />
+                                    </colgroup>
+                                    {/* Header row */}
+                                    <thead>
+                                        <tr className="bg-[var(--bg-tertiary)]">
+                                            {properties.map((prop) => {
+                                                const typeConf = getTypeConfig(prop.type);
+                                                const TypeIcon = typeConf.icon;
                                                 return (
-                                                    <div
+                                                    <th
                                                         key={prop.id}
-                                                        className="border-r border-[var(--border-light)] last:border-r-0 flex items-center px-3"
-                                                        style={{ minWidth: '180px', flex: '1 0 180px' }}
+                                                        className="text-left px-4 py-2.5 text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide border-r border-b border-[var(--border-light)] last:border-r-0 group relative"
                                                     >
-                                                        {isUploading ? (
-                                                            <span className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
-                                                                <SpinnerGap size={14} className="animate-spin" />
-                                                                Uploading…
-                                                            </span>
-                                                        ) : fileData?.filename ? (
-                                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                                <a
-                                                                    href={`${API_BASE}/files/${fileData.filename}/download?originalName=${encodeURIComponent(fileData.originalName || fileData.filename)}`}
-                                                                    target="_blank"
-                                                                    rel="noopener noreferrer"
-                                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 transition-colors truncate max-w-[140px]"
-                                                                    title={fileData.originalName || fileData.filename}
-                                                                >
-                                                                    <Paperclip size={11} weight="bold" className="shrink-0" />
-                                                                    <span className="truncate">{fileData.originalName || fileData.filename}</span>
-                                                                </a>
-                                                                <label className="p-1 rounded hover:bg-[var(--bg-hover)] cursor-pointer text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors shrink-0">
-                                                                    <UploadSimple size={13} weight="light" />
-                                                                    <input
-                                                                        type="file"
-                                                                        className="hidden"
-                                                                        onChange={(e) => {
-                                                                            const f = e.target.files?.[0];
-                                                                            if (f) handleFileUpload(record.id, prop.id, f);
-                                                                            e.target.value = '';
-                                                                        }}
-                                                                    />
-                                                                </label>
-                                                            </div>
-                                                        ) : (
-                                                            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors py-2">
-                                                                <UploadSimple size={14} weight="light" />
-                                                                Upload file
+                                                        <div className="flex items-center gap-2">
+                                                            <TypeIcon size={14} weight="light" className={typeConf.color.split(' ')[0]} />
+                                                            {editingPropId === prop.id ? (
                                                                 <input
-                                                                    type="file"
-                                                                    className="hidden"
-                                                                    onChange={(e) => {
-                                                                        const f = e.target.files?.[0];
-                                                                        if (f) handleFileUpload(record.id, prop.id, f);
-                                                                        e.target.value = '';
-                                                                    }}
+                                                                    type="text"
+                                                                    value={editingPropName}
+                                                                    onChange={(e) => setEditingPropName(e.target.value)}
+                                                                    onBlur={finishEditProp}
+                                                                    onKeyDown={(e) => { if (e.key === 'Enter') finishEditProp(); }}
+                                                                    className="flex-1 bg-transparent border-none outline-none text-xs font-medium text-[var(--text-primary)] uppercase tracking-wide"
+                                                                    autoFocus
                                                                 />
-                                                            </label>
+                                                            ) : (
+                                                                <span
+                                                                    className="cursor-pointer hover:text-[var(--text-primary)] transition-colors truncate"
+                                                                    onClick={() => startEditProp(prop)}
+                                                                    title={prop.name}
+                                                                >
+                                                                    {prop.name}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {properties.length > 1 && (
+                                                            <button
+                                                                onClick={() => handleRemoveProperty(prop.id)}
+                                                                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-red-500/10 text-[var(--text-tertiary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                            >
+                                                                <X size={12} />
+                                                            </button>
                                                         )}
-                                                    </div>
+                                                    </th>
                                                 );
-                                            }
-
-                                            // Default: text / number / date / url / etc.
-                                            return (
-                                                <div
-                                                    key={prop.id}
-                                                    className="border-r border-[var(--border-light)] last:border-r-0"
-                                                    style={{ minWidth: '180px', flex: '1 0 180px' }}
+                                            })}
+                                            {/* Add property column */}
+                                            <th className="border-b border-[var(--border-light)] p-0" ref={addPropBtnRef}>
+                                                <button
+                                                    onClick={() => setShowAddProperty(!showAddProperty)}
+                                                    className="flex items-center gap-1.5 px-3 py-2.5 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors w-full h-full whitespace-nowrap"
                                                 >
-                                                    <input
-                                                        type={prop.type === 'number' ? 'number' : prop.type === 'date' ? 'date' : 'text'}
-                                                        value={record.values[prop.id] || ''}
-                                                        onChange={(e) => handleRecordChange(record.id, prop.id, e.target.value)}
-                                                        onBlur={() => handleRecordBlur(record)}
-                                                        placeholder=""
-                                                        className="w-full px-4 py-2.5 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
-                                                    />
-                                                </div>
-                                            );
-                                        })}
-                                        {/* Delete row button */}
-                                        <div className="shrink-0 flex items-center justify-center border-l border-[var(--border-light)]" style={{ minWidth: '140px' }}>
-                                            <button
-                                                onClick={() => handleDeleteRecord(record.id, record.isNew)}
-                                                className="p-1.5 rounded-md hover:bg-red-500/10 text-[var(--text-tertiary)] hover:text-red-500 opacity-0 group-hover/row:opacity-100 transition-all"
-                                            >
-                                                <Trash size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                                    <Plus size={14} weight="light" />
+                                                </button>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    {/* Data rows */}
+                                    <tbody>
+                                        {filteredRecords.map((record) => (
+                                            <tr key={record.id} className="border-b border-[var(--border-light)] last:border-b-0 hover:bg-[var(--bg-tertiary)]/50 transition-colors group/row">
+                                                {properties.map((prop) => {
+                                                    const uploadKey = `${record.id}-${prop.id}`;
+                                                    const isUploading = uploadingFiles[uploadKey];
 
-                                {/* Add row */}
-                                <button
-                                    onClick={handleAddRecord}
-                                    className="w-full min-w-fit flex items-center gap-2 px-4 py-2.5 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors rounded-b-xl"
-                                >
-                                    <Plus size={14} weight="light" />
-                                    New row
-                                </button>
+                                                    // File type column
+                                                    if (prop.type === 'file') {
+                                                        const rawValue = record.values[prop.id];
+                                                        let fileData: any = null;
+                                                        try {
+                                                            if (rawValue) fileData = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+                                                        } catch {}
+
+                                                        return (
+                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0 px-3 py-1">
+                                                                {isUploading ? (
+                                                                    <span className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
+                                                                        <SpinnerGap size={14} className="animate-spin" />
+                                                                        Uploading…
+                                                                    </span>
+                                                                ) : fileData?.filename ? (
+                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                        <a
+                                                                            href={`${API_BASE}/files/${fileData.filename}/download?originalName=${encodeURIComponent(fileData.originalName || fileData.filename)}`}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 transition-colors truncate max-w-[140px]"
+                                                                            title={fileData.originalName || fileData.filename}
+                                                                        >
+                                                                            <Paperclip size={11} weight="bold" className="shrink-0" />
+                                                                            <span className="truncate">{fileData.originalName || fileData.filename}</span>
+                                                                        </a>
+                                                                        <label className="p-1 rounded hover:bg-[var(--bg-hover)] cursor-pointer text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors shrink-0">
+                                                                            <UploadSimple size={13} weight="light" />
+                                                                            <input
+                                                                                type="file"
+                                                                                className="hidden"
+                                                                                onChange={(e) => {
+                                                                                    const f = e.target.files?.[0];
+                                                                                    if (f) handleFileUpload(record.id, prop.id, f);
+                                                                                    e.target.value = '';
+                                                                                }}
+                                                                            />
+                                                                        </label>
+                                                                    </div>
+                                                                ) : (
+                                                                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-[var(--text-tertiary)] opacity-0 group-hover/row:opacity-100 hover:text-[var(--text-secondary)] transition-all py-2">
+                                                                        <UploadSimple size={14} weight="light" />
+                                                                        Upload file
+                                                                        <input
+                                                                            type="file"
+                                                                            className="hidden"
+                                                                            onChange={(e) => {
+                                                                                const f = e.target.files?.[0];
+                                                                                if (f) handleFileUpload(record.id, prop.id, f);
+                                                                                e.target.value = '';
+                                                                            }}
+                                                                        />
+                                                                    </label>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    }
+
+                                                    // Select type column
+                                                    if (prop.type === 'select') {
+                                                        const cellKey = `${record.id}-${prop.id}`;
+                                                        const isOpen = activeSelectCell === cellKey;
+                                                        const currentValue = record.values[prop.id] || '';
+                                                        const allOptions = getSelectOptions(prop.id);
+                                                        const filtered = selectFilter
+                                                            ? allOptions.filter(o => o.toLowerCase().includes(selectFilter.toLowerCase()))
+                                                            : allOptions;
+                                                        const showCreate = selectFilter.trim() && !allOptions.some(o => o.toLowerCase() === selectFilter.trim().toLowerCase());
+
+                                                        return (
+                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0 relative">
+                                                                <div
+                                                                    className="w-full px-3 py-2 cursor-pointer min-h-[40px] flex items-center"
+                                                                    onClick={() => { setActiveSelectCell(isOpen ? null : cellKey); setSelectFilter(''); }}
+                                                                >
+                                                                    {currentValue ? (
+                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getTagColor(currentValue)}`}>
+                                                                            {currentValue}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-xs text-[var(--text-tertiary)] opacity-0 group-hover/row:opacity-100 transition-opacity">Select…</span>
+                                                                    )}
+                                                                </div>
+                                                                {isOpen && (
+                                                                    <>
+                                                                        <div className="fixed inset-0 z-30" onClick={() => setActiveSelectCell(null)} />
+                                                                        <div className="absolute top-full left-0 z-40 mt-1 w-52 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl overflow-hidden">
+                                                                            <div className="p-2 border-b border-[var(--border-light)]">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={selectFilter}
+                                                                                    onChange={(e) => setSelectFilter(e.target.value)}
+                                                                                    placeholder="Search or create…"
+                                                                                    className="w-full px-2 py-1.5 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
+                                                                                    autoFocus
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter' && selectFilter.trim()) {
+                                                                                            handleRecordChange(record.id, prop.id, selectFilter.trim());
+                                                                                            setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: selectFilter.trim() } }), 50);
+                                                                                            setActiveSelectCell(null);
+                                                                                            setSelectFilter('');
+                                                                                        }
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                            <div className="max-h-40 overflow-y-auto p-1">
+                                                                                {currentValue && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            handleRecordChange(record.id, prop.id, '');
+                                                                                            setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: '' } }), 50);
+                                                                                            setActiveSelectCell(null);
+                                                                                        }}
+                                                                                        className="w-full text-left px-2 py-1.5 text-[11px] text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] rounded transition-colors"
+                                                                                    >
+                                                                                        Clear selection
+                                                                                    </button>
+                                                                                )}
+                                                                                {filtered.map(opt => (
+                                                                                    <button
+                                                                                        key={opt}
+                                                                                        onClick={() => {
+                                                                                            handleRecordChange(record.id, prop.id, opt);
+                                                                                            setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: opt } }), 50);
+                                                                                            setActiveSelectCell(null);
+                                                                                        }}
+                                                                                        className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center gap-2 ${
+                                                                                            currentValue === opt ? 'bg-[var(--bg-tertiary)]' : 'hover:bg-[var(--bg-tertiary)]'
+                                                                                        }`}
+                                                                                    >
+                                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getTagColor(opt)}`}>{opt}</span>
+                                                                                    </button>
+                                                                                ))}
+                                                                                {showCreate && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            handleRecordChange(record.id, prop.id, selectFilter.trim());
+                                                                                            setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: selectFilter.trim() } }), 50);
+                                                                                            setActiveSelectCell(null);
+                                                                                            setSelectFilter('');
+                                                                                        }}
+                                                                                        className="w-full text-left px-2 py-1.5 rounded text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors flex items-center gap-2"
+                                                                                    >
+                                                                                        <Plus size={12} weight="bold" className="text-[var(--accent-primary)]" />
+                                                                                        Create "<span className="font-medium text-[var(--text-primary)]">{selectFilter.trim()}</span>"
+                                                                                    </button>
+                                                                                )}
+                                                                                {filtered.length === 0 && !showCreate && (
+                                                                                    <p className="px-2 py-2 text-[11px] text-[var(--text-tertiary)] text-center">No options yet. Type to create one.</p>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    }
+
+                                                    // Multi-select type column
+                                                    if (prop.type === 'multi-select') {
+                                                        const cellKey = `${record.id}-${prop.id}`;
+                                                        const isOpen = activeSelectCell === cellKey;
+                                                        const rawVal = record.values[prop.id] || '[]';
+                                                        let selectedValues: string[] = [];
+                                                        try { selectedValues = JSON.parse(rawVal); } catch { if (rawVal.trim()) selectedValues = [rawVal]; }
+                                                        const allOptions = getSelectOptions(prop.id);
+                                                        const filtered = selectFilter
+                                                            ? allOptions.filter(o => o.toLowerCase().includes(selectFilter.toLowerCase()))
+                                                            : allOptions;
+                                                        const showCreate = selectFilter.trim() && !allOptions.some(o => o.toLowerCase() === selectFilter.trim().toLowerCase());
+
+                                                        const toggleOption = (opt: string) => {
+                                                            const newValues = selectedValues.includes(opt)
+                                                                ? selectedValues.filter(v => v !== opt)
+                                                                : [...selectedValues, opt];
+                                                            const jsonVal = JSON.stringify(newValues);
+                                                            handleRecordChange(record.id, prop.id, jsonVal);
+                                                            setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: jsonVal } }), 50);
+                                                        };
+
+                                                        return (
+                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0 relative">
+                                                                <div
+                                                                    className="w-full px-3 py-2 cursor-pointer min-h-[40px] flex items-center gap-1 flex-wrap"
+                                                                    onClick={() => { setActiveSelectCell(isOpen ? null : cellKey); setSelectFilter(''); }}
+                                                                >
+                                                                    {selectedValues.length > 0 ? (
+                                                                        selectedValues.map(v => (
+                                                                            <span key={v} className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getTagColor(v)}`}>
+                                                                                {v}
+                                                                            </span>
+                                                                        ))
+                                                                    ) : (
+                                                                        <span className="text-xs text-[var(--text-tertiary)] opacity-0 group-hover/row:opacity-100 transition-opacity">Select…</span>
+                                                                    )}
+                                                                </div>
+                                                                {isOpen && (
+                                                                    <>
+                                                                        <div className="fixed inset-0 z-30" onClick={() => setActiveSelectCell(null)} />
+                                                                        <div className="absolute top-full left-0 z-40 mt-1 w-52 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl overflow-hidden">
+                                                                            <div className="p-2 border-b border-[var(--border-light)]">
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={selectFilter}
+                                                                                    onChange={(e) => setSelectFilter(e.target.value)}
+                                                                                    placeholder="Search or create…"
+                                                                                    className="w-full px-2 py-1.5 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
+                                                                                    autoFocus
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter' && selectFilter.trim()) {
+                                                                                            toggleOption(selectFilter.trim());
+                                                                                            setSelectFilter('');
+                                                                                        }
+                                                                                    }}
+                                                                                />
+                                                                            </div>
+                                                                            <div className="max-h-40 overflow-y-auto p-1">
+                                                                                {selectedValues.length > 0 && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            handleRecordChange(record.id, prop.id, '[]');
+                                                                                            setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: '[]' } }), 50);
+                                                                                            setActiveSelectCell(null);
+                                                                                        }}
+                                                                                        className="w-full text-left px-2 py-1.5 text-[11px] text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] rounded transition-colors"
+                                                                                    >
+                                                                                        Clear all
+                                                                                    </button>
+                                                                                )}
+                                                                                {filtered.map(opt => {
+                                                                                    const isSelected = selectedValues.includes(opt);
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={opt}
+                                                                                            onClick={() => toggleOption(opt)}
+                                                                                            className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center gap-2 ${
+                                                                                                isSelected ? 'bg-[var(--bg-tertiary)]' : 'hover:bg-[var(--bg-tertiary)]'
+                                                                                            }`}
+                                                                                        >
+                                                                                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                                                                                                isSelected ? 'bg-[var(--accent-primary)] border-[var(--accent-primary)]' : 'border-[var(--border-light)]'
+                                                                                            }`}>
+                                                                                                {isSelected && <span className="text-white text-[9px]">✓</span>}
+                                                                                            </div>
+                                                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getTagColor(opt)}`}>{opt}</span>
+                                                                                        </button>
+                                                                                    );
+                                                                                })}
+                                                                                {showCreate && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            toggleOption(selectFilter.trim());
+                                                                                            setSelectFilter('');
+                                                                                        }}
+                                                                                        className="w-full text-left px-2 py-1.5 rounded text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors flex items-center gap-2"
+                                                                                    >
+                                                                                        <Plus size={12} weight="bold" className="text-[var(--accent-primary)]" />
+                                                                                        Create "<span className="font-medium text-[var(--text-primary)]">{selectFilter.trim()}</span>"
+                                                                                    </button>
+                                                                                )}
+                                                                                {filtered.length === 0 && !showCreate && (
+                                                                                    <p className="px-2 py-2 text-[11px] text-[var(--text-tertiary)] text-center">No options yet. Type to create one.</p>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    }
+
+                                                    // Relation type column
+                                                    if (prop.type === 'relation' && prop.relatedEntityId) {
+                                                        const cellKey = `${record.id}-${prop.id}`;
+                                                        const isOpen = activeSelectCell === cellKey;
+                                                        const rawVal = record.values[prop.id] || '[]';
+                                                        let selectedIds: string[] = [];
+                                                        try { selectedIds = JSON.parse(rawVal); if (!Array.isArray(selectedIds)) selectedIds = rawVal ? [rawVal] : []; } catch { if (rawVal.trim()) selectedIds = [rawVal]; }
+                                                        const related = relatedRecords[prop.relatedEntityId];
+                                                        const availableRecords = related?.records || [];
+                                                        const entityName = related?.entityName || 'Entity';
+                                                        const filtered = selectFilter
+                                                            ? availableRecords.filter(r => r.displayName.toLowerCase().includes(selectFilter.toLowerCase()))
+                                                            : availableRecords;
+
+                                                        const toggleRecord = (recId: string) => {
+                                                            const isRemoving = selectedIds.includes(recId);
+                                                            const newIds = isRemoving
+                                                                ? selectedIds.filter(id => id !== recId)
+                                                                : [...selectedIds, recId];
+                                                            const jsonVal = JSON.stringify(newIds);
+                                                            handleRecordChange(record.id, prop.id, jsonVal);
+                                                            setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: jsonVal } }), 50);
+
+                                                            // Sync reverse side if two-way relation exists
+                                                            if (prop.relatedEntityId && !record.isNew) {
+                                                                if (isRemoving) {
+                                                                    syncReverseRelation(prop.relatedEntityId, record.id, 'remove');
+                                                                } else {
+                                                                    addReverseLink(prop.relatedEntityId, recId, record.id);
+                                                                }
+                                                            }
+                                                        };
+
+                                                        return (
+                                                            <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0 relative">
+                                                                <div
+                                                                    className="w-full px-3 py-2 cursor-pointer min-h-[40px] flex items-center gap-1 flex-wrap"
+                                                                    onClick={() => { setActiveSelectCell(isOpen ? null : cellKey); setSelectFilter(''); }}
+                                                                >
+                                                                    {selectedIds.length > 0 ? (
+                                                                        selectedIds.map(id => {
+                                                                            const rec = availableRecords.find(r => r.id === id);
+                                                                            return (
+                                                                                <button
+                                                                                    key={id}
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        if (prop.relatedEntityId) openPeekPanel(prop.relatedEntityId, id);
+                                                                                    }}
+                                                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-teal-100 text-teal-800 hover:bg-teal-200 transition-colors cursor-pointer"
+                                                                                >
+                                                                                    <LinkIcon size={10} weight="bold" />
+                                                                                    {rec?.displayName || id.slice(0, 8)}
+                                                                                </button>
+                                                                            );
+                                                                        })
+                                                                    ) : (
+                                                                        <span className="text-xs text-[var(--text-tertiary)] opacity-0 group-hover/row:opacity-100 transition-opacity">Link {entityName}…</span>
+                                                                    )}
+                                                                </div>
+                                                                {isOpen && (
+                                                                    <>
+                                                                        <div className="fixed inset-0 z-30" onClick={() => setActiveSelectCell(null)} />
+                                                                        <div className="absolute top-full left-0 z-40 mt-1 w-56 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg shadow-xl overflow-hidden">
+                                                                            <div className="px-2.5 py-2 border-b border-[var(--border-light)]">
+                                                                                <p className="text-[10px] text-[var(--text-tertiary)] font-medium mb-1.5">{entityName}</p>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={selectFilter}
+                                                                                    onChange={(e) => setSelectFilter(e.target.value)}
+                                                                                    placeholder="Search records…"
+                                                                                    className="w-full px-2 py-1.5 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
+                                                                                    autoFocus
+                                                                                />
+                                                                            </div>
+                                                                            <div className="max-h-48 overflow-y-auto p-1">
+                                                                                {selectedIds.length > 0 && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            handleRecordChange(record.id, prop.id, '[]');
+                                                                                            setTimeout(() => handleRecordBlur({ ...record, values: { ...record.values, [prop.id]: '[]' } }), 50);
+                                                                                            setActiveSelectCell(null);
+                                                                                            // Sync reverse: remove all links
+                                                                                            if (prop.relatedEntityId && !record.isNew) {
+                                                                                                selectedIds.forEach(id => {
+                                                                                                    syncReverseRelation(prop.relatedEntityId!, record.id, 'remove');
+                                                                                                });
+                                                                                            }
+                                                                                        }}
+                                                                                        className="w-full text-left px-2 py-1.5 text-[11px] text-[var(--text-tertiary)] hover:bg-[var(--bg-tertiary)] rounded transition-colors"
+                                                                                    >
+                                                                                        Clear all links
+                                                                                    </button>
+                                                                                )}
+                                                                                {filtered.map(rec => {
+                                                                                    const isLinked = selectedIds.includes(rec.id);
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={rec.id}
+                                                                                            onClick={() => toggleRecord(rec.id)}
+                                                                                            className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors flex items-center gap-2 ${
+                                                                                                isLinked ? 'bg-teal-50 text-teal-800' : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+                                                                                            }`}
+                                                                                        >
+                                                                                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 ${
+                                                                                                isLinked ? 'bg-teal-500 border-teal-500' : 'border-[var(--border-light)]'
+                                                                                            }`}>
+                                                                                                {isLinked && <span className="text-white text-[9px]">✓</span>}
+                                                                                            </div>
+                                                                                            <span className="truncate">{rec.displayName}</span>
+                                                                                        </button>
+                                                                                    );
+                                                                                })}
+                                                                                {filtered.length === 0 && (
+                                                                                    <p className="px-2 py-3 text-[11px] text-[var(--text-tertiary)] text-center">
+                                                                                        {availableRecords.length === 0 ? `No records in ${entityName}` : 'No matches'}
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    }
+
+                                                    // Default: text / number / date / url / etc.
+                                                    return (
+                                                        <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0 p-0">
+                                                            <input
+                                                                type={prop.type === 'number' ? 'number' : prop.type === 'date' ? 'date' : 'text'}
+                                                                value={record.values[prop.id] || ''}
+                                                                onChange={(e) => handleRecordChange(record.id, prop.id, e.target.value)}
+                                                                onBlur={() => handleRecordBlur(record)}
+                                                                placeholder=""
+                                                                className="w-full px-4 py-2.5 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
+                                                            />
+                                                        </td>
+                                                    );
+                                                })}
+                                                {/* Delete row button */}
+                                                <td className="border-l border-[var(--border-light)] text-center p-0">
+                                                    <button
+                                                        onClick={() => handleDeleteRecord(record.id, record.isNew)}
+                                                        className="p-1.5 rounded-md hover:bg-red-500/10 text-[var(--text-tertiary)] hover:text-red-500 opacity-0 group-hover/row:opacity-100 transition-all"
+                                                    >
+                                                        <Trash size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    {/* Add row */}
+                                    <tfoot>
+                                        <tr>
+                                            <td colSpan={properties.length + 1} className="p-0">
+                                                <button
+                                                    onClick={handleAddRecord}
+                                                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors rounded-b-xl"
+                                                >
+                                                    <Plus size={14} weight="light" />
+                                                    New row
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Right Panel - Options (AI, CSV, Templates) */}
+                {/* Right Panel - Peek into related record */}
+                {peekRecord && !showOptionsPanel && (
+                    <div className="w-96 border-l border-[var(--border-light)] bg-[var(--bg-card)] overflow-y-auto shrink-0 flex flex-col animate-in slide-in-from-right-5">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-light)]">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <LinkIcon size={16} weight="bold" className="text-teal-500 shrink-0" />
+                                <h3 className="text-sm font-semibold text-[var(--text-primary)] truncate">{peekRecord.entityName}</h3>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                    onClick={() => navigate(`/database/${peekRecord.relatedEntityId}`)}
+                                    className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10 rounded-md transition-colors"
+                                    title="Open full table"
+                                >
+                                    <ArrowSquareOut size={13} weight="bold" />
+                                    Open
+                                </button>
+                                <button
+                                    onClick={() => setPeekRecord(null)}
+                                    className="p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
+                                >
+                                    <X size={14} className="text-[var(--text-tertiary)]" />
+                                </button>
+                            </div>
+                        </div>
+                        {/* Record fields */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                            {peekRecord.entityProperties.map(prop => {
+                                const typeConf = getTypeConfig(prop.type);
+                                const TypeIcon = typeConf.icon;
+                                const rawValue = peekRecord.values[prop.id];
+
+                                // Render value based on type
+                                let displayContent: React.ReactNode;
+
+                                if (prop.type === 'relation' && prop.relatedEntityId) {
+                                    let ids: string[] = [];
+                                    try { ids = JSON.parse(rawValue || '[]'); if (!Array.isArray(ids)) ids = rawValue ? [rawValue] : []; } catch { if (rawValue) ids = [rawValue]; }
+                                    const related = relatedRecords[prop.relatedEntityId];
+                                    displayContent = ids.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                            {ids.map(id => {
+                                                const rec = related?.records.find(r => r.id === id);
+                                                return (
+                                                    <button
+                                                        key={id}
+                                                        onClick={() => openPeekPanel(prop.relatedEntityId!, id)}
+                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-teal-100 text-teal-800 hover:bg-teal-200 transition-colors"
+                                                    >
+                                                        <LinkIcon size={10} weight="bold" />
+                                                        {rec?.displayName || id.slice(0, 8)}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-[var(--text-tertiary)] italic">No links</span>
+                                    );
+                                } else if (prop.type === 'file') {
+                                    let fileData: any = null;
+                                    try { if (rawValue) fileData = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue; } catch {}
+                                    displayContent = fileData?.filename ? (
+                                        <a
+                                            href={`${API_BASE}/files/${fileData.filename}/download?originalName=${encodeURIComponent(fileData.originalName || fileData.filename)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-purple-500/10 text-purple-600 hover:bg-purple-500/20 transition-colors"
+                                        >
+                                            <Paperclip size={11} weight="bold" />
+                                            {fileData.originalName || fileData.filename}
+                                        </a>
+                                    ) : (
+                                        <span className="text-xs text-[var(--text-tertiary)] italic">No file</span>
+                                    );
+                                } else if (prop.type === 'select') {
+                                    displayContent = rawValue ? (
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getTagColor(rawValue)}`}>
+                                            {rawValue}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-[var(--text-tertiary)] italic">Empty</span>
+                                    );
+                                } else if (prop.type === 'multi-select') {
+                                    let values: string[] = [];
+                                    try { values = JSON.parse(rawValue || '[]'); } catch { if (rawValue) values = [rawValue]; }
+                                    displayContent = values.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                            {values.map(v => (
+                                                <span key={v} className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${getTagColor(v)}`}>
+                                                    {v}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-[var(--text-tertiary)] italic">Empty</span>
+                                    );
+                                } else if (prop.type === 'url' && rawValue) {
+                                    displayContent = (
+                                        <a
+                                            href={rawValue.startsWith('http') ? rawValue : `https://${rawValue}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm text-[var(--accent-primary)] hover:underline break-all"
+                                        >
+                                            {rawValue}
+                                        </a>
+                                    );
+                                } else {
+                                    displayContent = rawValue ? (
+                                        <span className="text-sm text-[var(--text-primary)] break-words">{rawValue}</span>
+                                    ) : (
+                                        <span className="text-xs text-[var(--text-tertiary)] italic">Empty</span>
+                                    );
+                                }
+
+                                return (
+                                    <div key={prop.id}>
+                                        <div className="flex items-center gap-1.5 mb-1.5">
+                                            <TypeIcon size={13} weight="light" className={typeConf.color.split(' ')[0]} />
+                                            <span className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">{prop.name}</span>
+                                        </div>
+                                        <div className="pl-5">
+                                            {displayContent}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
                 {showOptionsPanel && (
                     <div className="w-80 border-l border-[var(--border-light)] bg-[var(--bg-card)] p-5 overflow-y-auto shrink-0">
                         <div className="flex items-center justify-between mb-5">
@@ -1039,10 +1822,10 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                     <button
                                         key={pt.value}
                                         onClick={() => setNewPropType(pt.value)}
-                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-colors ${
+                                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs transition-colors border ${
                                             newPropType === pt.value
-                                                ? 'bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] font-medium'
-                                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                                                ? 'border-[var(--text-tertiary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-medium'
+                                                : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                                         }`}
                                     >
                                         <Icon size={14} weight="light" />
@@ -1051,9 +1834,39 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                 );
                             })}
                         </div>
+                        {/* Related entity selector for Relation type */}
+                        {newPropType === 'relation' && (
+                            <div className="mt-2 mb-1">
+                                <label className="text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-1 block">Link to</label>
+                                {allEntities.length === 0 ? (
+                                    <p className="text-[11px] text-[var(--text-tertiary)] italic">No other entities available</p>
+                                ) : (
+                                    <select
+                                        value={newPropRelationId}
+                                        onChange={(e) => setNewPropRelationId(e.target.value)}
+                                        className="w-full px-2 py-1.5 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-md text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
+                                    >
+                                        <option value="">Select entity…</option>
+                                        {allEntities.map(e => (
+                                            <option key={e.id} value={e.id}>{e.name}</option>
+                                        ))}
+                                    </select>
+                                )}
+                                <label className="flex items-center gap-2 mt-2 cursor-pointer select-none group">
+                                    <input
+                                        type="checkbox"
+                                        checked={newPropTwoWay}
+                                        onChange={(e) => setNewPropTwoWay(e.target.checked)}
+                                        className="w-3.5 h-3.5 rounded border-[var(--border-light)] text-[var(--accent-primary)] focus:ring-[var(--accent-primary)] cursor-pointer"
+                                    />
+                                    <span className="text-[11px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">Two-way relation</span>
+                                </label>
+                            </div>
+                        )}
                         <button
                             onClick={handleAddProperty}
-                            className="w-full px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-colors"
+                            disabled={newPropType === 'relation' && !newPropRelationId}
+                            className="w-full px-3 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             Add
                         </button>
