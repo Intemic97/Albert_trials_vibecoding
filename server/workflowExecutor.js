@@ -928,6 +928,9 @@ class WorkflowExecutor {
             throw new Error('OpenAI API key not configured');
         }
 
+        const outputType = node.config?.outputType || 'text';
+        const enumOptions = node.config?.enumOptions || [];
+
         try {
             const OpenAI = require('openai');
             const openai = new OpenAI({ apiKey });
@@ -938,19 +941,44 @@ class WorkflowExecutor {
                 context = `\n\nContext data:\n${JSON.stringify(inputData, null, 2)}`;
             }
 
+            // Build output format instruction based on outputType
+            let outputInstruction = '';
+            if (outputType === 'number') {
+                outputInstruction = '\n\nIMPORTANT: Your response MUST be a single numeric value (integer or decimal). Do not include any text, units, or explanation — only the number.';
+            } else if (outputType === 'date') {
+                outputInstruction = '\n\nIMPORTANT: Your response MUST be a single date in ISO 8601 format (YYYY-MM-DD). Do not include any text or explanation — only the date.';
+            } else if (outputType === 'enum' && enumOptions.length > 0) {
+                outputInstruction = `\n\nIMPORTANT: Your response MUST be exactly ONE of these options: ${enumOptions.map(o => `"${o}"`).join(', ')}. Do not include any text or explanation — only one of the listed options exactly as written.`;
+            }
+
             const completion = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [
-                    { role: 'user', content: prompt + context }
+                    { role: 'user', content: prompt + context + outputInstruction }
                 ]
             });
 
-            const response = completion.choices[0]?.message?.content || '';
+            let response = completion.choices[0]?.message?.content || '';
+
+            // Post-process based on output type
+            if (outputType === 'number') {
+                const num = parseFloat(response.replace(/[^0-9.\-]/g, ''));
+                response = isNaN(num) ? response : String(num);
+            } else if (outputType === 'date') {
+                // Try to extract a date pattern
+                const dateMatch = response.match(/\d{4}-\d{2}-\d{2}/);
+                if (dateMatch) response = dateMatch[0];
+            } else if (outputType === 'enum' && enumOptions.length > 0) {
+                // Try to match the response to one of the allowed options
+                const trimmed = response.trim().replace(/^["']|["']$/g, '');
+                const match = enumOptions.find(o => o.toLowerCase() === trimmed.toLowerCase());
+                if (match) response = match;
+            }
 
             return {
                 success: true,
                 message: 'LLM response generated',
-                outputData: { response, inputData },
+                outputData: { response, outputType, inputData },
                 llmResponse: response
             };
         } catch (error) {

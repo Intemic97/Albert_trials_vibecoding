@@ -808,10 +808,12 @@ router.post('/generate', authenticateToken, async (req, res) => {
     console.log('Received generation request');
     console.time('Total Request Time');
     try {
-        const { prompt, mentionedEntityIds, additionalContext } = req.body;
+        const { prompt, mentionedEntityIds, additionalContext, outputType, enumOptions } = req.body;
         console.log('Prompt:', prompt);
         console.log('Mentioned IDs:', mentionedEntityIds);
         console.log('Additional Context Present:', !!additionalContext);
+        console.log('Output Type:', outputType || 'text');
+        if (enumOptions?.length) console.log('Enum Options:', enumOptions);
 
         if (!process.env.OPENAI_API_KEY) {
             console.error('OpenAI API Key missing');
@@ -1008,9 +1010,19 @@ router.post('/generate', authenticateToken, async (req, res) => {
             systemPrompt += `\n\nAdditionally, here is some specific input data to consider: ${JSON.stringify(additionalContext)}.`;
         }
 
-        systemPrompt += `\n\nAnswer the user's question based on this data. 
+        // Add output type constraint
+        const effectiveOutputType = outputType || 'text';
+        if (effectiveOutputType === 'number') {
+            systemPrompt += `\n\nIMPORTANT: Your response MUST be a single numeric value (integer or decimal). Do not include any text, units, explanation, or markdown — output ONLY the number.`;
+        } else if (effectiveOutputType === 'date') {
+            systemPrompt += `\n\nIMPORTANT: Your response MUST be a single date in ISO 8601 format (YYYY-MM-DD). Do not include any text, explanation, or markdown — output ONLY the date.`;
+        } else if (effectiveOutputType === 'enum' && enumOptions && enumOptions.length > 0) {
+            systemPrompt += `\n\nIMPORTANT: Your response MUST be exactly ONE of these options: ${enumOptions.map(o => `"${o}"`).join(', ')}. Do not include any text, explanation, or markdown — output ONLY one of the listed options exactly as written.`;
+        } else {
+            systemPrompt += `\n\nAnswer the user's question based on this data. 
             If the answer is not in the data, say so.
             Format your response in Markdown.`;
+        }
 
         const completion = await openai.chat.completions.create({
             messages: [
@@ -1025,7 +1037,22 @@ router.post('/generate', authenticateToken, async (req, res) => {
         console.timeEnd('OpenAI API Time');
         console.timeEnd('Total Request Time');
 
-        res.json({ response: completion.choices[0].message.content });
+        let responseText = completion.choices[0].message.content || '';
+
+        // Post-process based on output type
+        if (effectiveOutputType === 'number') {
+            const num = parseFloat(responseText.replace(/[^0-9.\-]/g, ''));
+            if (!isNaN(num)) responseText = String(num);
+        } else if (effectiveOutputType === 'date') {
+            const dateMatch = responseText.match(/\d{4}-\d{2}-\d{2}/);
+            if (dateMatch) responseText = dateMatch[0];
+        } else if (effectiveOutputType === 'enum' && enumOptions && enumOptions.length > 0) {
+            const trimmed = responseText.trim().replace(/^["']|["']$/g, '');
+            const match = enumOptions.find(o => o.toLowerCase() === trimmed.toLowerCase());
+            if (match) responseText = match;
+        }
+
+        res.json({ response: responseText });
 
     } catch (error) {
         console.error('Error generating response:', error);

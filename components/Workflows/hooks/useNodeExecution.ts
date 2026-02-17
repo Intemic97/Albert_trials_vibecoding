@@ -419,6 +419,9 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
           if (node.config?.llmPrompt) {
             const llmProcessingMode = node.config.processingMode || 'batch';
             try {
+              const outputType = node.config.outputType || 'text';
+              const enumOptions = node.config.enumOptions || [];
+
               if (llmProcessingMode === 'perRow' && inputData && Array.isArray(inputData) && inputData.length > 0) {
                 const results: any[] = [];
                 for (let i = 0; i < inputData.length; i++) {
@@ -433,7 +436,9 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
                     body: JSON.stringify({
                       prompt: personalizedPrompt,
                       mentionedEntityIds: node.config.llmContextEntities || [],
-                      additionalContext: node.config.llmIncludeInput ? [record] : undefined
+                      additionalContext: node.config.llmIncludeInput ? [record] : undefined,
+                      outputType,
+                      enumOptions
                     }),
                     credentials: 'include'
                   });
@@ -453,7 +458,9 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
                   body: JSON.stringify({
                     prompt: node.config.llmPrompt,
                     mentionedEntityIds: node.config.llmContextEntities || [],
-                    additionalContext: node.config.llmIncludeInput ? inputData : undefined
+                    additionalContext: node.config.llmIncludeInput ? inputData : undefined,
+                    outputType,
+                    enumOptions
                   }),
                   credentials: 'include'
                 });
