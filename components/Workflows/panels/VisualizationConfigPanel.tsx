@@ -40,7 +40,8 @@ export const VisualizationConfigPanel: React.FC<VisualizationConfigPanelProps> =
       inputDataForViz = parentNode.outputData || parentNode.config?.parsedData || [];
     }
   }
-  const dataFields = Array.isArray(inputDataForViz) && inputDataForViz.length > 0 && typeof inputDataForViz[0] === 'object'
+  const hasInputData = Array.isArray(inputDataForViz) && inputDataForViz.length > 0;
+  const dataFields = hasInputData && typeof inputDataForViz[0] === 'object'
     ? Object.keys(inputDataForViz[0]) : [];
 
   const handleSave = () => {
