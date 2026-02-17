@@ -156,6 +156,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const [selectFilter, setSelectFilter] = useState('');
     const [newPropRelationId, setNewPropRelationId] = useState(''); // For relation type: which entity to link
     const [newPropTwoWay, setNewPropTwoWay] = useState(false); // Two-way relation checkbox
+    const [newPropUnit, setNewPropUnit] = useState(''); // Unit for number type (e.g. ºC, Kg)
     const [allEntities, setAllEntities] = useState<{ id: string; name: string }[]>([]);
     const [relatedRecords, setRelatedRecords] = useState<Record<string, { entityName: string; records: { id: string; displayName: string }[] }>>({}); // relatedEntityId -> records
 
@@ -421,6 +422,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
             name: finalName,
             type: newPropType,
             relatedEntityId: newPropType === 'relation' ? newPropRelationId : undefined,
+            unit: newPropType === 'number' && newPropUnit.trim() ? newPropUnit.trim() : undefined,
         };
         const isTwoWay = newPropType === 'relation' && newPropTwoWay;
         setProperties(prev => [...prev, newProp]);
@@ -428,6 +430,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         setNewPropType('text');
         setNewPropRelationId('');
         setNewPropTwoWay(false);
+        setNewPropUnit('');
         setShowAddProperty(false);
 
         try {
@@ -442,6 +445,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                     type: newProp.type,
                     defaultValue: '',
                     relatedEntityId: newProp.relatedEntityId,
+                    unit: newProp.unit,
                 }),
             });
 
@@ -1080,9 +1084,9 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                                 <span
                                                                     className="cursor-pointer hover:text-[var(--text-primary)] transition-colors truncate"
                                                                     onClick={() => startEditProp(prop)}
-                                                                    title={prop.name}
+                                                                    title={prop.unit ? `${prop.name} (${prop.unit})` : prop.name}
                                                                 >
-                                                                    {prop.name}
+                                                                    {prop.name}{prop.unit ? <span className="text-[var(--text-tertiary)] font-normal ml-1">({prop.unit})</span> : null}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -1517,14 +1521,19 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                                     // Default: text / number / date / url / etc.
                                                     return (
                                                         <td key={prop.id} className="border-r border-[var(--border-light)] last:border-r-0 p-0">
-                                                            <input
-                                                                type={prop.type === 'number' ? 'number' : prop.type === 'date' ? 'date' : 'text'}
-                                                                value={record.values[prop.id] || ''}
-                                                                onChange={(e) => handleRecordChange(record.id, prop.id, e.target.value)}
-                                                                onBlur={() => handleRecordBlur(record)}
-                                                                placeholder=""
-                                                                className="w-full px-4 py-2.5 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]"
-                                                            />
+                                                            <div className="flex items-center">
+                                                                <input
+                                                                    type={prop.type === 'number' ? 'number' : prop.type === 'date' ? 'date' : 'text'}
+                                                                    value={record.values[prop.id] || ''}
+                                                                    onChange={(e) => handleRecordChange(record.id, prop.id, e.target.value)}
+                                                                    onBlur={() => handleRecordBlur(record)}
+                                                                    placeholder=""
+                                                                    className={`${prop.type === 'number' && prop.unit ? 'pr-1' : 'pr-4'} w-full pl-4 py-2.5 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-tertiary)]`}
+                                                                />
+                                                                {prop.type === 'number' && prop.unit && record.values[prop.id] && (
+                                                                    <span className="pr-3 text-xs text-[var(--text-tertiary)] whitespace-nowrap select-none">{prop.unit}</span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     );
                                                 })}
@@ -1671,7 +1680,9 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                     );
                                 } else {
                                     displayContent = rawValue ? (
-                                        <span className="text-sm text-[var(--text-primary)] break-words">{rawValue}</span>
+                                        <span className="text-sm text-[var(--text-primary)] break-words">
+                                            {rawValue}{prop.type === 'number' && prop.unit ? <span className="text-[var(--text-tertiary)] ml-1">{prop.unit}</span> : null}
+                                        </span>
                                     ) : (
                                         <span className="text-xs text-[var(--text-tertiary)] italic">Empty</span>
                                     );
@@ -1681,7 +1692,7 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                     <div key={prop.id}>
                                         <div className="flex items-center gap-1.5 mb-1.5">
                                             <TypeIcon size={13} weight="light" className={typeConf.color.split(' ')[0]} />
-                                            <span className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">{prop.name}</span>
+                                            <span className="text-[11px] font-medium text-[var(--text-tertiary)] uppercase tracking-wide">{prop.name}{prop.unit ? ` (${prop.unit})` : ''}</span>
                                         </div>
                                         <div className="pl-5">
                                             {displayContent}
@@ -1861,6 +1872,19 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                     />
                                     <span className="text-[11px] text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">Two-way relation</span>
                                 </label>
+                            </div>
+                        )}
+                        {/* Unit input for Number type */}
+                        {newPropType === 'number' && (
+                            <div className="mt-2 mb-1">
+                                <label className="text-[10px] font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-1 block">Unit (optional)</label>
+                                <input
+                                    type="text"
+                                    value={newPropUnit}
+                                    onChange={(e) => setNewPropUnit(e.target.value)}
+                                    placeholder="e.g. ºC, Kg, m/s, %…"
+                                    className="w-full px-2 py-1.5 text-xs bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-md text-[var(--text-primary)] outline-none focus:ring-1 focus:ring-[var(--accent-primary)] placeholder:text-[var(--text-tertiary)]"
+                                />
                             </div>
                         )}
                         <button
