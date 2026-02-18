@@ -1154,6 +1154,51 @@ async function initDb() {
     await db.exec(`ALTER TABLE report_sections ADD COLUMN workflowStatus TEXT DEFAULT 'draft'`);
   } catch (e) { /* column exists */ }
 
+  // ── Workflow Version Control ──────────────────────────────────────────
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS workflow_versions (
+      id TEXT PRIMARY KEY,
+      workflowId TEXT NOT NULL,
+      organizationId TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      name TEXT,
+      data TEXT NOT NULL,
+      description TEXT,
+      createdBy TEXT,
+      createdByName TEXT,
+      createdAt TEXT,
+      isProduction INTEGER DEFAULT 0,
+      FOREIGN KEY(workflowId) REFERENCES workflows(id) ON DELETE CASCADE,
+      FOREIGN KEY(organizationId) REFERENCES organizations(id) ON DELETE CASCADE
+    )
+  `);
+
+  // Migration: add publishedVersionId to workflows
+  try {
+    await db.exec(`ALTER TABLE workflows ADD COLUMN publishedVersionId TEXT`);
+  } catch (e) { /* column exists */ }
+
+  // Index for fast version lookups
+  try {
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_wf_versions_workflow ON workflow_versions(workflowId, version)`);
+    await db.exec(`CREATE INDEX IF NOT EXISTS idx_wf_versions_production ON workflow_versions(workflowId, isProduction)`);
+  } catch (e) { /* indexes exist */ }
+
+  // Migration: Add triggeredByName to workflow_executions for tracking who ran the workflow
+  try {
+    await db.exec(`ALTER TABLE workflow_executions ADD COLUMN triggeredByName TEXT`);
+  } catch (e) { /* column exists */ }
+
+  // Migration: Add versionNumber to workflow_executions for tracking which version was executed
+  try {
+    await db.exec(`ALTER TABLE workflow_executions ADD COLUMN versionNumber INTEGER`);
+  } catch (e) { /* column exists */ }
+
+  // Migration: Add activeVersionNumber to workflows for persisting the version the user is on
+  try {
+    await db.exec(`ALTER TABLE workflows ADD COLUMN activeVersionNumber INTEGER`);
+  } catch (e) { /* column exists */ }
+
   return db;
 }
 

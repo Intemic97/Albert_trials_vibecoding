@@ -32,6 +32,7 @@ export interface WorkflowListItem {
     createdByName?: string;
     updatedAt?: string;
     lastEditedByName?: string;
+    publishedVersionId?: string | null;
 }
 
 interface WorkflowsListViewProps {
@@ -164,9 +165,17 @@ export const WorkflowsListView: React.FC<WorkflowsListViewProps> = ({
                                             <FlowArrow size={18} className="text-[var(--text-secondary)]" weight="light" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
-                                                {workflow.name}
-                                            </h3>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-base font-normal text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors truncate">
+                                                    {workflow.name}
+                                                </h3>
+                                                {workflow.publishedVersionId && (
+                                                    <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 flex items-center gap-0.5">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                                                        Live
+                                                    </span>
+                                                )}
+                                            </div>
                                             {/* Tags - Limited to 3 visible, truncated */}
                                             {workflow.tags && workflow.tags.length > 0 && (
                                                 <div className="flex flex-wrap gap-1.5 mt-2 max-h-[52px] overflow-hidden">

@@ -20,7 +20,7 @@ function setBroadcastToOrganization(fn) {
 const generateId = () => crypto.randomBytes(8).toString('hex');
 
 class WorkflowExecutor {
-    constructor(db, executionId = null, organizationId = null, userId = null) {
+    constructor(db, executionId = null, organizationId = null, userId = null, triggeredByName = null) {
         this.db = db;
         this.executionId = executionId;
         this.workflow = null;
@@ -30,21 +30,23 @@ class WorkflowExecutor {
         this.execution = null;
         this.organizationId = organizationId;
         this.userId = userId;
+        this.triggeredByName = triggeredByName;
         this.otAlertsManager = getOTAlertsManager(db, broadcastToOrganizationFn);
     }
 
     /**
      * Create a new execution record and execute the workflow
      */
-    async executeWorkflow(workflowId, inputs = {}, organizationId = null) {
+    async executeWorkflow(workflowId, inputs = {}, organizationId = null, triggeredByUserId = null, triggeredByName = null, versionNumber = null) {
         // Create execution record
         this.executionId = generateId();
         const now = new Date().toISOString();
+        const nameToStore = triggeredByName || this.triggeredByName;
 
         await this.db.run(`
-            INSERT INTO workflow_executions (id, workflowId, organizationId, status, inputs, createdAt)
-            VALUES (?, ?, ?, 'pending', ?, ?)
-        `, [this.executionId, workflowId, organizationId, JSON.stringify(inputs), now]);
+            INSERT INTO workflow_executions (id, workflowId, organizationId, status, inputs, createdAt, triggeredByName, versionNumber)
+            VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)
+        `, [this.executionId, workflowId, organizationId, JSON.stringify(inputs), now, nameToStore, versionNumber]);
 
         try {
             // Load workflow
@@ -53,8 +55,25 @@ class WorkflowExecutor {
                 throw new Error('Workflow not found');
             }
 
+            // For automated triggers (webhook, schedule), use published version data if available
+            let workflowDataRaw = this.workflow.data;
+            if (this.workflow.publishedVersionId && inputs?._triggerType !== 'manual') {
+                try {
+                    const publishedVersion = await this.db.get(
+                        'SELECT data FROM workflow_versions WHERE id = ? AND isProduction = 1',
+                        [this.workflow.publishedVersionId]
+                    );
+                    if (publishedVersion) {
+                        workflowDataRaw = publishedVersion.data;
+                        console.log(`[WorkflowExecutor] Using published version ${this.workflow.publishedVersionId} for workflow ${workflowId}`);
+                    }
+                } catch (e) {
+                    console.warn('[WorkflowExecutor] Failed to load published version, using latest:', e.message);
+                }
+            }
+
             // Parse workflow data
-            const workflowData = JSON.parse(this.workflow.data);
+            const workflowData = JSON.parse(workflowDataRaw);
             this.nodes = workflowData.nodes || [];
             this.connections = workflowData.connections || [];
 

@@ -1,10 +1,18 @@
 /**
  * WorkflowEditorToolbar
- * Extracted from Workflows.tsx - Canvas top bar with back, name, tags, save, history, run, export
+ * Canvas top bar with back, name, tags, save, history, run, publish.
+ * Version History button removed – version events are shown inside the unified History modal.
  */
 
-import React from 'react';
-import { ArrowLeft, Tag, CheckCircle, FloppyDisk as Save, ClockCounterClockwise as History, Play, Share as Share2 } from '@phosphor-icons/react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Tag, CheckCircle, FloppyDisk as Save, ClockCounterClockwise as History, Play, CaretDown, Circle, Trash } from '@phosphor-icons/react';
+
+interface VersionInfo {
+  version: number;
+  id: string;
+  name: string;
+  isProduction: boolean;
+}
 
 interface WorkflowEditorToolbarProps {
   workflowName: string;
@@ -18,15 +26,37 @@ interface WorkflowEditorToolbarProps {
   saveWorkflow: () => void;
   openExecutionHistory: () => void;
   runWorkflow: () => void;
-  openWorkflowRunner: () => void;
+  openPublishModal: () => void;
   setShowTagsModal: (show: boolean) => void;
+  /** The version number the user is currently viewing (null = Draft) */
+  activeVersion?: number | null;
+  versions?: VersionInfo[];
+  onRestoreVersion?: (versionId: string) => void;
+  onDeleteVersion?: (versionId: string, versionNum: number) => void;
 }
 
 export const WorkflowEditorToolbar: React.FC<WorkflowEditorToolbarProps> = ({
   workflowName, setWorkflowName, currentWorkflowId, autoSaveStatus,
   isSaving, isRunning, nodesCount, backToList, saveWorkflow,
-  openExecutionHistory, runWorkflow, openWorkflowRunner, setShowTagsModal
+  openExecutionHistory, runWorkflow, openPublishModal, setShowTagsModal,
+  activeVersion, versions, onRestoreVersion, onDeleteVersion
 }) => {
+  const [showVersionDropdown, setShowVersionDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowVersionDropdown(false);
+      }
+    };
+    if (showVersionDropdown) {
+      document.addEventListener('mousedown', handleClick);
+    }
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showVersionDropdown]);
+
   return (
     <div className="bg-[var(--bg-card)] border-b border-[var(--border-light)] px-6 py-2 flex items-center justify-between shadow-sm z-20 shrink-0">
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -45,8 +75,101 @@ export const WorkflowEditorToolbar: React.FC<WorkflowEditorToolbarProps> = ({
           className="text-lg font-normal text-[var(--text-primary)] bg-transparent border-none focus:outline-none flex-1 min-w-0"
           placeholder="Workflow Name"
         />
+
       </div>
+
       <div className="flex items-center gap-3 flex-shrink-0">
+        {/* Version selector dropdown – placed with the right-side icons for even spacing */}
+        {currentWorkflowId && (
+          <div className="relative flex-shrink-0" ref={dropdownRef}>
+            <button
+              onClick={() => setShowVersionDropdown(!showVersionDropdown)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--border-light)] hover:bg-[var(--bg-hover)] transition-colors text-sm"
+            >
+              <span className="text-[var(--text-secondary)] font-medium">
+                {activeVersion != null ? `v${activeVersion}` : 'Draft'}
+              </span>
+              <CaretDown size={12} className="text-[var(--text-tertiary)]" />
+            </button>
+
+            {showVersionDropdown && versions && versions.length > 0 && (
+              <div className="absolute top-full right-0 mt-1.5 w-48 bg-[var(--bg-card)] rounded-xl shadow-xl border border-[var(--border-light)] py-1 z-50"
+                   style={{ animation: 'fadeInScale 0.1s ease-out' }}>
+                {/* Draft option */}
+                <div className="px-3 py-2 flex items-center justify-between text-sm hover:bg-[var(--bg-hover)] cursor-default">
+                  <div className="flex items-center gap-2">
+                    {activeVersion == null && (
+                      <CheckCircle size={14} className="text-[var(--text-primary)]" weight="bold" />
+                    )}
+                    <span className={`font-medium ${activeVersion == null ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)] ml-5'}`}>
+                      Draft
+                    </span>
+                  </div>
+                  <div className="relative group/tooltip">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--text-tertiary)] cursor-help">
+                      <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                    </svg>
+                    <div className="absolute right-0 bottom-full mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover/tooltip:opacity-100 transition-opacity shadow-lg z-50">
+                      Current working draft (auto-saved)
+                      <div className="absolute top-full right-3 w-2 h-2 bg-gray-900 rotate-45 -mt-1"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="h-px bg-[var(--border-light)] my-1" />
+
+                {/* Version list – only v1, v2, etc. */}
+                {versions.map((v) => (
+                  <div
+                    key={v.id}
+                    className="group/ver w-full px-3 py-2 flex items-center justify-between text-sm hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                    onClick={() => {
+                      if (onRestoreVersion) onRestoreVersion(v.id);
+                      setShowVersionDropdown(false);
+                    }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {v.isProduction ? (
+                        <Circle size={8} weight="fill" className="text-emerald-500 shrink-0" />
+                      ) : (
+                        <span className="w-2 shrink-0" />
+                      )}
+                      <span className={`font-medium ${
+                        activeVersion === v.version ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'
+                      }`}>
+                        v{v.version}
+                      </span>
+                      {activeVersion === v.version && (
+                        <CheckCircle size={14} className="text-[var(--text-primary)]" weight="bold" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      {v.isProduction && (
+                        <span className="text-[11px] font-medium text-emerald-600">Live</span>
+                      )}
+                      {/* Delete button – visible only on hover, hidden for production versions */}
+                      {!v.isProduction && onDeleteVersion && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Delete v${v.version}? This cannot be undone.`)) {
+                              onDeleteVersion(v.id, v.version);
+                              setShowVersionDropdown(false);
+                            }
+                          }}
+                          className="p-0.5 rounded opacity-0 group-hover/ver:opacity-100 hover:bg-red-100 text-[var(--text-tertiary)] hover:text-red-500 transition-all"
+                          title={`Delete v${v.version}`}
+                        >
+                          <Trash size={13} weight="light" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <button
           onClick={() => setShowTagsModal(true)}
           disabled={!currentWorkflowId}
@@ -79,11 +202,12 @@ export const WorkflowEditorToolbar: React.FC<WorkflowEditorToolbarProps> = ({
         >
           {isSaving ? <span className="animate-spin">⟳</span> : <Save size={18} className="text-[var(--text-secondary)]" weight="light" />}
         </button>
+        {/* History button */}
         <button
           onClick={openExecutionHistory}
           disabled={!currentWorkflowId}
           className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
-          title="History"
+          title="History (Executions & Versions)"
         >
           <History size={18} className="text-[var(--text-secondary)]" weight="light" />
         </button>
@@ -95,19 +219,15 @@ export const WorkflowEditorToolbar: React.FC<WorkflowEditorToolbarProps> = ({
           <Play size={16} weight="light" />
           {isRunning ? 'Running...' : 'Run'}
         </button>
+        {/* Publish button */}
         <button
-          onClick={openWorkflowRunner}
+          onClick={openPublishModal}
           disabled={nodesCount === 0}
-          className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed gap-2"
+          className="flex items-center px-4 py-1.5 bg-[var(--text-primary)] text-[var(--bg-card)] rounded-lg text-xs font-medium hover:opacity-90 transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Share2 size={16} weight="light" />
-          Export
+          Publish
         </button>
       </div>
     </div>
   );
 };
-
-
-
-

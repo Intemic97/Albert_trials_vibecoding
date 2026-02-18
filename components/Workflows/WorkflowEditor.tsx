@@ -668,6 +668,11 @@ export const WorkflowEditor: React.FC<WorkflowEditorProps> = ({
           workflowId={workflow.id || ''}
           workflowName={workflow.name}
           onClose={() => setShowExecutionHistory(false)}
+          onRestore={(data, version) => {
+            setNodes(data.nodes || []);
+            setConnections(data.connections || []);
+            setShowExecutionHistory(false);
+          }}
         />
       )}
       

@@ -19,7 +19,7 @@ module.exports = function({ db, broadcastToOrganization }) {
 
 router.get('/workflows', authenticateToken, async (req, res) => {
     try {
-        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName, tags FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
+        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName, tags, publishedVersionId FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
         // Parse tags JSON for each workflow
         const parsedWorkflows = workflows.map(workflow => ({
             ...workflow,
@@ -94,13 +94,18 @@ router.post('/workflows', authenticateToken, async (req, res) => {
 router.put('/workflows/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, data, tags, lastEditedByName } = req.body;
+        const { name, data, tags, lastEditedByName, activeVersionNumber } = req.body;
         const now = new Date().toISOString();
 
-        await db.run(
-            'UPDATE workflows SET name = ?, data = ?, tags = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ? WHERE id = ? AND organizationId = ?',
-            [name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, req.user.sub, lastEditedByName || 'Unknown', id, req.user.orgId]
-        );
+        // Build dynamic update – include activeVersionNumber when explicitly provided
+        const hasActiveVersion = activeVersionNumber !== undefined;
+        const sql = hasActiveVersion
+            ? 'UPDATE workflows SET name = ?, data = ?, tags = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ?, activeVersionNumber = ? WHERE id = ? AND organizationId = ?'
+            : 'UPDATE workflows SET name = ?, data = ?, tags = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ? WHERE id = ? AND organizationId = ?';
+        const params = hasActiveVersion
+            ? [name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, req.user.sub, lastEditedByName || 'Unknown', activeVersionNumber, id, req.user.orgId]
+            : [name, JSON.stringify(data), tags ? JSON.stringify(tags) : null, now, req.user.sub, lastEditedByName || 'Unknown', id, req.user.orgId];
+        await db.run(sql, params);
 
         // Log activity
         await logActivity(db, {
@@ -430,7 +435,7 @@ router.post('/workflow/:id/run-public', async (req, res) => {
 router.post('/workflow/:id/execute', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const { inputs, usePrefect } = req.body;
+        const { inputs, usePrefect, versionNumber } = req.body;
 
         // Get workflow name for logging
         const workflow = await db.get('SELECT name FROM workflows WHERE id = ?', [id]);
@@ -450,6 +455,14 @@ router.post('/workflow/:id/execute', authenticateToken, async (req, res) => {
             userAgent: req.headers['user-agent']
         });
 
+        // Compute triggeredByName once for both execution paths
+        // Look up user's name from DB for reliability (JWT may not always have it)
+        let triggeredByName = req.user.name || req.user.email?.split('@')[0] || 'Unknown';
+        try {
+            const execUser = await db.get('SELECT name FROM users WHERE id = ?', [req.user.sub]);
+            if (execUser?.name) triggeredByName = execUser.name;
+        } catch (e) { /* ignore */ }
+
         // Check if we should use Prefect service (background execution)
         const shouldUsePrefect = usePrefect !== false; // Default to true
 
@@ -459,6 +472,16 @@ router.post('/workflow/:id/execute', authenticateToken, async (req, res) => {
             try {
                 // Delegate to Prefect microservice for background execution
                 const result = await prefectClient.executeWorkflow(id, inputs || {}, req.user.orgId);
+
+                // Store triggeredByName and versionNumber in the execution record
+                if (result.executionId) {
+                    try {
+                        await db.run(
+                            'UPDATE workflow_executions SET triggeredByName = ?, versionNumber = ? WHERE id = ?',
+                            [triggeredByName, versionNumber != null ? versionNumber : null, result.executionId]
+                        );
+                    } catch (e) { /* ignore */ }
+                }
 
                 // Start polling for execution progress
                 const pollingService = getPollingService();
@@ -486,8 +509,8 @@ router.post('/workflow/:id/execute', authenticateToken, async (req, res) => {
         // Local execution (synchronous, blocks until complete)
         console.log(`[WorkflowExecutor] Local execution for workflow ${id}`);
 
-        const executor = new WorkflowExecutor(db, null, req.user.orgId, req.user.sub);
-        const result = await executor.executeWorkflow(id, inputs || {}, req.user.orgId);
+        const executor = new WorkflowExecutor(db, null, req.user.orgId, req.user.sub, triggeredByName);
+        const result = await executor.executeWorkflow(id, inputs || {}, req.user.orgId, null, triggeredByName, versionNumber != null ? versionNumber : null);
 
         res.json({
             success: true,
@@ -793,7 +816,7 @@ router.get('/workflow/:id/executions', async (req, res) => {
         const limit = parseInt(req.query.limit) || 20;
         
         const executions = await db.all(`
-            SELECT id, status, triggerType, inputs, nodeResults, finalOutput, createdAt, startedAt, completedAt, error
+            SELECT id, status, triggerType, inputs, nodeResults, finalOutput, createdAt, startedAt, completedAt, error, triggeredByName, versionNumber
             FROM workflow_executions 
             WHERE workflowId = ?
             ORDER BY createdAt DESC
@@ -805,7 +828,9 @@ router.get('/workflow/:id/executions', async (req, res) => {
             ...e,
             inputs: e.inputs ? JSON.parse(e.inputs) : null,
             nodeResults: e.nodeResults ? JSON.parse(e.nodeResults) : null,
-            finalOutput: e.finalOutput ? JSON.parse(e.finalOutput) : null
+            finalOutput: e.finalOutput ? JSON.parse(e.finalOutput) : null,
+            triggeredByName: e.triggeredByName || null,
+            versionNumber: e.versionNumber || null
         }));
 
         res.json(parsed);
@@ -1146,6 +1171,252 @@ router.post('/workflow/notify-approval-email', authenticateToken, async (req, re
     } catch (error) {
         console.error('Error sending approval email:', error);
         res.status(500).json({ error: 'Failed to send approval email' });
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WORKFLOW VERSION CONTROL
+// ═══════════════════════════════════════════════════════════════════════════
+
+// List all versions for a workflow
+router.get('/workflows/:id/versions', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const versions = await db.all(
+            `SELECT id, workflowId, version, name, description, createdBy, createdByName, createdAt, isProduction
+             FROM workflow_versions
+             WHERE workflowId = ? AND organizationId = ?
+             ORDER BY version DESC`,
+            [id, req.user.orgId]
+        );
+        res.json(versions);
+    } catch (error) {
+        console.error('Error fetching workflow versions:', error);
+        res.status(500).json({ error: 'Failed to fetch versions' });
+    }
+});
+
+// Get a specific version (includes full data)
+router.get('/workflows/:id/versions/:versionId', authenticateToken, async (req, res) => {
+    try {
+        const { id, versionId } = req.params;
+        const version = await db.get(
+            `SELECT * FROM workflow_versions WHERE id = ? AND workflowId = ? AND organizationId = ?`,
+            [versionId, id, req.user.orgId]
+        );
+        if (!version) {
+            return res.status(404).json({ error: 'Version not found' });
+        }
+        version.data = JSON.parse(version.data);
+        res.json(version);
+    } catch (error) {
+        console.error('Error fetching version:', error);
+        res.status(500).json({ error: 'Failed to fetch version' });
+    }
+});
+
+// Create a new version snapshot (called on explicit save)
+router.post('/workflows/:id/versions', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, description } = req.body;
+
+        // Get the current workflow data
+        const workflow = await db.get(
+            'SELECT * FROM workflows WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // Determine next version number
+        const lastVersion = await db.get(
+            'SELECT MAX(version) as maxVer FROM workflow_versions WHERE workflowId = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+        const nextVersion = (lastVersion?.maxVer || 0) + 1;
+
+        const versionId = generateId();
+        const now = new Date().toISOString();
+        const createdByName = req.body.createdByName || req.user.email;
+        const versionName = name || `v${nextVersion}`;
+
+        await db.run(
+            `INSERT INTO workflow_versions (id, workflowId, organizationId, version, name, data, description, createdBy, createdByName, createdAt, isProduction)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+            [versionId, id, req.user.orgId, nextVersion, versionName, workflow.data, description || null, req.user.sub, createdByName, now]
+        );
+
+        // Set activeVersionNumber on the workflow to the newly created version
+        await db.run(
+            'UPDATE workflows SET activeVersionNumber = ? WHERE id = ? AND organizationId = ?',
+            [nextVersion, id, req.user.orgId]
+        );
+
+        res.json({
+            id: versionId,
+            version: nextVersion,
+            name: versionName,
+            description: description || null,
+            createdBy: req.user.sub,
+            createdByName,
+            createdAt: now,
+            isProduction: 0
+        });
+    } catch (error) {
+        console.error('Error creating version:', error);
+        res.status(500).json({ error: 'Failed to create version' });
+    }
+});
+
+// Publish a version (set it as the production version)
+router.put('/workflows/:id/versions/:versionId/publish', authenticateToken, async (req, res) => {
+    try {
+        const { id, versionId } = req.params;
+
+        // Verify version exists
+        const version = await db.get(
+            'SELECT id, version FROM workflow_versions WHERE id = ? AND workflowId = ? AND organizationId = ?',
+            [versionId, id, req.user.orgId]
+        );
+        if (!version) {
+            return res.status(404).json({ error: 'Version not found' });
+        }
+
+        // Unset any current production version for this workflow
+        await db.run(
+            'UPDATE workflow_versions SET isProduction = 0 WHERE workflowId = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+
+        // Set this version as production
+        await db.run(
+            'UPDATE workflow_versions SET isProduction = 1 WHERE id = ?',
+            [versionId]
+        );
+
+        // Update workflow's publishedVersionId
+        await db.run(
+            'UPDATE workflows SET publishedVersionId = ? WHERE id = ? AND organizationId = ?',
+            [versionId, id, req.user.orgId]
+        );
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: 'publish',
+            resourceType: 'workflow_version',
+            resourceId: versionId,
+            resourceName: `v${version.version}`,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
+        res.json({ message: 'Version published', versionId, version: version.version });
+    } catch (error) {
+        console.error('Error publishing version:', error);
+        res.status(500).json({ error: 'Failed to publish version' });
+    }
+});
+
+// Unpublish (remove from production)
+router.put('/workflows/:id/versions/:versionId/unpublish', authenticateToken, async (req, res) => {
+    try {
+        const { id, versionId } = req.params;
+
+        await db.run(
+            'UPDATE workflow_versions SET isProduction = 0 WHERE id = ? AND workflowId = ? AND organizationId = ?',
+            [versionId, id, req.user.orgId]
+        );
+        await db.run(
+            'UPDATE workflows SET publishedVersionId = NULL WHERE id = ? AND organizationId = ?',
+            [id, req.user.orgId]
+        );
+
+        res.json({ message: 'Version unpublished' });
+    } catch (error) {
+        console.error('Error unpublishing version:', error);
+        res.status(500).json({ error: 'Failed to unpublish version' });
+    }
+});
+
+// Delete a version
+router.delete('/workflows/:id/versions/:versionId', authenticateToken, async (req, res) => {
+    try {
+        const { id, versionId } = req.params;
+
+        const version = await db.get(
+            'SELECT id, version, isProduction FROM workflow_versions WHERE id = ? AND workflowId = ? AND organizationId = ?',
+            [versionId, id, req.user.orgId]
+        );
+        if (!version) {
+            return res.status(404).json({ error: 'Version not found' });
+        }
+        if (version.isProduction) {
+            return res.status(400).json({ error: 'Cannot delete the production version. Unpublish it first.' });
+        }
+
+        await db.run('DELETE FROM workflow_versions WHERE id = ?', [versionId]);
+
+        // If activeVersionNumber matches the deleted version, clear it
+        const wf = await db.get('SELECT activeVersionNumber FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        if (wf && wf.activeVersionNumber === version.version) {
+            await db.run('UPDATE workflows SET activeVersionNumber = NULL WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        }
+
+        res.json({ message: 'Version deleted', versionId, version: version.version });
+    } catch (error) {
+        console.error('Error deleting version:', error);
+        res.status(500).json({ error: 'Failed to delete version' });
+    }
+});
+
+// Restore a version (loads its data into the current workflow)
+router.post('/workflows/:id/versions/:versionId/restore', authenticateToken, async (req, res) => {
+    try {
+        const { id, versionId } = req.params;
+
+        const version = await db.get(
+            'SELECT * FROM workflow_versions WHERE id = ? AND workflowId = ? AND organizationId = ?',
+            [versionId, id, req.user.orgId]
+        );
+        if (!version) {
+            return res.status(404).json({ error: 'Version not found' });
+        }
+
+        const now = new Date().toISOString();
+        const lastEditedByName = req.body.lastEditedByName || req.user.email;
+
+        // Update the workflow with the version's data and set activeVersionNumber
+        await db.run(
+            'UPDATE workflows SET data = ?, updatedAt = ?, lastEditedBy = ?, lastEditedByName = ?, activeVersionNumber = ? WHERE id = ? AND organizationId = ?',
+            [version.data, now, req.user.sub, lastEditedByName, version.version, id, req.user.orgId]
+        );
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: lastEditedByName,
+            userEmail: req.user.email,
+            action: 'restore',
+            resourceType: 'workflow_version',
+            resourceId: versionId,
+            resourceName: `v${version.version}`,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
+        // Return the restored data so frontend can update
+        const restoredData = JSON.parse(version.data);
+        res.json({ message: 'Version restored', data: restoredData, version: version.version });
+    } catch (error) {
+        console.error('Error restoring version:', error);
+        res.status(500).json({ error: 'Failed to restore version' });
     }
 });
 

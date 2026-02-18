@@ -38,6 +38,8 @@ export interface NodeExecutionDeps {
   setWaitingApprovalNodeId: (id: string | null) => void;
   /** Set pending approval data (for human-in-the-loop) */
   setPendingApprovalData: (data: { inputData: any; resolve: () => void } | null) => void;
+  /** The version number currently active on the canvas (null = Draft) */
+  activeVersionNumber?: number | null;
 }
 
 // ---- Return type ----
@@ -1227,11 +1229,12 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
         inputDataB: undefined
       })));
 
+      const activeVersion = depsRef.current.activeVersionNumber ?? undefined;
       fetch(`${API_BASE}/workflow/${currentWorkflowId}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ inputs: {} })
+        body: JSON.stringify({ inputs: {}, versionNumber: activeVersion })
       }).catch(err => console.error('Background execution error:', err));
 
       const triggerNodes = nodes.filter(node =>

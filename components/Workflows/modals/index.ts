@@ -40,3 +40,7 @@ export { ExecutionHistoryModal } from './ExecutionHistoryModal';
 export { WorkflowRunnerModal } from './WorkflowRunnerModal';
 export { TemplatesGalleryModal } from './TemplatesGalleryModal';
 export { TagsModal } from './TagsModal';
+
+// Version control
+export { VersionHistoryPanel } from './VersionHistoryPanel';
+export { PublishWorkflowModal } from './PublishWorkflowModal';

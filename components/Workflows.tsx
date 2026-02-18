@@ -72,7 +72,7 @@ import { useNodeExecution } from './Workflows/hooks/useNodeExecution';
 
 // Import extracted modal components
 import { DataPreviewModal } from './Workflows/modals/DataPreviewModal';
-import { ExecutionHistoryInlineModal } from './Workflows/modals/ExecutionHistoryInlineModal';
+// ExecutionHistoryInlineModal removed – unified history is in ExecutionHistoryModal
 import { FeedbackPopupModal } from './Workflows/modals/FeedbackPopupModal';
 import { ExitConfirmationModal } from './Workflows/modals/ExitConfirmationModal';
 import { QuickConnectModal } from './Workflows/modals/QuickConnectModal';
@@ -82,6 +82,7 @@ import { TemplatePreviewModal } from './Workflows/modals/TemplatePreviewModal';
 import { AIAssistantSidePanel } from './Workflows/modals/AIAssistantSidePanel';
 import { WorkflowEditorToolbar } from './Workflows/modals/WorkflowEditorToolbar';
 import { NodePaletteSidebar } from './Workflows/modals/NodePaletteSidebar';
+import { PublishWorkflowModal } from './Workflows/modals/PublishWorkflowModal';
 
 // Use imported DRAGGABLE_ITEMS from workflows module
 const DRAGGABLE_ITEMS = WORKFLOW_DRAGGABLE_ITEMS;
@@ -399,9 +400,23 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
 
     // Execution History State
     const [showExecutionHistory, setShowExecutionHistory] = useState<boolean>(false);
-    const [executionHistory, setExecutionHistory] = useState<any[]>([]);
-    const [loadingExecutions, setLoadingExecutions] = useState<boolean>(false);
-    const [selectedExecution, setSelectedExecution] = useState<any>(null);
+    // executionHistory, loadingExecutions, selectedExecution removed – ExecutionHistoryModal handles its own data
+
+    // Version Control State
+    const [publishedVersionId, setPublishedVersionId] = useState<string | null>(null);
+    const [publishedVersionNumber, setPublishedVersionNumber] = useState<number | null>(null);
+    /** Version the user is currently viewing/editing (null = Draft / unsaved changes) */
+    const [activeVersionNumber, setActiveVersionNumber] = useState<number | null>(null);
+    /**
+     * Stores a structural fingerprint of the version data when a version is loaded.
+     * Used to detect whether the user actually changed the workflow structure
+     * (nodes type/position/config, connections) vs. just saving the same content.
+     */
+    const versionSnapshotRef = useRef<string | null>(null);
+    const [showPublishModal, setShowPublishModal] = useState<boolean>(false);
+    const [showPublishedOverlay, setShowPublishedOverlay] = useState<boolean>(false);
+    const [latestVersionNumber, setLatestVersionNumber] = useState<number | null>(null);
+    const [versionsList, setVersionsList] = useState<Array<{ version: number; id: string; name: string; isProduction: boolean }>>([]);
 
     // Workflows List View State
     const [currentView, setCurrentView] = useState<'list' | 'canvas'>('list');
@@ -456,6 +471,44 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         setTimeout(() => setToast(null), 4000);
     };
 
+    /**
+     * Compute a structural fingerprint from nodes + connections.
+     * Compares only the properties that define "the same workflow":
+     *   - node id, type, x, y, config (sorted by id)
+     *   - connection fromNodeId, toNodeId, outputType (sorted)
+     * Execution state (status, outputData, executionResult) is intentionally excluded.
+     */
+    const computeStructureFingerprint = useCallback((n: WorkflowNode[], c: Connection[]): string => {
+        const nodesPart = [...n]
+            .sort((a, b) => a.id.localeCompare(b.id))
+            .map(nd => ({
+                id: nd.id,
+                type: nd.type,
+                x: Math.round(nd.x ?? 0),
+                y: Math.round(nd.y ?? 0),
+                label: nd.label,
+                config: nd.config,
+            }));
+        const connPart = [...c]
+            .sort((a, b) => `${a.fromNodeId}-${a.toNodeId}`.localeCompare(`${b.fromNodeId}-${b.toNodeId}`))
+            .map(cn => ({
+                from: cn.fromNodeId,
+                to: cn.toNodeId,
+                out: cn.outputType ?? null,
+                inp: cn.inputPort ?? null,
+            }));
+        return JSON.stringify({ n: nodesPart, c: connPart });
+    }, []);
+
+    /**
+     * Compare current canvas with the version snapshot.
+     * Returns true if the structure has changed (→ should switch to Draft).
+     */
+    const hasStructureChanged = useCallback((): boolean => {
+        if (versionSnapshotRef.current === null) return false; // no version loaded
+        return computeStructureFingerprint(nodes, connections) !== versionSnapshotRef.current;
+    }, [nodes, connections, computeStructureFingerprint]);
+
     // Auto-save functionality
     useEffect(() => {
         if (!currentWorkflowId || !hasUnsavedChanges) return;
@@ -465,6 +518,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                 setAutoSaveStatus('saving');
                 try {
                     const data = { nodes, connections };
+                    // Detect if structure changed → switch to Draft and persist it
+                    let versionToSave = activeVersionNumber;
+                    if (activeVersionNumber !== null && hasStructureChanged()) {
+                        versionToSave = null;
+                    }
                     const res = await fetch(`${API_BASE}/workflows/${currentWorkflowId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
@@ -472,13 +530,18 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                             name: workflowName, 
                             data,
                             tags: workflowTags,
-                            lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
+                            lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown',
+                            activeVersionNumber: versionToSave,
                         }),
                         credentials: 'include'
                     });
                     if (res.ok) {
                         setAutoSaveStatus('saved');
                         setHasUnsavedChanges(false);
+                        if (versionToSave !== activeVersionNumber) {
+                            setActiveVersionNumber(null);
+                            versionSnapshotRef.current = null;
+                        }
                         setTimeout(() => setAutoSaveStatus(null), 2000);
                     }
                 } catch (error) {
@@ -489,7 +552,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         }, 2000); // Auto-save after 2 seconds of inactivity
 
         return () => clearTimeout(autoSaveTimer);
-    }, [nodes, connections, workflowName, workflowTags, currentWorkflowId, hasUnsavedChanges]);
+    }, [nodes, connections, workflowName, workflowTags, currentWorkflowId, hasUnsavedChanges, activeVersionNumber, hasStructureChanged]);
 
     // Generate shareable URL and embed code
     const getShareableUrl = () => {
@@ -647,13 +710,203 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             setNodes(workflow.data.nodes || []);
             setConnections(workflow.data.connections || []);
             setWorkflowTags(workflow.tags || []);
+            setPublishedVersionId(workflow.publishedVersionId || null);
+            // Restore persisted activeVersionNumber from DB (null = Draft)
+            const savedVersion: number | null = workflow.activeVersionNumber ?? null;
+            setActiveVersionNumber(savedVersion);
+            if (savedVersion != null) {
+                // Set snapshot so auto-save doesn't immediately flip to Draft
+                versionSnapshotRef.current = computeStructureFingerprint(
+                    workflow.data.nodes || [],
+                    workflow.data.connections || [],
+                );
+            } else {
+                versionSnapshotRef.current = null;
+            }
             lastLoadedWorkflowIdRef.current = workflow.id;
             // Update URL to reflect the loaded workflow
             if (updateUrl) {
                 navigate(`/workflow/${workflow.id}`, { replace: true });
             }
+            // Fetch published version number if a version is published
+            if (workflow.publishedVersionId) {
+                try {
+                    const vRes = await fetch(`${API_BASE}/workflows/${workflow.id}/versions/${workflow.publishedVersionId}`, { credentials: 'include' });
+                    if (vRes.ok) {
+                        const vData = await vRes.json();
+                        setPublishedVersionNumber(vData.version);
+                    }
+                } catch { /* ignore */ }
+            } else {
+                setPublishedVersionNumber(null);
+            }
+            // Fetch versions list for the dropdown
+            await fetchVersionsList(workflow.id);
         } catch (error) {
             console.error('Error loading workflow:', error);
+        }
+    };
+
+    // Fetch lightweight versions list for the toolbar dropdown
+    const fetchVersionsList = async (wfId?: string) => {
+        const id = wfId || currentWorkflowId;
+        if (!id) return;
+        try {
+            const res = await fetch(`${API_BASE}/workflows/${id}/versions`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                setVersionsList(data.map((v: any) => ({ version: v.version, id: v.id, name: v.name || `v${v.version}`, isProduction: v.isProduction === 1 })));
+                if (data.length > 0) {
+                    setLatestVersionNumber(data[0].version);
+                } else {
+                    setLatestVersionNumber(null);
+                }
+            }
+        } catch { /* ignore */ }
+    };
+
+    // Publish a new version (called from PublishWorkflowModal)
+    const handlePublishVersion = async (versionName: string, deployToProduction: boolean) => {
+        const wfId = currentWorkflowId;
+        if (!wfId) {
+            showToast('Please save the workflow first', 'error');
+            return;
+        }
+
+        // First save current state
+        try {
+            const cleanedNodes = nodes.map((node: any) => {
+                const cleanedNode = { ...node };
+                delete cleanedNode.result;
+                delete cleanedNode.status;
+                delete cleanedNode.error;
+                delete cleanedNode.executionTime;
+                return cleanedNode;
+            });
+            await fetch(`${API_BASE}/workflows/${wfId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: workflowName,
+                    data: { nodes: cleanedNodes, connections },
+                    tags: workflowTags,
+                    lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
+                }),
+                credentials: 'include'
+            });
+        } catch (saveErr) {
+            console.warn('Pre-publish save failed:', saveErr);
+        }
+
+        // Create a new version
+        const res = await fetch(`${API_BASE}/workflows/${wfId}/versions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: versionName,
+                createdByName: user?.name || user?.email?.split('@')[0] || 'Unknown',
+            }),
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to create version');
+        const newVersion = await res.json();
+
+        // Optionally deploy to production
+        if (deployToProduction) {
+            const pubRes = await fetch(`${API_BASE}/workflows/${wfId}/versions/${newVersion.id}/publish`, {
+                method: 'PUT',
+                credentials: 'include',
+            });
+            if (pubRes.ok) {
+                setPublishedVersionId(newVersion.id);
+                setPublishedVersionNumber(newVersion.version);
+            }
+        }
+
+        // Update versions list
+        await fetchVersionsList(wfId);
+
+        // Mark the newly published version as the active one
+        setActiveVersionNumber(newVersion.version);
+        versionSnapshotRef.current = computeStructureFingerprint(nodes, connections);
+
+        // Show the green "Published!" overlay
+        setShowPublishedOverlay(true);
+        setTimeout(() => setShowPublishedOverlay(false), 2500);
+
+        showToast(`Published ${versionName}${deployToProduction ? ' (deployed to production)' : ''}`, 'success');
+    };
+
+    // Handle restoring a version from the dropdown
+    const handleRestoreFromDropdown = async (versionId: string) => {
+        if (!currentWorkflowId) return;
+        try {
+            // 1) Call restore so the DB is updated with this version's data
+            const res = await fetch(`${API_BASE}/workflows/${currentWorkflowId}/versions/${versionId}/restore`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+            });
+            if (!res.ok) {
+                showToast('Failed to restore version', 'error');
+                return;
+            }
+            const result = await res.json();
+            const versionNum: number | null = result.version ?? null;
+
+            // 2) Reload the workflow from DB to guarantee a clean state refresh
+            const wfRes = await fetch(`${API_BASE}/workflows/${currentWorkflowId}`, { credentials: 'include' });
+            let loadedNodes: WorkflowNode[] = [];
+            let loadedConns: Connection[] = [];
+            if (wfRes.ok) {
+                const workflow = await wfRes.json();
+                loadedNodes = workflow.data?.nodes || [];
+                loadedConns = workflow.data?.connections || [];
+            } else {
+                // Fallback: use the data returned by the restore call
+                loadedNodes = result.data?.nodes || [];
+                loadedConns = result.data?.connections || [];
+            }
+            setNodes(loadedNodes);
+            setConnections(loadedConns);
+
+            // 3) Store structural snapshot so we can detect real changes later
+            versionSnapshotRef.current = computeStructureFingerprint(loadedNodes, loadedConns);
+
+            // 4) Update the active version indicator
+            setActiveVersionNumber(versionNum);
+
+            showToast(`Switched to v${versionNum || '?'}`, 'success');
+        } catch (error) {
+            console.error('Failed to restore version:', error);
+            showToast('Failed to restore version', 'error');
+        }
+    };
+
+    // Handle deleting a version from the dropdown
+    const handleDeleteVersion = async (versionId: string, versionNum: number) => {
+        if (!currentWorkflowId) return;
+        try {
+            const res = await fetch(`${API_BASE}/workflows/${currentWorkflowId}/versions/${versionId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Failed to delete version' }));
+                showToast(err.error || 'Failed to delete version', 'error');
+                return;
+            }
+            // Refresh the versions list
+            await fetchVersionsList(currentWorkflowId);
+            // If we were viewing the deleted version, switch to Draft
+            if (activeVersionNumber === versionNum) {
+                setActiveVersionNumber(null);
+                versionSnapshotRef.current = null;
+            }
+            showToast(`Version v${versionNum} deleted`, 'success');
+        } catch (error) {
+            console.error('Failed to delete version:', error);
+            showToast('Failed to delete version', 'error');
         }
     };
 
@@ -691,6 +944,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         }
 
         setIsSaving(true);
+        let newWorkflowIdRef: string | undefined;
         try {
             // Limit data size while preserving execution state for UX
             // This prevents 413 "Request Entity Too Large" errors while keeping useful info
@@ -745,6 +999,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             const data = { nodes: cleanedNodes, connections };
 
             if (currentWorkflowId) {
+                // Detect if structure changed → switch to Draft and persist it
+                let versionToSave = activeVersionNumber;
+                if (activeVersionNumber !== null && hasStructureChanged()) {
+                    versionToSave = null;
+                }
                 // Update existing
                 const res = await fetch(`${API_BASE}/workflows/${currentWorkflowId}`, {
                     method: 'PUT',
@@ -753,11 +1012,16 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                         name: workflowName, 
                         data,
                         tags: workflowTags,
-                        lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown'
+                        lastEditedByName: user?.name || user?.email?.split('@')[0] || 'Unknown',
+                        activeVersionNumber: versionToSave,
                     }),
                     credentials: 'include'
                 });
                 if (!res.ok) throw new Error('Failed to update workflow');
+                if (versionToSave !== activeVersionNumber) {
+                    setActiveVersionNumber(null);
+                    versionSnapshotRef.current = null;
+                }
             } else {
                 // Create new
                 const res = await fetch(`${API_BASE}/workflows`, {
@@ -774,11 +1038,13 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                 if (!res.ok) throw new Error('Failed to create workflow');
                 const newWorkflow = await res.json();
                 setCurrentWorkflowId(newWorkflow.id);
+                newWorkflowIdRef = newWorkflow.id;
                 // Update URL with new workflow ID
                 navigate(`/workflow/${newWorkflow.id}`, { replace: true });
             }
 
             await fetchWorkflows();
+
             showToast('Workflow saved successfully!', 'success');
         } catch (error) {
             console.error('Error saving workflow:', error);
@@ -1968,50 +2234,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         setShowRunnerModal(true);
     };
 
-    // Execution History Functions
-    const loadExecutionHistory = async () => {
-        if (!currentWorkflowId) return;
-        
-        setLoadingExecutions(true);
-        try {
-            const res = await fetch(`${API_BASE}/workflow/${currentWorkflowId}/executions?limit=20`, {
-                credentials: 'include'
-            });
-            if (res.ok) {
-                const data = await res.json();
-                // Parse JSON strings for inputs and nodeResults
-                const parsedData = data.map((exec: any) => ({
-                    ...exec,
-                    inputs: exec.inputs ? (typeof exec.inputs === 'string' ? JSON.parse(exec.inputs) : exec.inputs) : null,
-                    nodeResults: exec.nodeResults ? (typeof exec.nodeResults === 'string' ? JSON.parse(exec.nodeResults) : exec.nodeResults) : null
-                }));
-                setExecutionHistory(parsedData);
-            }
-        } catch (error) {
-            console.error('Failed to load execution history:', error);
-        } finally {
-            setLoadingExecutions(false);
-        }
-    };
-
+    // Execution history is now handled entirely by the ExecutionHistoryModal component
     const openExecutionHistory = () => {
-        loadExecutionHistory();
         setShowExecutionHistory(true);
-        setSelectedExecution(null);
     };
 
-    const formatDate = (dateString: string) => {
-        if (!dateString) return '-';
-        const date = new Date(dateString);
-        return date.toLocaleString('es-ES', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-        });
-    };
+    // formatDate removed – no longer needed (ExecutionHistoryModal has its own formatting)
 
     const runWorkflowFromRunner = async () => {
         setIsRunningWorkflow(true);
@@ -2147,6 +2375,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         saveWorkflow,
         setWaitingApprovalNodeId,
         setPendingApprovalData,
+        activeVersionNumber,
     });
 
     // AI Workflow Assistant Functions
@@ -3256,8 +3485,12 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                         saveWorkflow={saveWorkflow}
                         openExecutionHistory={openExecutionHistory}
                         runWorkflow={runWorkflow}
-                        openWorkflowRunner={openWorkflowRunner}
+                        openPublishModal={() => setShowPublishModal(true)}
                         setShowTagsModal={setShowTagsModal}
+                        activeVersion={activeVersionNumber}
+                        versions={versionsList}
+                        onRestoreVersion={handleRestoreFromDropdown}
+                        onDeleteVersion={handleDeleteVersion}
                     />
 
                     {/* Content Area (Sidebar + Canvas) */}
@@ -5348,18 +5581,65 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                 </div>
             )}
 
-            {/* Execution History Modal */}
-            <ExecutionHistoryInlineModal
-                showExecutionHistory={showExecutionHistory}
+            {/* Unified Execution + Version History Modal */}
+            <ExecutionHistoryModal
+                isOpen={showExecutionHistory}
                 onClose={() => setShowExecutionHistory(false)}
-                executionHistory={executionHistory}
-                selectedExecution={selectedExecution}
-                setSelectedExecution={setSelectedExecution}
-                loadExecutionHistory={loadExecutionHistory}
-                loadingExecutions={loadingExecutions}
-                nodes={nodes}
-                formatDate={formatDate}
+                workflowId={currentWorkflowId || ''}
+                workflowName={workflowName}
+                onRerun={(executionId) => {
+                    // Optionally handle re-run
+                    console.log('Re-run execution:', executionId);
+                }}
+                onRestore={(data, version) => {
+                    setNodes(data.nodes || []);
+                    setConnections(data.connections || []);
+                    setShowExecutionHistory(false);
+                    showToast(`Restored to v${version}`, 'success');
+                }}
+                publishedVersionId={publishedVersionId}
+                onPublishedVersionChange={async (versionId) => {
+                    setPublishedVersionId(versionId);
+                    if (versionId && currentWorkflowId) {
+                        try {
+                            const vRes = await fetch(`${API_BASE}/workflows/${currentWorkflowId}/versions/${versionId}`, { credentials: 'include' });
+                            if (vRes.ok) {
+                                const vData = await vRes.json();
+                                setPublishedVersionNumber(vData.version);
+                            }
+                        } catch { /* ignore */ }
+                    } else {
+                        setPublishedVersionNumber(null);
+                    }
+                    await fetchVersionsList();
+                }}
             />
+
+            {/* Publish Modal (OpenAI-style) */}
+            <PublishWorkflowModal
+                isOpen={showPublishModal}
+                onClose={() => setShowPublishModal(false)}
+                workflowName={workflowName}
+                currentVersion={latestVersionNumber}
+                onPublish={handlePublishVersion}
+            />
+
+            {/* Published! overlay on canvas */}
+            {showPublishedOverlay && (
+                <div
+                    className="fixed inset-0 z-[9998] flex items-center justify-center pointer-events-none"
+                    style={{ animation: 'publishedOverlay 2.5s ease-in-out forwards' }}
+                >
+                    <div className="flex items-center gap-3 px-6 py-4 bg-white/95 dark:bg-gray-900/95 rounded-2xl shadow-2xl border border-emerald-200 dark:border-emerald-800">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M5 10L8.5 13.5L15 6.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        </div>
+                        <span className="text-lg font-semibold text-[var(--text-primary)]">Published!</span>
+                    </div>
+                </div>
+            )}
 
             {/* Node Feedback Popup */}
             <FeedbackPopupModal

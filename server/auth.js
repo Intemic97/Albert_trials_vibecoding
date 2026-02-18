@@ -179,7 +179,7 @@ async function login(req, res) {
             return res.status(403).json({ error: 'User does not belong to an organization' });
         }
 
-        const token = jwt.sign({ sub: user.id, email: user.email, orgId: userOrg.organizationId, isAdmin: !!user.isAdmin }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ sub: user.id, email: user.email, name: user.name, orgId: userOrg.organizationId, isAdmin: !!user.isAdmin }, JWT_SECRET, { expiresIn: '24h' });
 
         res.cookie('auth_token', token, COOKIE_OPTIONS);
 
@@ -283,13 +283,14 @@ async function switchOrganization(req, res) {
             return res.status(403).json({ error: 'User does not belong to this organization' });
         }
 
-        // Get user's admin status to preserve it in the new token
-        const user = await db.get('SELECT isAdmin FROM users WHERE id = ?', [userId]);
+        // Get user's admin status and name to preserve in the new token
+        const user = await db.get('SELECT isAdmin, name FROM users WHERE id = ?', [userId]);
 
         // Generate new token with updated orgId and preserve isAdmin
         const token = jwt.sign({ 
             sub: userId, 
             email: req.user.email, 
+            name: user?.name || req.user.name,
             orgId, 
             isAdmin: !!user?.isAdmin 
         }, JWT_SECRET, { expiresIn: '24h' });
@@ -800,7 +801,7 @@ async function registerWithInvitation(req, res) {
 
         // Auto-login
         const token_jwt = jwt.sign(
-            { sub: userId, email, orgId: invitation.organizationId }, 
+            { sub: userId, email, name, orgId: invitation.organizationId }, 
             JWT_SECRET, 
             { expiresIn: '24h' }
         );
@@ -1106,7 +1107,7 @@ async function googleCallback(req, res) {
             }
 
             const token = jwt.sign(
-                { sub: user.id, email: user.email, orgId: userOrg.organizationId, isAdmin: !!user.isAdmin },
+                { sub: user.id, email: user.email, name: user.name, orgId: userOrg.organizationId, isAdmin: !!user.isAdmin },
                 JWT_SECRET,
                 { expiresIn: '24h' }
             );
@@ -1147,7 +1148,7 @@ async function googleCallback(req, res) {
 
             // Auto-login
             const token = jwt.sign(
-                { sub: userId, email, orgId, isAdmin: false },
+                { sub: userId, email, name: name || email.split('@')[0], orgId, isAdmin: false },
                 JWT_SECRET,
                 { expiresIn: '24h' }
             );
