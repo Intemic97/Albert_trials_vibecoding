@@ -1199,6 +1199,11 @@ async function initDb() {
     await db.exec(`ALTER TABLE workflows ADD COLUMN activeVersionNumber INTEGER`);
   } catch (e) { /* column exists */ }
 
+  // Migration: Add isPublic flag to workflows (SECURITY - controls public form access)
+  try {
+    await db.exec(`ALTER TABLE workflows ADD COLUMN isPublic INTEGER DEFAULT 0`);
+  } catch (e) { /* column exists */ }
+
   return db;
 }
 

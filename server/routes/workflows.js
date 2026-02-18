@@ -15,11 +15,39 @@ const { prefectClient } = require('../prefectClient');
 const { getPollingService } = require('../executionPolling');
 const workflowScheduler = require('../services/workflowScheduler');
 
+// ==================== RATE LIMITING FOR PUBLIC ENDPOINTS ====================
+const PUBLIC_RATE_LIMIT_PER_MIN = parseInt(process.env.PUBLIC_RATE_LIMIT_PER_MIN || '30', 10);
+const publicRateLimitMap = new Map();
+
+// Clean up stale entries every 60 seconds
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, data] of publicRateLimitMap.entries()) {
+        if (now - data.windowStart > 120000) publicRateLimitMap.delete(key);
+    }
+}, 60000);
+
+function publicRateLimit(req, res, next) {
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    const now = Date.now();
+    let data = publicRateLimitMap.get(ip);
+    if (!data || now - data.windowStart > 60000) {
+        data = { count: 0, windowStart: now };
+        publicRateLimitMap.set(ip, data);
+    }
+    data.count++;
+    if (data.count > PUBLIC_RATE_LIMIT_PER_MIN) {
+        console.warn(`[SECURITY] Rate limit exceeded for IP ${ip} on public endpoint ${req.path}`);
+        return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+}
+
 module.exports = function({ db, broadcastToOrganization }) {
 
 router.get('/workflows', authenticateToken, async (req, res) => {
     try {
-        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName, tags, publishedVersionId FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
+        const workflows = await db.all('SELECT id, name, createdAt, updatedAt, createdBy, createdByName, lastEditedBy, lastEditedByName, tags, publishedVersionId, isPublic FROM workflows WHERE organizationId = ? ORDER BY updatedAt DESC', [req.user.orgId]);
         // Parse tags JSON for each workflow
         const parsedWorkflows = workflows.map(workflow => ({
             ...workflow,
@@ -165,6 +193,41 @@ router.delete('/workflows/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Toggle workflow public access (for public forms)
+router.put('/workflows/:id/public-access', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isPublic } = req.body;
+
+        // Verify workflow belongs to user's organization
+        const workflow = await db.get('SELECT id, name FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        await db.run('UPDATE workflows SET isPublic = ? WHERE id = ? AND organizationId = ?', [isPublic ? 1 : 0, id, req.user.orgId]);
+
+        // Log activity
+        await logActivity(db, {
+            organizationId: req.user.orgId,
+            userId: req.user.sub,
+            userName: req.user.email,
+            userEmail: req.user.email,
+            action: isPublic ? 'make_public' : 'make_private',
+            resourceType: 'workflow',
+            resourceId: id,
+            resourceName: workflow.name,
+            ipAddress: req.ip || req.headers['x-forwarded-for'],
+            userAgent: req.headers['user-agent']
+        });
+
+        res.json({ message: `Workflow ${isPublic ? 'made public' : 'made private'}`, isPublic: !!isPublic });
+    } catch (error) {
+        console.error('Error toggling workflow public access:', error);
+        res.status(500).json({ error: 'Failed to update workflow public access' });
+    }
+});
+
 // Request access to a workflow from another organization
 router.post('/workflows/:id/request-access', authenticateToken, async (req, res) => {
     try {
@@ -219,8 +282,8 @@ router.post('/workflows/:id/request-access', authenticateToken, async (req, res)
 
 // ==================== WEBHOOK ENDPOINTS ====================
 
-// Receive webhook and trigger workflow execution
-router.post('/webhook/:workflowId', async (req, res) => {
+// Receive webhook and trigger workflow execution (rate limited)
+router.post('/webhook/:workflowId', publicRateLimit, async (req, res) => {
     try {
         const { workflowId } = req.params;
         const webhookData = req.body;
@@ -263,8 +326,8 @@ router.post('/webhook/:workflowId', async (req, res) => {
     }
 });
 
-// Webhook with custom token for security
-router.post('/webhook/:workflowId/:token', async (req, res) => {
+// Webhook with custom token for security (rate limited)
+router.post('/webhook/:workflowId/:token', publicRateLimit, async (req, res) => {
     try {
         const { workflowId, token } = req.params;
         const webhookData = req.body;
@@ -336,11 +399,11 @@ router.get('/workflow/:id/webhook-url', authenticateToken, async (req, res) => {
 
 // ==================== PUBLIC WORKFLOW FORM ENDPOINTS ====================
 
-// Debug endpoint to see workflow data
-router.get('/workflow/:id/debug', async (req, res) => {
+// Debug endpoint to see workflow data (protected - requires auth + org isolation)
+router.get('/workflow/:id/debug', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
-        const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [id]);
+        const workflow = await db.get('SELECT * FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
         
         if (!workflow) {
             return res.status(404).json({ error: 'Workflow not found' });
@@ -361,14 +424,19 @@ router.get('/workflow/:id/debug', async (req, res) => {
     }
 });
 
-// Get workflow info for public form (no auth required)
-router.get('/workflow/:id/public', async (req, res) => {
+// Get workflow info for public form (no auth required - but workflow must be marked as public)
+router.get('/workflow/:id/public', publicRateLimit, async (req, res) => {
     try {
         const { id } = req.params;
-        const workflow = await db.get('SELECT id, name, data FROM workflows WHERE id = ?', [id]);
+        const workflow = await db.get('SELECT id, name, data, isPublic FROM workflows WHERE id = ?', [id]);
         
         if (!workflow) {
             return res.status(404).json({ error: 'Workflow not found' });
+        }
+
+        // SECURITY: Only serve workflow data if explicitly marked as public
+        if (!workflow.isPublic) {
+            return res.status(403).json({ error: 'This workflow is not available publicly' });
         }
 
         // Parse workflow data to extract manual input nodes
@@ -400,19 +468,25 @@ router.get('/workflow/:id/public', async (req, res) => {
     }
 });
 
-// Run workflow from public form (no auth required) - FULL EXECUTION
-router.post('/workflow/:id/run-public', async (req, res) => {
+// Run workflow from public form (no auth required, but workflow must be marked as public + rate limited)
+router.post('/workflow/:id/run-public', publicRateLimit, async (req, res) => {
     try {
         const { id } = req.params;
         const { inputs } = req.body; // { nodeId: value, ... }
-
-        console.log(`[WorkflowExecutor] Public execution started for workflow ${id}`);
 
         // Get workflow to retrieve organizationId
         const workflow = await db.get('SELECT * FROM workflows WHERE id = ?', [id]);
         if (!workflow) {
             return res.status(404).json({ error: 'Workflow not found' });
         }
+
+        // SECURITY: Only allow execution if workflow is explicitly marked as public
+        if (!workflow.isPublic) {
+            console.warn(`[SECURITY] Blocked public execution attempt on non-public workflow ${id} from IP ${req.ip}`);
+            return res.status(403).json({ error: 'This workflow is not available for public execution' });
+        }
+
+        console.log(`[WorkflowExecutor] Public execution started for workflow ${id}`);
 
         const executor = new WorkflowExecutor(db, null, workflow.organizationId, null);
         const result = await executor.executeWorkflow(id, inputs || {}, workflow.organizationId);
@@ -809,19 +883,25 @@ router.get('/prefect/health', authenticateToken, async (req, res) => {
     }
 });
 
-// Get execution history for a workflow (public - for webhook debugging)
-router.get('/workflow/:id/executions', async (req, res) => {
+// Get execution history for a workflow (authenticated + org isolation)
+router.get('/workflow/:id/executions', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const limit = parseInt(req.query.limit) || 20;
+
+        // SECURITY: Verify the workflow belongs to the user's organization
+        const workflow = await db.get('SELECT id FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
+        if (!workflow) {
+            return res.status(404).json({ error: 'Workflow not found' });
+        }
         
         const executions = await db.all(`
             SELECT id, status, triggerType, inputs, nodeResults, finalOutput, createdAt, startedAt, completedAt, error, triggeredByName, versionNumber
             FROM workflow_executions 
-            WHERE workflowId = ?
+            WHERE workflowId = ? AND organizationId = ?
             ORDER BY createdAt DESC
             LIMIT ?
-        `, [id, limit]);
+        `, [id, req.user.orgId, limit]);
 
         // Parse JSON fields
         const parsed = executions.map(e => ({
