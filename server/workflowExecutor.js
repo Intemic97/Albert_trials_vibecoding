@@ -4,6 +4,9 @@
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
 const { gcsService } = require('./gcsService');
 const { isTimeSeriesData: detectTimeSeriesData, normalizeTimeSeriesData } = require('./utils/timeSeriesHelper');
 const { getOTConnectionsManager } = require('./utils/otConnections');
@@ -327,6 +330,7 @@ class WorkflowExecutor {
             dataHistorian: () => this.handleDataHistorian(node, inputData),
             timeSeriesAggregator: () => this.handleTimeSeriesAggregator(node, inputData),
             jsCode: () => this.handleJsCode(node, inputData),
+            python: () => this.handlePython(node, inputData),
             specializedAgent: () => this.handleSpecializedAgent(node, inputData),
         };
 
@@ -353,8 +357,11 @@ class WorkflowExecutor {
     }
 
     async handleManualInput(node, inputData) {
-        const varName = node.config?.inputVarName || node.config?.variableName || 'input';
-        const value = node.config?.inputVarValue || node.config?.variableValue || '';
+        const varName = node.config?.inputVarName || node.config?.manualInputVarName || node.config?.variableName || 'input';
+        const rawValue = node.config?.inputVarValue || node.config?.manualInputVarValue || node.config?.variableValue || '';
+        
+        // Parse numeric values so downstream nodes get numbers, not strings
+        const value = (rawValue !== '' && !isNaN(Number(rawValue))) ? Number(rawValue) : rawValue;
         
         return {
             success: true,
@@ -397,13 +404,32 @@ class WorkflowExecutor {
             }
         });
 
-        const data = Object.values(recordMap);
+        const fetchedRecords = Object.values(recordMap);
+
+        // Merge: add input data columns to each fetched record (like addField does)
+        let outputData;
+        if (inputData && typeof inputData === 'object' && !Array.isArray(inputData) && Object.keys(inputData).length > 0) {
+            // Input is a key-value map (e.g. from manualInput) — spread input keys into every fetched record
+            outputData = fetchedRecords.map(record => ({ ...inputData, ...record }));
+        } else if (Array.isArray(inputData) && inputData.length > 0) {
+            // Input is an array — spread input row fields into each fetched record (cross join style)
+            // If both have same length, merge 1-to-1; otherwise spread first input row into all
+            if (inputData.length === fetchedRecords.length) {
+                outputData = fetchedRecords.map((record, i) => ({ ...inputData[i], ...record }));
+            } else {
+                // Spread all input rows' fields into fetched records
+                const inputFlat = inputData.length === 1 ? inputData[0] : {};
+                outputData = fetchedRecords.map(record => ({ ...inputFlat, ...record }));
+            }
+        } else {
+            outputData = fetchedRecords;
+        }
 
         return {
             success: true,
-            message: `Fetched ${data.length} records`,
-            outputData: data,
-            recordCount: data.length
+            message: `Fetched ${fetchedRecords.length} records`,
+            outputData,
+            recordCount: fetchedRecords.length
         };
     }
 
@@ -847,6 +873,265 @@ class WorkflowExecutor {
             console.error('[JsCode] Error executing code:', error.message);
             throw new Error(`JavaScript execution error: ${error.message}`);
         }
+    }
+
+    async handlePython(node, inputData) {
+        const code = node.config?.pythonCode || node.config?.code || '';
+        if (!code) {
+            return { success: true, message: 'No Python code configured', outputData: inputData };
+        }
+
+        // Normalize inputData to array (same convention as ai.js)
+        const normalizedInput = Array.isArray(inputData) ? inputData : (inputData ? [inputData] : []);
+
+        // ========== 1. Try Lambda if configured (same as ai.js) ==========
+        const useLambda = process.env.USE_LAMBDA_FOR_PYTHON === 'true' &&
+                         process.env.AWS_ACCESS_KEY_ID &&
+                         process.env.LAMBDA_FUNCTION_NAME;
+
+        if (useLambda) {
+            try {
+                const { executePythonInLambda } = require('./lambdaService');
+                console.log('[Python WorkflowExecutor] Using AWS Lambda for execution');
+                const lambdaResult = await executePythonInLambda(code, normalizedInput);
+
+                if (lambdaResult.success) {
+                    const outputData = lambdaResult.result;
+                    console.log(`[Python WorkflowExecutor] Lambda execution successful, type: ${Array.isArray(outputData) ? `array[${outputData.length}]` : typeof outputData}`);
+                    return {
+                        success: true,
+                        message: `Python executed via Lambda`,
+                        outputData
+                    };
+                } else {
+                    throw new Error(lambdaResult.error || 'Lambda execution failed');
+                }
+            } catch (lambdaError) {
+                console.warn('[Python WorkflowExecutor] Lambda failed, falling back to local:', lambdaError.message);
+                // Fall through to local execution
+            }
+        }
+
+        // ========== 2. Local execution with sandboxing (same wrapper as ai.js) ==========
+        const EXECUTION_TIMEOUT = 30;
+
+        return new Promise((resolve, reject) => {
+            try {
+                const codeBase64 = Buffer.from(code).toString('base64');
+
+                // Full wrapper with security checks — identical to ai.js /python/execute
+                const wrapperCode = `
+import json
+import sys
+import ast
+import base64
+import signal
+
+# ============== TIMEOUT HANDLER ==============
+class TimeoutError(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutError("Execution timed out (${EXECUTION_TIMEOUT}s limit)")
+
+try:
+    signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(${EXECUTION_TIMEOUT})
+except:
+    pass  # Windows doesn't support SIGALRM
+
+# ============== SECURITY CHECKS ==============
+def check_security(code_str):
+    try:
+        tree = ast.parse(code_str)
+    except SyntaxError as e:
+        return f"Syntax Error: {e}"
+
+    allowed_imports = {
+        'json', 'math', 're', 'datetime', 'collections', 'itertools',
+        'functools', 'decimal', 'fractions', 'random', 'statistics',
+        'string', 'copy', 'operator', 'numbers', 'time', 'calendar',
+        'heapq', 'bisect', 'array', 'enum', 'typing', 'dataclasses',
+        'csv', 'hashlib', 'hmac', 'base64', 'binascii', 'struct',
+        'codecs', 'unicodedata', 'difflib', 'textwrap', 'pprint',
+        'urllib', 'html', 'xml', 'warnings', 'logging', 'uuid',
+        'pickle', 'shelve', 'sqlite3', 'zlib', 'gzip', 'bz2',
+        'numpy', 'pandas', 'scipy', 'matplotlib', 'seaborn',
+        'io', 'pathlib', 'glob', 'fnmatch', 'linecache', 'shutil'
+    }
+
+    forbidden_names = {
+        'open', 'exec', 'eval', 'compile', '__import__', 'input',
+        'breakpoint', 'help', 'exit', 'quit',
+        '__build_class__', '__loader__', '__spec__', '__builtins__',
+        '__cached__', '__doc__', '__file__', '__name__', '__package__'
+    }
+
+    forbidden_attrs = {
+        '__class__', '__bases__', '__subclasses__', '__mro__', '__dict__',
+        '__globals__', '__code__', '__closure__', '__func__', '__self__',
+        '__reduce__', '__reduce_ex__', '__getinitargs__', '__getnewargs__',
+        '__getstate__', '__setstate__', 'gi_frame', 'gi_code', 'f_globals',
+        'f_locals', 'f_builtins', 'co_code', 'func_globals', 'func_code'
+    }
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                module_base = alias.name.split('.')[0]
+                if module_base not in allowed_imports:
+                    return f"Security Error: Import of '{alias.name}' is not allowed"
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                module_base = node.module.split('.')[0]
+                if module_base not in allowed_imports:
+                    return f"Security Error: Import from '{node.module}' is not allowed"
+        elif isinstance(node, ast.Name):
+            if node.id in forbidden_names:
+                return f"Security Error: Access to '{node.id}' is not allowed"
+        elif isinstance(node, ast.Attribute):
+            if node.attr in forbidden_attrs:
+                return f"Security Error: Access to '{node.attr}' is not allowed"
+
+    return None
+
+# ============== SAFE BUILTINS ==============
+SAFE_BUILTINS = {
+    'True': True, 'False': False, 'None': None,
+    'abs': abs, 'all': all, 'any': any, 'bin': bin, 'bool': bool,
+    'chr': chr, 'dict': dict, 'divmod': divmod, 'enumerate': enumerate,
+    'filter': filter, 'float': float, 'format': format, 'frozenset': frozenset,
+    'hash': hash, 'hex': hex, 'int': int, 'isinstance': isinstance,
+    'issubclass': issubclass, 'iter': iter, 'len': len, 'list': list,
+    'map': map, 'max': max, 'min': min, 'next': next, 'oct': oct,
+    'ord': ord, 'pow': pow, 'print': print, 'range': range,
+    'repr': repr, 'reversed': reversed, 'round': round, 'set': set,
+    'slice': slice, 'sorted': sorted, 'str': str, 'sum': sum,
+    'tuple': tuple, 'zip': zip, 'complex': complex,
+    # Allow __import__ so whitelisted 'import X' statements work inside exec()
+    # Security check above already validates only whitelisted modules are imported
+    '__import__': __import__,
+}
+
+# ============== DECODE AND EXECUTE ==============
+try:
+    user_code = base64.b64decode("${codeBase64}").decode('utf-8')
+
+    security_error = check_security(user_code)
+    if security_error:
+        print(json.dumps({"error": security_error}))
+        sys.exit(0)
+
+    restricted_globals = {
+        '__builtins__': SAFE_BUILTINS,
+        'json': json,
+        'math': __import__('math'),
+        're': __import__('re'),
+        'datetime': __import__('datetime'),
+        'collections': __import__('collections'),
+        'itertools': __import__('itertools'),
+        'functools': __import__('functools'),
+        'decimal': __import__('decimal'),
+        'fractions': __import__('fractions'),
+        'random': __import__('random'),
+        'statistics': __import__('statistics'),
+        'string': __import__('string'),
+        'copy': __import__('copy'),
+    }
+    restricted_locals = {}
+
+    exec(user_code, restricted_globals, restricted_locals)
+
+    input_data = json.load(sys.stdin)
+
+    if 'process' in restricted_locals:
+        result = restricted_locals['process'](input_data)
+        print(json.dumps(result))
+    else:
+        print(json.dumps({"error": "Function 'process(data)' not found. Please define: def process(data): ..."}))
+
+except TimeoutError as e:
+    print(json.dumps({"error": str(e)}))
+except MemoryError:
+    print(json.dumps({"error": "Memory limit exceeded"}))
+except Exception as e:
+    print(json.dumps({"error": f"Runtime Error: {str(e)}"}))
+finally:
+    try:
+        signal.alarm(0)
+    except:
+        pass
+`;
+
+                const tempFile = path.join(__dirname, `sandbox_exec_${crypto.randomBytes(8).toString('hex')}.py`);
+                fs.writeFileSync(tempFile, wrapperCode);
+
+                const pythonCommand = process.platform === 'win32' ? 'py' : 'python3';
+                console.log('[Python WorkflowExecutor] Local sandboxed execution with:', pythonCommand);
+                const pythonProcess = spawn(pythonCommand, [tempFile]);
+
+                const processTimeout = setTimeout(() => {
+                    pythonProcess.kill('SIGKILL');
+                    console.error('[Python WorkflowExecutor] Process killed due to timeout');
+                }, (EXECUTION_TIMEOUT + 5) * 1000);
+
+                let stdoutData = '';
+                let stderrData = '';
+
+                pythonProcess.stdin.write(JSON.stringify(normalizedInput));
+                pythonProcess.stdin.end();
+
+                pythonProcess.stdout.on('data', (data) => {
+                    if (stdoutData.length < 10 * 1024 * 1024) {
+                        stdoutData += data.toString();
+                    }
+                });
+
+                pythonProcess.stderr.on('data', (data) => {
+                    if (stderrData.length < 1024 * 1024) {
+                        stderrData += data.toString();
+                    }
+                });
+
+                pythonProcess.on('error', (err) => {
+                    clearTimeout(processTimeout);
+                    try { fs.unlinkSync(tempFile); } catch (e) { /* ignore */ }
+                    console.error('[Python WorkflowExecutor] Failed to start python:', err);
+                    reject(new Error(`Failed to start Python: ${err.message}`));
+                });
+
+                pythonProcess.on('close', (code) => {
+                    clearTimeout(processTimeout);
+                    try { fs.unlinkSync(tempFile); } catch (e) { /* ignore */ }
+
+                    if (code !== 0 && !stdoutData) {
+                        console.error('[Python WorkflowExecutor] Execution failed:', stderrData);
+                        return reject(new Error(`Python execution failed: ${stderrData || 'Unknown error'}`));
+                    }
+
+                    try {
+                        const result = JSON.parse(stdoutData);
+                        if (result.error) {
+                            console.error('[Python WorkflowExecutor] Code error:', result.error);
+                            return reject(new Error(`Python code error: ${result.error}`));
+                        }
+
+                        console.log(`[Python WorkflowExecutor] Execution successful, result type: ${Array.isArray(result) ? `array[${result.length}]` : typeof result}`);
+
+                        resolve({
+                            success: true,
+                            message: `Python executed successfully (${Array.isArray(result) ? result.length + ' records' : typeof result})`,
+                            outputData: result
+                        });
+                    } catch (parseError) {
+                        console.error('[Python WorkflowExecutor] Failed to parse output:', stdoutData.substring(0, 200));
+                        reject(new Error('Failed to parse Python output'));
+                    }
+                });
+            } catch (error) {
+                reject(new Error(`Python setup error: ${error.message}`));
+            }
+        });
     }
 
     async handleCondition(node, inputData) {

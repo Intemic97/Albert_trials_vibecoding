@@ -30,11 +30,18 @@ import {
 // TYPES
 // ============================================================================
 
+interface WorkflowConnection {
+    id: string;
+    fromNodeId: string;
+    toNodeId: string;
+}
+
 interface Workflow {
     id: string;
     name: string;
     description?: string;
     nodes: WorkflowNode[];
+    data?: { nodes: WorkflowNode[]; connections: WorkflowConnection[] };
 }
 
 interface WorkflowNode {
@@ -43,6 +50,8 @@ interface WorkflowNode {
     label: string;
     config?: Record<string, any>;
     data?: any;
+    outputData?: any;
+    status?: string;
 }
 
 interface ParameterConfig {
@@ -464,7 +473,7 @@ const VisualizationCard: React.FC<{
         if (typeof source === 'number') return source;
         if (typeof source === 'string') return source;
         
-        // Array with aggregation
+        // Array with aggregation (explicit valueKey)
         if (Array.isArray(source) && source.length > 0 && dataMapping.valueKey) {
             const values = source.map(item => parseFloat(item[dataMapping.valueKey!])).filter(v => !isNaN(v));
             if (values.length === 0) return null;
@@ -475,13 +484,35 @@ const VisualizationCard: React.FC<{
                 case 'min': return Math.min(...values);
                 case 'max': return Math.max(...values);
                 case 'count': return values.length;
-                default: return values.reduce((a, b) => a + b, 0); // default sum for arrays
+                default: return values.reduce((a, b) => a + b, 0);
             }
         }
         
+        // Single-element array: extract first numeric or string value from the object
+        if (Array.isArray(source) && source.length === 1 && typeof source[0] === 'object') {
+            const obj = source[0];
+            const vals = Object.values(obj);
+            const firstNumeric = vals.find(v => typeof v === 'number');
+            if (firstNumeric !== undefined) return firstNumeric as number;
+            const firstString = vals.find(v => typeof v === 'string');
+            if (firstString !== undefined) return firstString as string;
+        }
+
+        // Multi-element array without valueKey: return count
+        if (Array.isArray(source) && source.length > 1) {
+            return source.length;
+        }
+        
         // Object with valueKey
-        if (typeof source === 'object' && source !== null && dataMapping.valueKey) {
+        if (typeof source === 'object' && source !== null && !Array.isArray(source) && dataMapping.valueKey) {
             return source[dataMapping.valueKey];
+        }
+
+        // Plain object: first numeric value
+        if (typeof source === 'object' && source !== null && !Array.isArray(source)) {
+            const vals = Object.values(source);
+            const firstNumeric = vals.find(v => typeof v === 'number');
+            if (firstNumeric !== undefined) return firstNumeric as number;
         }
         
         return source;
@@ -753,29 +784,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [datePreset, setDatePreset] = useState<string>('7d');
     
-    const [newVisualization, setNewVisualization] = useState({
-        type: 'kpi' as VisualizationConfig['type'],
-        title: '',
-        source: '',
-        format: 'number' as 'number' | 'currency' | 'percent',
-        xAxis: '',
-        yAxis: [] as string[],
-        labelKey: '',
-        valueKey: '',
-        aggregation: 'none' as 'none' | 'sum' | 'avg' | 'min' | 'max' | 'count',
-        unit: '',
-    });
-
-    // Helper: classify lastResult fields into scalar vs array
-    const resultScalarFields = useMemo(() => {
-        if (!lastResult || typeof lastResult !== 'object') return [];
-        return Object.entries(lastResult).filter(([_, v]) => typeof v === 'number' || typeof v === 'string');
-    }, [lastResult]);
-
-    const resultArrayFields = useMemo(() => {
-        if (!lastResult || typeof lastResult !== 'object') return [];
-        return Object.entries(lastResult).filter(([_, v]) => Array.isArray(v) && v.length > 0) as [string, any[]][];
-    }, [lastResult]);
+    // (newVisualization state removed — now uses node-based auto-detection)
 
     // Helper: get keys from an array field in lastResult
     const getArrayFieldKeys = useCallback((fieldName: string) => {
@@ -815,6 +824,17 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         workflowId: ''
     });
 
+    // Workflow detail for output node selection
+    const [workflowDetail, setWorkflowDetail] = useState<{ nodes: WorkflowNode[]; connections: WorkflowConnection[] } | null>(null);
+
+    // Compute output nodes: leaf nodes with no outgoing connection (terminal/result nodes)
+    const outputNodes = useMemo(() => {
+        if (!workflowDetail) return [];
+        const { nodes: wfNodes, connections: wfConns } = workflowDetail;
+        const fromNodeIds = new Set(wfConns.map(c => c.fromNodeId));
+        return wfNodes.filter(n => !fromNodeIds.has(n.id));
+    }, [workflowDetail]);
+
     // ========================================================================
     // DATA FETCHING
     // ========================================================================
@@ -833,6 +853,34 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             }
         }
     }, [simulationId, simulations]);
+
+    // Fetch workflow detail when a simulation with a real workflowId is selected
+    useEffect(() => {
+        if (!selectedSimulation?.workflowId) { setWorkflowDetail(null); return; }
+        if (selectedSimulation.workflowId.startsWith('demo') || selectedSimulation.workflowId.startsWith('preset')) {
+            setWorkflowDetail(null);
+            return;
+        }
+        (async () => {
+            try {
+                const res = await fetch(`${API_BASE}/workflows/${selectedSimulation.workflowId}`, { credentials: 'include' });
+                if (res.ok) {
+                    const wf = await res.json();
+                    console.log('[Lab] Workflow detail fetched:', { id: wf.id, name: wf.name, nodeCount: wf.data?.nodes?.length, connectionCount: wf.data?.connections?.length });
+                    if (wf.data) {
+                        setWorkflowDetail({
+                            nodes: wf.data.nodes || [],
+                            connections: wf.data.connections || []
+                        });
+                    }
+                } else {
+                    console.warn('[Lab] Failed to fetch workflow detail, status:', res.status);
+                }
+            } catch (e) {
+                console.error('Error fetching workflow detail for Lab:', e);
+            }
+        })();
+    }, [selectedSimulation?.workflowId]);
 
     useEffect(() => {
         const onDocumentClick = (event: MouseEvent) => {
@@ -1499,19 +1547,17 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         return null;
     };
 
-    // Extract raw data arrays from workflow execution results
+    // Extract raw data from workflow execution results, keyed by nodeId
     const extractWorkflowData = (results: any): Record<string, any> => {
         if (!results || typeof results !== 'object') return {};
         const extracted: Record<string, any> = {};
         Object.entries(results).forEach(([nodeId, nodeResult]: [string, any]) => {
-            if (nodeResult?.outputData) {
-                if (Array.isArray(nodeResult.outputData) && nodeResult.outputData.length > 0) {
-                    extracted[nodeId] = nodeResult.outputData;
-                } else if (typeof nodeResult.outputData === 'object') {
-                    Object.assign(extracted, nodeResult.outputData);
-                }
+            if (nodeResult?.outputData !== undefined) {
+                // Store by nodeId so visualizations can reference specific nodes
+                extracted[nodeId] = nodeResult.outputData;
             }
         });
+        console.log('[Lab] extractWorkflowData keys:', Object.keys(extracted), 'from result keys:', Object.keys(results));
         return extracted;
     };
 
@@ -1567,11 +1613,12 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     console.error('Calculation error:', calcError);
                 }
             } else {
-                // === FALLBACK: raw workflow execution ===
+                // === REAL WORKFLOW EXECUTION ===
                 const inputs: Record<string, any> = {};
                 selectedSimulation.parameters.forEach(param => {
                     inputs[param.nodeId] = parameterValues[param.id];
                 });
+                console.log(`[Lab] Executing workflow ${selectedSimulation.workflowId} with inputs:`, inputs);
                 const res = await fetch(`${API_BASE}/workflow/${selectedSimulation.workflowId}/execute`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1580,7 +1627,22 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    result = extractWorkflowData(data.result || {});
+                    console.log('[Lab] Workflow execution response:', data);
+                    if (data.backgroundExecution && data.executionId) {
+                        // Background execution → poll for results
+                        const pollResult = await pollExecution(data.executionId);
+                        if (pollResult) {
+                            result = extractWorkflowData(pollResult);
+                        }
+                    } else if (data.result) {
+                        // Synchronous execution — results are inline
+                        result = extractWorkflowData(data.result);
+                    } else if (data.results) {
+                        result = extractWorkflowData(data.results);
+                    }
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    console.error('[Lab] Workflow execution failed:', errData);
                 }
             }
             
@@ -1929,38 +1991,48 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         setParameterValues(scenario.parameterValues);
     };
 
-    const addVisualization = async () => {
-        if (!selectedSimulation || !newVisualization.title || !newVisualization.source) return;
+    // Add visualization from an output node with auto-detected type
+    const addVisualizationFromNode = async (node: WorkflowNode) => {
+        if (!selectedSimulation) return;
 
-        const chartType = newVisualization.type;
+        // The source is the nodeId — extractWorkflowData keys results by nodeId
+        const source = node.id;
+        const title = node.label || node.type || 'Output';
+
+        // Auto-detect type from lastResult if available, otherwise default to KPI
+        let vizType: VisualizationConfig['type'] = 'kpi';
         const dataMapping: VisualizationConfig['dataMapping'] = {
-            source: newVisualization.source,
-            format: newVisualization.format,
-            ...(newVisualization.unit && { unit: newVisualization.unit }),
-            ...(newVisualization.aggregation !== 'none' && { aggregation: newVisualization.aggregation }),
+            source,
+            format: 'number',
         };
 
-        // KPI on array: add valueKey + aggregation
-        if (chartType === 'kpi' && newVisualization.valueKey) {
-            dataMapping.valueKey = newVisualization.valueKey;
-        }
-
-        // Line / Bar / Area: add xAxis + yAxis
-        if (isChartType(chartType)) {
-            dataMapping.xAxis = newVisualization.xAxis;
-            dataMapping.yAxis = newVisualization.yAxis;
-        }
-
-        // Pie: add labelKey + valueKey
-        if (chartType === 'pie') {
-            dataMapping.labelKey = newVisualization.labelKey || 'name';
-            dataMapping.valueKey = newVisualization.valueKey || 'value';
+        if (lastResult && lastResult[source] != null) {
+            const data = lastResult[source];
+            if (Array.isArray(data) && data.length > 1) {
+                // Multi-row array → line chart
+                vizType = 'line';
+                const sample = data[0];
+                if (sample && typeof sample === 'object') {
+                    const keys = Object.keys(sample);
+                    const numericKeys = keys.filter(k => typeof sample[k] === 'number');
+                    const stringKeys = keys.filter(k => typeof sample[k] === 'string');
+                    dataMapping.xAxis = stringKeys[0] || keys[0] || '';
+                    dataMapping.yAxis = numericKeys.length > 0 ? numericKeys.slice(0, 3) : [keys[1] || keys[0]];
+                }
+            } else if (Array.isArray(data) && data.length === 1) {
+                // Single-row array → KPI card
+                vizType = 'kpi';
+            } else if (typeof data === 'number' || typeof data === 'string') {
+                vizType = 'kpi';
+            } else if (typeof data === 'object' && !Array.isArray(data)) {
+                vizType = 'kpi';
+            }
         }
 
         const viz: VisualizationConfig = {
             id: generateUUID(),
-            type: chartType,
-            title: newVisualization.title,
+            type: vizType,
+            title,
             dataMapping,
             position: { x: 0, y: 0, w: 1, h: 1 },
             color: CHART_COLORS[selectedSimulation.visualizations.length % CHART_COLORS.length]
@@ -1972,26 +2044,11 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
             updatedAt: new Date().toISOString()
         };
 
-        // Update locally first for immediate feedback
         setSelectedSimulation(updatedSim);
         setSimulations(prev => prev.map(s => s.id === updatedSim.id ? updatedSim : s));
-        
-        // Reset form and close modal
-        setNewVisualization({
-            type: 'kpi',
-            title: '',
-            source: '',
-            format: 'number',
-            xAxis: '',
-            yAxis: [],
-            labelKey: '',
-            valueKey: '',
-            aggregation: 'none',
-            unit: '',
-        });
         setShowAddVisualization(false);
 
-        // Persist to backend (skip for demo)
+        // Persist to backend
         if (selectedSimulation.id !== 'demo-experiment') {
             try {
                 await fetch(`${API_BASE}/simulations/${selectedSimulation.id}`, {
@@ -3273,7 +3330,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     {/* Header with Add Button */}
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-sm font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
-                            Visualizations
+                            Result Visualizations
                         </h2>
                         <button
                             onClick={() => setShowAddVisualization(true)}
@@ -3436,17 +3493,17 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                 <ChartLine size={24} className="text-[var(--text-tertiary)]" />
                             </div>
                             <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">
-                                No visualizations yet
+                                No result widgets yet
                             </h3>
                             <p className="text-sm text-[var(--text-tertiary)] max-w-md mb-4">
-                                Add charts, KPIs, and tables to visualize your experiment results.
+                                Add widgets from your workflow's output nodes to visualize results here.
                             </p>
                             <button
                                 onClick={() => setShowAddVisualization(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors"
                             >
                                 <Plus size={16} />
-                                Add Visualization
+                                Add Widget
                             </button>
                         </div>
                     )}
@@ -3468,13 +3525,13 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                 </div>
             </div>
 
-            {/* Add Visualization Modal */}
+            {/* Add Visualization Modal — select an output node */}
             {showAddVisualization && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-lg overflow-hidden">
+                    <div className="bg-[var(--bg-card)] rounded-2xl w-full max-w-md overflow-hidden">
                         <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between">
                             <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                                Add Visualization
+                                Add Result Widget
                             </h2>
                             <button
                                 onClick={() => setShowAddVisualization(false)}
@@ -3484,311 +3541,98 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                             </button>
                         </div>
                         
-                        <div className="p-6 space-y-5">
-                            {/* Visualization Type */}
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-3">
-                                    Type
-                                </label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {VISUALIZATION_TYPES.map(vt => {
-                                        const Icon = vt.icon;
-                                        const isSelected = newVisualization.type === vt.type;
-                                        return (
-                                            <button
-                                                key={vt.type}
-                                                onClick={() => setNewVisualization(prev => ({ ...prev, type: vt.type as any }))}
-                                                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all ${
-                                                    isSelected
-                                                        ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/5'
-                                                        : 'border-[var(--border-light)] hover:border-[var(--border-medium)]'
-                                                }`}
-                                            >
-                                                <Icon size={20} className={isSelected ? 'text-[var(--accent-primary)]' : 'text-[var(--text-secondary)]'} />
-                                                <span className={`text-xs font-medium ${isSelected ? 'text-[var(--accent-primary)]' : 'text-[var(--text-secondary)]'}`}>
-                                                    {vt.label}
-                                                </span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Title */}
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                                    Title
-                                </label>
-                                <input
-                                    type="text"
-                                    value={newVisualization.title}
-                                    onChange={(e) => setNewVisualization(prev => ({ ...prev, title: e.target.value }))}
-                                    placeholder="e.g., Monthly Revenue"
-                                    className="w-full px-3 py-2.5 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
-                                />
-                            </div>
-
-                            {/* Data Source - contextual by chart type */}
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                                    Data Source
-                                </label>
-                                {!lastResult ? (
-                                    <p className="text-xs text-[var(--text-tertiary)] p-3 bg-[var(--bg-tertiary)] rounded-lg border border-[var(--border-light)]">
-                                        Run the experiment first to see available data fields.
+                        <div className="p-6">
+                            {outputNodes.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <FlowArrow size={32} className="mx-auto mb-3 text-[var(--text-tertiary)]" />
+                                    <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
+                                        No output nodes found
                                     </p>
-                                ) : newVisualization.type === 'kpi' ? (
-                                    /* KPI: show only scalar (number) fields with preview */
-                                    <div>
-                                        <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-2">Numeric Fields</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {resultScalarFields.filter(([_, v]) => typeof v === 'number').map(([key, value]) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => setNewVisualization(prev => ({
-                                                        ...prev,
-                                                        source: key,
-                                                        title: prev.title || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-                                                    }))}
-                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
-                                                        newVisualization.source === key
-                                                            ? 'bg-[#419CAF] text-white'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
-                                                    }`}
-                                                >
-                                                    {key.replace(/_/g, ' ')} <span className="opacity-50 ml-1">({typeof value === 'number' ? value.toLocaleString() : value})</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {resultScalarFields.filter(([_, v]) => typeof v === 'number').length === 0 && (
-                                            <p className="text-xs text-[var(--text-tertiary)]">No numeric fields in workflow output.</p>
-                                        )}
-                                    </div>
-                                ) : (
-                                    /* Charts / Pie / Table: show only array fields */
-                                    <div>
-                                        <p className="text-[10px] uppercase tracking-wide text-[var(--text-tertiary)] mb-2">Dataset Fields</p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {resultArrayFields.map(([key, arr]) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => setNewVisualization(prev => ({
-                                                        ...prev,
-                                                        source: key,
-                                                        xAxis: '',
-                                                        yAxis: [],
-                                                        labelKey: '',
-                                                        valueKey: '',
-                                                        title: prev.title || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-                                                    }))}
-                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
-                                                        newVisualization.source === key
-                                                            ? 'bg-[#419CAF] text-white'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
-                                                    }`}
-                                                >
-                                                    {key.replace(/_/g, ' ')} <span className="opacity-50 ml-1">({arr.length} items)</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                        {resultArrayFields.length === 0 && (
-                                            <p className="text-xs text-[var(--text-tertiary)]">No array fields in workflow output. Charts need array data.</p>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Format selector (KPI + Charts) */}
-                            {newVisualization.type !== 'table' && (
-                                <div>
-                                    <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Formato</label>
-                                    <div className="flex gap-1.5">
-                                        {FORMAT_OPTIONS.map(opt => (
-                                            <button
-                                                key={opt.value}
-                                                onClick={() => setNewVisualization(prev => ({ ...prev, format: opt.value as any }))}
-                                                className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                                                    newVisualization.format === opt.value
-                                                        ? 'bg-[#419CAF] text-white'
-                                                        : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'
-                                                }`}
-                                            >
-                                                {opt.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    <p className="text-xs text-[var(--text-tertiary)] max-w-sm mx-auto mb-3">
+                                        {!selectedSimulation?.workflowId || selectedSimulation.workflowId.startsWith('demo') || selectedSimulation.workflowId.startsWith('preset')
+                                            ? 'This experiment does not have a real workflow assigned. Create or assign a workflow first.'
+                                            : 'The assigned workflow has no terminal (output) nodes. Add nodes to the workflow that produce results.'}
+                                    </p>
+                                    {selectedSimulation?.workflowId && !selectedSimulation.workflowId.startsWith('demo') && !selectedSimulation.workflowId.startsWith('preset') && (
+                                        <button
+                                            onClick={() => {
+                                                setShowAddVisualization(false);
+                                                navigate(`/workflow/${selectedSimulation.workflowId}`);
+                                            }}
+                                            className="inline-flex items-center gap-1.5 text-xs text-[var(--accent-primary)] hover:text-[var(--accent-primary-hover)] hover:underline transition-colors"
+                                        >
+                                            <FlowArrow size={12} />
+                                            Open workflow "{selectedSimulation.workflowName || 'Assigned Workflow'}"
+                                        </button>
+                                    )}
                                 </div>
-                            )}
-
-                            {/* KPI on array: aggregation + valueKey */}
-                            {newVisualization.type === 'kpi' && newVisualization.source && lastResult && Array.isArray(lastResult[newVisualization.source]) && (
+                            ) : (
                                 <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Agregacion</label>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {['sum', 'avg', 'min', 'max', 'count'].map(agg => (
+                                    <p className="text-xs text-[var(--text-tertiary)] mb-4">
+                                        Select an output node from the workflow. The visualization type will be auto-detected based on the data.
+                                    </p>
+                                    <div className="space-y-2 max-h-[360px] overflow-y-auto custom-scrollbar">
+                                        {outputNodes.map(node => {
+                                            // Check if already added
+                                            const alreadyAdded = selectedSimulation?.visualizations.some(v => v.dataMapping.source === node.id);
+                                            // Preview data if available
+                                            const nodeData = lastResult?.[node.id];
+                                            let previewText = 'Run experiment to see output';
+                                            if (nodeData != null) {
+                                                if (Array.isArray(nodeData)) {
+                                                    previewText = `${nodeData.length} rows → Line Chart`;
+                                                } else if (typeof nodeData === 'number') {
+                                                    previewText = `${nodeData.toLocaleString()} → KPI Card`;
+                                                } else if (typeof nodeData === 'string') {
+                                                    previewText = `"${nodeData.substring(0, 40)}${nodeData.length > 40 ? '…' : ''}" → Text Card`;
+                                                } else if (typeof nodeData === 'object') {
+                                                    previewText = `Object (${Object.keys(nodeData).length} fields) → KPI Card`;
+                                                }
+                                            }
+                                            return (
                                                 <button
-                                                    key={agg}
-                                                    type="button"
-                                                    onClick={() => setNewVisualization(prev => ({ ...prev, aggregation: agg as any }))}
-                                                    className={`px-3 py-1.5 text-xs rounded-md transition-all ${
-                                                        newVisualization.aggregation === agg
-                                                            ? 'bg-[#419CAF] text-white'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'
+                                                    key={node.id}
+                                                    onClick={() => !alreadyAdded && addVisualizationFromNode(node)}
+                                                    disabled={!!alreadyAdded}
+                                                    className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                                                        alreadyAdded
+                                                            ? 'border-[var(--border-light)] bg-[var(--bg-tertiary)] opacity-50 cursor-not-allowed'
+                                                            : 'border-[var(--border-light)] hover:border-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/5 cursor-pointer'
                                                     }`}
                                                 >
-                                                    {agg === 'sum' ? 'Suma' : agg === 'avg' ? 'Promedio' : agg === 'min' ? 'Minimo' : agg === 'max' ? 'Maximo' : 'Conteo'}
+                                                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+                                                        alreadyAdded ? 'bg-[var(--bg-tertiary)]' : 'bg-[var(--accent-primary)]/10'
+                                                    }`}>
+                                                        {alreadyAdded
+                                                            ? <Check size={16} className="text-[var(--text-tertiary)]" />
+                                                            : <FlowArrow size={16} className="text-[var(--accent-primary)]" />
+                                                        }
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                                                            {node.label || node.type}
+                                                        </p>
+                                                        <p className="text-[11px] text-[var(--text-tertiary)] truncate">
+                                                            {alreadyAdded ? 'Already added' : previewText}
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] shrink-0">
+                                                        {node.type}
+                                                    </span>
                                                 </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Campo a agregar</label>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {getArrayFieldKeys(newVisualization.source).filter(f => f.type === 'number').map(({ key }) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => setNewVisualization(prev => ({ ...prev, valueKey: key }))}
-                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
-                                                        newVisualization.valueKey === key
-                                                            ? 'bg-[#419CAF] text-white'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50'
-                                                    }`}
-                                                >
-                                                    {key}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Unit (optional, for all types) */}
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Unidad <span className="text-[var(--text-tertiary)] font-normal">(opcional)</span></label>
-                                <input
-                                    type="text"
-                                    value={newVisualization.unit}
-                                    onChange={(e) => setNewVisualization(prev => ({ ...prev, unit: e.target.value }))}
-                                    placeholder="Ej: ton, USD/ton, kWh, %..."
-                                    className="w-full px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-light)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[#419CAF]"
-                                />
-                            </div>
-
-                            {/* Line / Bar / Area: X-Axis and Y-Axis with clickable keys */}
-                            {isChartType(newVisualization.type) && newVisualization.source && getArrayFieldKeys(newVisualization.source).length > 0 && (
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">X Axis (labels)</label>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {getArrayFieldKeys(newVisualization.source).map(({ key, type: kType }) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => setNewVisualization(prev => ({ ...prev, xAxis: key }))}
-                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
-                                                        newVisualization.xAxis === key
-                                                            ? 'bg-[#419CAF] text-white'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
-                                                    }`}
-                                                >
-                                                    {key} <span className="opacity-40">({kType})</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Y Axis (values) <span className="text-[var(--text-tertiary)] font-normal">- select one or more</span></label>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {getArrayFieldKeys(newVisualization.source).filter(f => f.type === 'number').map(({ key }) => {
-                                                const isSelected = newVisualization.yAxis.includes(key);
-                                                return (
-                                                    <button
-                                                        key={key}
-                                                        type="button"
-                                                        onClick={() => setNewVisualization(prev => ({
-                                                            ...prev,
-                                                            yAxis: isSelected
-                                                                ? prev.yAxis.filter(k => k !== key)
-                                                                : [...prev.yAxis, key]
-                                                        }))}
-                                                        className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
-                                                            isSelected
-                                                                ? 'bg-[#419CAF] text-white'
-                                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
-                                                        }`}
-                                                    >
-                                                        {isSelected ? '✓ ' : ''}{key}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {/* Pie Chart: Label Field + Value Field */}
-                            {newVisualization.type === 'pie' && newVisualization.source && getArrayFieldKeys(newVisualization.source).length > 0 && (
-                                <>
-                                    <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Label Field (slice names)</label>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {getArrayFieldKeys(newVisualization.source).filter(f => f.type === 'string').map(({ key }) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => setNewVisualization(prev => ({ ...prev, labelKey: key }))}
-                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
-                                                        newVisualization.labelKey === key
-                                                            ? 'bg-[#419CAF] text-white'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
-                                                    }`}
-                                                >
-                                                    {key}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">Value Field (slice sizes)</label>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {getArrayFieldKeys(newVisualization.source).filter(f => f.type === 'number').map(({ key }) => (
-                                                <button
-                                                    key={key}
-                                                    type="button"
-                                                    onClick={() => setNewVisualization(prev => ({ ...prev, valueKey: key }))}
-                                                    className={`px-2.5 py-1.5 text-xs rounded-md transition-all ${
-                                                        newVisualization.valueKey === key
-                                                            ? 'bg-[#419CAF] text-white'
-                                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border border-[var(--border-light)] hover:border-[#419CAF]/50 hover:text-[#419CAF]'
-                                                    }`}
-                                                >
-                                                    {key}
-                                                </button>
-                                            ))}
-                                        </div>
+                                            );
+                                        })}
                                     </div>
                                 </>
                             )}
                         </div>
                         
-                        <div className="px-6 py-4 border-t border-[var(--border-light)] flex justify-end gap-3">
+                        <div className="px-6 py-3 border-t border-[var(--border-light)] flex justify-end">
                             <button
                                 onClick={() => setShowAddVisualization(false)}
                                 className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                             >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={addVisualization}
-                                disabled={!newVisualization.title || !newVisualization.source}
-                                className="flex items-center gap-2 px-4 py-2 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Plus size={16} />
-                                Add
+                                Close
                             </button>
                         </div>
                     </div>

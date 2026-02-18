@@ -337,6 +337,9 @@ SAFE_BUILTINS = {
     'zip': zip,
     # Math functions (safe)
     'complex': complex,
+    # Allow __import__ so whitelisted 'import X' statements work inside exec()
+    # Security check above already validates only whitelisted modules are imported
+    '__import__': __import__,
 }
 
 # ============== DECODE AND EXECUTE ==============
@@ -471,7 +474,17 @@ finally:
 
 // Franmit Reactor Execution Endpoint - Local Python Execution
 router.post('/franmit/execute', authenticateToken, async (req, res) => {
-    const { mode, receta, recetas, qins, reactorConfiguration } = req.body;
+    const { mode, receta, recetas, qins, reactorConfiguration, apiSecret } = req.body;
+
+    // Validate API secret before executing
+    const expectedSecret = process.env.FRANMIT_API_SECRET;
+    if (!expectedSecret) {
+        console.error('[Franmit] FRANMIT_API_SECRET not configured in environment');
+        return res.status(500).json({ success: false, error: 'FranMIT not configured on server. Contact administrator.' });
+    }
+    if (!apiSecret || apiSecret !== expectedSecret) {
+        return res.status(403).json({ success: false, error: 'Invalid API secret. Please enter the correct secret in the node configuration.' });
+    }
 
     const fs = require('fs');
     const path = require('path');

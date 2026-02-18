@@ -94,7 +94,10 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
         const records = await res.json();
 
         const entity = entities.find((e: any) => e.id === node.config?.entityId);
-        nodeData = records.map((record: any) => {
+        console.log('[fetchData] records from API:', records.length, 'first record:', JSON.stringify(records[0]));
+        console.log('[fetchData] entity found:', !!entity, 'entity props:', entity?.properties?.length);
+        console.log('[fetchData] inputData:', inputData);
+        const fetchedRecords = records.map((record: any) => {
           const flattened: any = { id: record.id, createdAt: record.createdAt };
           if (record.values) {
             Object.entries(record.values).forEach(([propId, value]) => {
@@ -108,6 +111,22 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
           }
           return flattened;
         });
+
+        // Merge: add input data columns to each fetched record (like addField does)
+        if (inputData && typeof inputData === 'object' && !Array.isArray(inputData) && Object.keys(inputData).length > 0) {
+          // Input is key-value map (e.g. from manualInput) — spread into every fetched record
+          nodeData = fetchedRecords.map((record: any) => ({ ...inputData, ...record }));
+        } else if (Array.isArray(inputData) && inputData.length > 0) {
+          // Input is array — merge 1-to-1 if same length, else spread first row into all
+          if (inputData.length === fetchedRecords.length) {
+            nodeData = fetchedRecords.map((record: any, i: number) => ({ ...inputData[i], ...record }));
+          } else {
+            const inputFlat = inputData.length === 1 ? inputData[0] : {};
+            nodeData = fetchedRecords.map((record: any) => ({ ...inputFlat, ...record }));
+          }
+        } else {
+          nodeData = fetchedRecords;
+        }
         result = `Fetched ${records.length} records from ${node.config.entityName}`;
       } catch (error) {
         result = 'Error fetching data';
@@ -316,6 +335,14 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
 
         case 'franmit':
           try {
+            // Block execution if API secret is not configured
+            const franmitSecret = node.config?.franmitApiSecretId || '';
+            if (!franmitSecret.trim()) {
+              result = 'Error: API secret not configured. Open the node config and enter the secret.';
+              updateNodeAndBroadcast(nodeId, { status: 'error' as const, executionResult: result, outputData: [{ error: 'API secret not configured' }] });
+              return;
+            }
+
             const sanitizeFranmitOutput = (obj: any, depth = 0): any => {
               if (depth > 50) return obj;
               if (obj === null || obj === undefined) return 0;
@@ -367,8 +394,8 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
 
             const isBatch = Array.isArray(mappedInputData) && mappedInputData.length > 0;
             const requestBody = isBatch
-              ? { mode: 'batch', recetas: mappedInputData, reactorConfiguration }
-              : { mode: 'single', receta: (typeof mappedInputData === 'object' && !Array.isArray(mappedInputData)) ? mappedInputData : {}, reactorConfiguration };
+              ? { mode: 'batch', recetas: mappedInputData, reactorConfiguration, apiSecret: franmitSecret }
+              : { mode: 'single', receta: (typeof mappedInputData === 'object' && !Array.isArray(mappedInputData)) ? mappedInputData : {}, reactorConfiguration, apiSecret: franmitSecret };
 
             const response = await fetch(`${API_BASE}/franmit/execute`, {
               method: 'POST',
@@ -520,14 +547,14 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
           break;
 
         case 'manualInput':
-          if (node.config?.inputVarName) {
-            const varName = node.config.inputVarName;
-            const varValue = node.config.inputVarValue || '';
+          if (node.config?.manualInputVarName || node.config?.inputVarName) {
+            const varName = node.config.manualInputVarName || node.config.inputVarName;
+            const varValue = node.config.manualInputVarValue ?? node.config.inputVarValue ?? '';
             const parsedValue = !isNaN(Number(varValue)) && varValue.trim() !== '' ? Number(varValue) : varValue;
             nodeData = [{ [varName]: parsedValue }];
             result = `Set ${varName} = ${parsedValue}`;
           } else {
-            result = 'Not configured';
+            result = 'Not configured — set variable name in node config';
           }
           break;
 

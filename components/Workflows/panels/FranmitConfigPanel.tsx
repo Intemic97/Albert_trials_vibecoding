@@ -137,6 +137,7 @@ export const FranmitConfigPanel: React.FC<FranmitConfigPanelProps> = ({ nodeId, 
                 </button>
                 <button
                     onClick={handleSave}
+                    disabled={!franmitApiSecretId.trim()}
                     className="flex items-center px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     Save
@@ -144,19 +145,31 @@ export const FranmitConfigPanel: React.FC<FranmitConfigPanelProps> = ({ nodeId, 
             </>
         }
     >
+        {/* Hidden dummy fields to prevent browser autofill on real inputs */}
+        <div aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+            <input type="text" name="prevent-autofill-user" tabIndex={-1} />
+            <input type="password" name="prevent-autofill-pass" tabIndex={-1} />
+        </div>
         <div className="space-y-5">
-            {/* API Credentials Secret ID */}
+            {/* API Secret */}
             <div>
                 <label className="block text-xs font-medium text-[var(--text-primary)] mb-2">
-                    API Credentials Secret ID
+                    API Secret <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                     <input
                         type={showFranmitApiSecret ? 'text' : 'password'}
                         value={franmitApiSecretId}
                         onChange={(e) => setFranmitApiSecretId(e.target.value)}
-                        placeholder="Enter secret ID..."
-                        className="w-full px-3 py-1.5 pr-10 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
+                        placeholder="Enter API secret to enable execution..."
+                        autoComplete="off"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        name="franmit-secret-field"
+                        id="franmit-secret-field"
+                        className={`w-full px-3 py-1.5 pr-10 border rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)] ${
+                          !franmitApiSecretId.trim() ? 'border-red-300' : 'border-[var(--border-light)]'
+                        }`}
                     />
                     <button
                         type="button"
@@ -167,6 +180,9 @@ export const FranmitConfigPanel: React.FC<FranmitConfigPanelProps> = ({ nodeId, 
                         <Eye size={14} />
                     </button>
                 </div>
+                {!franmitApiSecretId.trim() && (
+                    <p className="text-[10px] text-red-500 mt-1">Required — node cannot execute without a valid secret</p>
+                )}
             </div>
 
             {/* Parameters Section */}
@@ -183,6 +199,7 @@ export const FranmitConfigPanel: React.FC<FranmitConfigPanelProps> = ({ nodeId, 
                         value={franmitReactorVolume}
                         onChange={(e) => setFranmitReactorVolume(e.target.value)}
                         placeholder="53"
+                        autoComplete="off"
                         className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                     />
                 </div>
@@ -197,6 +214,7 @@ export const FranmitConfigPanel: React.FC<FranmitConfigPanelProps> = ({ nodeId, 
                         value={franmitReactionVolume}
                         onChange={(e) => setFranmitReactionVolume(e.target.value)}
                         placeholder="Reaction Volume"
+                        autoComplete="off"
                         className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                     />
                 </div>
@@ -211,6 +229,7 @@ export const FranmitConfigPanel: React.FC<FranmitConfigPanelProps> = ({ nodeId, 
                         value={franmitCatalystScaleFactor}
                         onChange={(e) => setFranmitCatalystScaleFactor(e.target.value)}
                         placeholder="1"
+                        autoComplete="off"
                         className="w-full px-3 py-1.5 border border-[var(--border-light)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--border-medium)] focus:border-[var(--border-medium)] placeholder:text-[var(--text-tertiary)]"
                     />
                 </div>

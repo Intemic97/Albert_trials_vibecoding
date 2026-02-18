@@ -47,6 +47,61 @@ export const SplitColumnsConfigPanel: React.FC<SplitColumnsConfigPanelProps> = (
   );
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
 
+  // --- Drag & drop handlers ---
+  const handleDragStart = (column: string) => {
+    setDraggedColumn(column);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedColumn(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDropOnOutputA = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!draggedColumn) return;
+    // Remove from B and available, add to A
+    setSplitColumnsOutputB(prev => prev.filter(c => c !== draggedColumn));
+    setSplitColumnsAvailable(prev => prev.filter(c => c !== draggedColumn));
+    setSplitColumnsOutputA(prev => prev.includes(draggedColumn) ? prev : [...prev, draggedColumn]);
+    setDraggedColumn(null);
+  };
+
+  const handleDropOnOutputB = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!draggedColumn) return;
+    // Remove from A and available, add to B
+    setSplitColumnsOutputA(prev => prev.filter(c => c !== draggedColumn));
+    setSplitColumnsAvailable(prev => prev.filter(c => c !== draggedColumn));
+    setSplitColumnsOutputB(prev => prev.includes(draggedColumn) ? prev : [...prev, draggedColumn]);
+    setDraggedColumn(null);
+  };
+
+  const moveColumnToB = (column: string) => {
+    setSplitColumnsOutputA(prev => prev.filter(c => c !== column));
+    setSplitColumnsOutputB(prev => prev.includes(column) ? prev : [...prev, column]);
+  };
+
+  const moveColumnToA = (column: string) => {
+    setSplitColumnsOutputB(prev => prev.filter(c => c !== column));
+    setSplitColumnsOutputA(prev => prev.includes(column) ? prev : [...prev, column]);
+  };
+
+  const moveAllToA = () => {
+    setSplitColumnsOutputA([...allColumns]);
+    setSplitColumnsOutputB([]);
+    setSplitColumnsAvailable([]);
+  };
+
+  const moveAllToB = () => {
+    setSplitColumnsOutputA([]);
+    setSplitColumnsOutputB([...allColumns]);
+    setSplitColumnsAvailable([]);
+  };
+
   const handleSave = () => {
     onSave(nodeId, { columnsOutputA: splitColumnsOutputA, columnsOutputB: splitColumnsOutputB });
     onClose();
