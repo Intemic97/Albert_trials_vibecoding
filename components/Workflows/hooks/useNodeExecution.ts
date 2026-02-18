@@ -214,13 +214,15 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
         }
 
         case 'addField':
-          if (node.config?.conditionField && inputData && Array.isArray(inputData)) {
-            const fieldName = node.config.conditionField;
-            const fieldValue = node.config.conditionValue || '';
+          if ((node.config?.addFieldName || node.config?.conditionField) && inputData && Array.isArray(inputData)) {
+            const fieldName = node.config.addFieldName || node.config.conditionField;
+            const fieldValue = node.config.addFieldValue ?? node.config.conditionValue ?? '';
             nodeData = inputData.map((record: any) => ({ ...record, [fieldName]: fieldValue }));
             result = `Added field "${fieldName}" = "${fieldValue}" to ${nodeData.length} records`;
+          } else if (!inputData || (Array.isArray(inputData) && inputData.length === 0)) {
+            result = 'No input data received';
           } else {
-            result = 'Not configured or no data';
+            result = 'Not configured — set field name in node config';
           }
           break;
 
@@ -330,14 +332,43 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
               return obj;
             };
 
+            // Apply column mapping: rename input columns to FranMIT expected parameter names
+            const colMapping: Record<string, string> = node.config?.franmitColumnMapping || {};
+            const applyFranmitMapping = (row: Record<string, any>): Record<string, any> => {
+              if (!row || typeof row !== 'object') return row;
+              const mapped: Record<string, any> = {};
+              // Build reverse map: inputColumn -> franmitParam
+              const reverseMap: Record<string, string> = {};
+              for (const [franmitParam, inputCol] of Object.entries(colMapping)) {
+                if (inputCol && typeof inputCol === 'string') {
+                  reverseMap[inputCol] = franmitParam;
+                }
+              }
+              for (const [key, value] of Object.entries(row)) {
+                const targetKey = reverseMap[key] || key;
+                mapped[targetKey] = value;
+              }
+              return mapped;
+            };
+
+            const hasMappingConfig = Object.keys(colMapping).length > 0;
+            let mappedInputData = inputData;
+            if (hasMappingConfig) {
+              if (Array.isArray(inputData)) {
+                mappedInputData = inputData.map(applyFranmitMapping);
+              } else if (typeof inputData === 'object' && inputData !== null) {
+                mappedInputData = applyFranmitMapping(inputData);
+              }
+            }
+
             const reactorConfiguration: any = {};
             reactorConfiguration.V_reb = parseFloat(node.config?.franmitReactorVolume || '') || 53;
             reactorConfiguration.scale_cat = parseFloat(node.config?.franmitCatalystScaleFactor || '') || 1;
 
-            const isBatch = Array.isArray(inputData) && inputData.length > 0;
+            const isBatch = Array.isArray(mappedInputData) && mappedInputData.length > 0;
             const requestBody = isBatch
-              ? { mode: 'batch', recetas: inputData, reactorConfiguration }
-              : { mode: 'single', receta: (typeof inputData === 'object' && !Array.isArray(inputData)) ? inputData : {}, reactorConfiguration };
+              ? { mode: 'batch', recetas: mappedInputData, reactorConfiguration }
+              : { mode: 'single', receta: (typeof mappedInputData === 'object' && !Array.isArray(mappedInputData)) ? mappedInputData : {}, reactorConfiguration };
 
             const response = await fetch(`${API_BASE}/franmit/execute`, {
               method: 'POST',

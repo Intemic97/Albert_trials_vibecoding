@@ -535,8 +535,8 @@ router.post('/franmit/execute', authenticateToken, async (req, res) => {
         
         console.log('[Franmit] Input data:', JSON.stringify(inputData).substring(0, 400));
 
-        // Path to Python script
-        const scriptPath = path.join(__dirname, 'franmit_model.py');
+        // Path to Python script (franmit_model.py lives in server/, one level up from routes/)
+        const scriptPath = path.join(__dirname, '..', 'franmit_model.py');
         
         if (!fs.existsSync(scriptPath)) {
             return res.status(500).json({

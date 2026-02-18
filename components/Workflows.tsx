@@ -4961,15 +4961,28 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                         )}
 
                         {/* FranMIT Configuration Panel */}
-                        {configuringFranmitNodeId && (
-                            <FranmitConfigPanel
-                                nodeId={configuringFranmitNodeId!}
-                                node={nodes.find(n => n.id === configuringFranmitNodeId)}
-                                onSave={handlePanelSave}
-                                onClose={() => setConfiguringFranmitNodeId(null)}
-                                openFeedbackPopup={openFeedbackPopup}
-                            />
-                        )}
+                        {configuringFranmitNodeId && (() => {
+                            // Derive available input columns from parent node's outputData
+                            const parentConn = connections.find(c => c.toNodeId === configuringFranmitNodeId);
+                            const parentNode = parentConn ? nodes.find(n => n.id === parentConn.fromNodeId) : null;
+                            const parentOutput = parentNode?.outputData;
+                            let inputCols: string[] = [];
+                            if (Array.isArray(parentOutput) && parentOutput.length > 0 && typeof parentOutput[0] === 'object') {
+                                inputCols = Object.keys(parentOutput[0]);
+                            } else if (parentOutput && typeof parentOutput === 'object' && !Array.isArray(parentOutput)) {
+                                inputCols = Object.keys(parentOutput);
+                            }
+                            return (
+                                <FranmitConfigPanel
+                                    nodeId={configuringFranmitNodeId!}
+                                    node={nodes.find(n => n.id === configuringFranmitNodeId)}
+                                    onSave={handlePanelSave}
+                                    onClose={() => setConfiguringFranmitNodeId(null)}
+                                    openFeedbackPopup={openFeedbackPopup}
+                                    inputColumns={inputCols}
+                                />
+                            );
+                        })()}
 
                         {/* Conveyor Belt Configuration Panel */}
                         {configuringConveyorNodeId && (
