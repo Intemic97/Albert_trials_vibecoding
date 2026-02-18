@@ -755,10 +755,9 @@ async function gracefulShutdown(signal) {
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));   // Ctrl+C
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM')); // kill command
 
-// Windows: handle Ctrl+C on Windows terminal
-if (process.platform === 'win32') {
+// Windows: handle Ctrl+C on Windows terminal (only if stdin is a TTY)
+if (process.platform === 'win32' && process.stdin.isTTY) {
     const readline = require('readline');
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     rl.on('SIGINT', () => gracefulShutdown('SIGINT'));
-    rl.on('close', () => gracefulShutdown('STDIN_CLOSE'));
 }
