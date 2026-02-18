@@ -49,9 +49,18 @@ class WorkflowExecutor {
         `, [this.executionId, workflowId, organizationId, JSON.stringify(inputs), now, nameToStore, versionNumber]);
 
         try {
-            // Load workflow
-            this.workflow = await this.db.get('SELECT * FROM workflows WHERE id = ?', [workflowId]);
+            // Load workflow (with org validation if organizationId is provided)
+            if (organizationId) {
+                this.workflow = await this.db.get('SELECT * FROM workflows WHERE id = ? AND organizationId = ?', [workflowId, organizationId]);
+            } else {
+                this.workflow = await this.db.get('SELECT * FROM workflows WHERE id = ?', [workflowId]);
+            }
             if (!this.workflow) {
+                throw new Error('Workflow not found');
+            }
+            // Double-check org match even for cases where orgId was passed but workflow belongs to different org
+            if (organizationId && this.workflow.organizationId !== organizationId) {
+                console.warn(`[SECURITY] WorkflowExecutor: org mismatch for workflow ${workflowId}. Expected=${organizationId}, Actual=${this.workflow.organizationId}`);
                 throw new Error('Workflow not found');
             }
 

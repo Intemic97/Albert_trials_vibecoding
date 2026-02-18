@@ -548,6 +548,45 @@ app.use('/api/billing/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 
+// ==================== GLOBAL RATE LIMITING FOR PUBLIC ENDPOINTS ====================
+
+const AUTH_RATE_LIMIT_PER_MIN = parseInt(process.env.AUTH_RATE_LIMIT_PER_MIN || '20', 10);
+const authRateLimitMap = new Map();
+
+// Cleanup stale entries every 2 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, data] of authRateLimitMap.entries()) {
+        if (now - data.windowStart > 120000) authRateLimitMap.delete(key);
+    }
+}, 120000);
+
+function authRateLimit(req, res, next) {
+    const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    const now = Date.now();
+    let data = authRateLimitMap.get(ip);
+    if (!data || now - data.windowStart > 60000) {
+        data = { count: 0, windowStart: now };
+        authRateLimitMap.set(ip, data);
+    }
+    data.count++;
+    if (data.count > AUTH_RATE_LIMIT_PER_MIN) {
+        console.warn(`[SECURITY] Auth rate limit exceeded for IP ${ip} on ${req.method} ${req.path}`);
+        return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    next();
+}
+
+// Apply rate limiting to all public auth endpoints
+app.use('/api/auth/login', authRateLimit);
+app.use('/api/auth/register', authRateLimit);
+app.use('/api/auth/forgot-password', authRateLimit);
+app.use('/api/auth/reset-password', authRateLimit);
+app.use('/api/auth/resend-verification', authRateLimit);
+app.use('/api/auth/register-with-invitation', authRateLimit);
+// Slack public webhook
+app.use('/api/slack/database-assistant', authRateLimit);
+
 // ==================== DATABASE & SERVER START ====================
 
 let db;

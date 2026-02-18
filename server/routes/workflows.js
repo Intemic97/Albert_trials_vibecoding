@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../auth');
-const { generateId, logActivity } = require('../utils/helpers');
+const { generateId, logActivity, logSecurityEvent } = require('../utils/helpers');
 const { openDb } = require('../db');
 const { WorkflowExecutor } = require('../workflowExecutor');
 const { prefectClient } = require('../prefectClient');
@@ -67,6 +67,21 @@ router.get('/workflows/:id', authenticateToken, async (req, res) => {
         // First, try to get the workflow from user's organization
         const workflow = await db.get('SELECT * FROM workflows WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
         if (!workflow) {
+            // Check if workflow exists in another org (cross-tenant attempt)
+            const exists = await db.get('SELECT id, organizationId FROM workflows WHERE id = ?', [id]);
+            if (exists) {
+                logSecurityEvent(db, {
+                    organizationId: req.user.orgId,
+                    userId: req.user.sub,
+                    userEmail: req.user.email,
+                    action: 'cross_tenant_access_blocked',
+                    resourceType: 'workflow',
+                    resourceId: id,
+                    details: { targetOrg: exists.organizationId, endpoint: 'GET /workflows/:id' },
+                    ipAddress: req.ip || req.headers['x-forwarded-for'],
+                    userAgent: req.headers['user-agent']
+                });
+            }
             return res.status(404).json({ error: 'Workflow not found' });
         }
         // Parse JSON data and tags before sending
@@ -600,7 +615,7 @@ router.post('/workflow/:id/execute', authenticateToken, async (req, res) => {
     }
 });
 
-// Get execution status (authenticated)
+// Get execution status (authenticated + org-scoped)
 router.get('/executions/:executionId', authenticateToken, async (req, res) => {
     try {
         const { executionId } = req.params;
@@ -613,11 +628,26 @@ router.get('/executions/:executionId', authenticateToken, async (req, res) => {
             // Fallback to local database
             const db = await openDb();
             const execution = await db.get(
-                'SELECT * FROM workflow_executions WHERE id = ?',
-                [executionId]
+                'SELECT * FROM workflow_executions WHERE id = ? AND organizationId = ?',
+                [executionId, req.user.orgId]
             );
             
             if (!execution) {
+                // Check cross-tenant attempt
+                const exists = await db.get('SELECT id, organizationId FROM workflow_executions WHERE id = ?', [executionId]);
+                if (exists) {
+                    logSecurityEvent(db, {
+                        organizationId: req.user.orgId,
+                        userId: req.user.sub,
+                        userEmail: req.user.email,
+                        action: 'cross_tenant_access_blocked',
+                        resourceType: 'workflow_execution',
+                        resourceId: executionId,
+                        details: { targetOrg: exists.organizationId, endpoint: 'GET /executions/:executionId' },
+                        ipAddress: req.ip || req.headers['x-forwarded-for'],
+                        userAgent: req.headers['user-agent']
+                    });
+                }
                 return res.status(404).json({ error: 'Execution not found' });
             }
             
@@ -661,12 +691,36 @@ router.get('/executions/polling/active', authenticateToken, async (req, res) => 
     }
 });
 
-// Cancel a running execution
+// Cancel a running execution (org-scoped)
 router.post('/executions/:executionId/cancel', authenticateToken, async (req, res) => {
     try {
         const { executionId } = req.params;
         
         console.log(`[Execution] Cancel request for: ${executionId}`);
+        
+        // Verify execution belongs to user's organization FIRST
+        const dbConn = await openDb();
+        const execCheck = await dbConn.get(
+            'SELECT id, organizationId, workflowId, status FROM workflow_executions WHERE id = ?',
+            [executionId]
+        );
+        
+        if (!execCheck || execCheck.organizationId !== req.user.orgId) {
+            if (execCheck) {
+                logSecurityEvent(dbConn, {
+                    organizationId: req.user.orgId,
+                    userId: req.user.sub,
+                    userEmail: req.user.email,
+                    action: 'cross_tenant_cancel_blocked',
+                    resourceType: 'workflow_execution',
+                    resourceId: executionId,
+                    details: { targetOrg: execCheck.organizationId, endpoint: 'POST /executions/:executionId/cancel' },
+                    ipAddress: req.ip || req.headers['x-forwarded-for'],
+                    userAgent: req.headers['user-agent']
+                });
+            }
+            return res.status(404).json({ error: 'Execution not found' });
+        }
         
         // Try Prefect service first
         try {
@@ -679,65 +733,44 @@ router.post('/executions/:executionId/cancel', authenticateToken, async (req, re
             }
             
             // Broadcast cancellation via WebSocket
-            const db = await openDb();
-            const execution = await db.get(
-                'SELECT workflowId, organizationId FROM workflow_executions WHERE id = ?',
-                [executionId]
-            );
-            
-            if (execution && execution.organizationId) {
-                broadcastToOrganization(execution.organizationId, {
-                    type: 'execution_cancelled',
-                    executionId,
-                    workflowId: execution.workflowId,
-                    message: 'Execution cancelled by user'
-                });
-            }
+            broadcastToOrganization(req.user.orgId, {
+                type: 'execution_cancelled',
+                executionId,
+                workflowId: execCheck.workflowId,
+                message: 'Execution cancelled by user'
+            });
             
             return res.json(result);
         } catch (prefectError) {
             console.warn('[Execution] Prefect cancel failed, trying local:', prefectError.message);
             
-            // Fallback: cancel in local database
-            const db = await openDb();
-            const execution = await db.get(
-                'SELECT * FROM workflow_executions WHERE id = ?',
-                [executionId]
-            );
-            
-            if (!execution) {
-                return res.status(404).json({ error: 'Execution not found' });
-            }
-            
-            if (!['pending', 'running'].includes(execution.status)) {
+            if (!['pending', 'running'].includes(execCheck.status)) {
                 return res.json({
                     success: false,
                     executionId,
-                    message: `Cannot cancel execution with status '${execution.status}'`,
-                    previousStatus: execution.status
+                    message: `Cannot cancel execution with status '${execCheck.status}'`,
+                    previousStatus: execCheck.status
                 });
             }
             
-            await db.run(
-                "UPDATE workflow_executions SET status = 'cancelled', error = 'Execution cancelled by user' WHERE id = ?",
-                [executionId]
+            await dbConn.run(
+                "UPDATE workflow_executions SET status = 'cancelled', error = 'Execution cancelled by user' WHERE id = ? AND organizationId = ?",
+                [executionId, req.user.orgId]
             );
             
             // Broadcast cancellation
-            if (execution.organizationId) {
-                broadcastToOrganization(execution.organizationId, {
-                    type: 'execution_cancelled',
-                    executionId,
-                    workflowId: execution.workflowId,
-                    message: 'Execution cancelled by user'
-                });
-            }
+            broadcastToOrganization(req.user.orgId, {
+                type: 'execution_cancelled',
+                executionId,
+                workflowId: execCheck.workflowId,
+                message: 'Execution cancelled by user'
+            });
             
             return res.json({
                 success: true,
                 executionId,
                 message: 'Execution cancelled successfully',
-                previousStatus: execution.status
+                previousStatus: execCheck.status
             });
         }
     } catch (error) {
@@ -746,7 +779,7 @@ router.post('/executions/:executionId/cancel', authenticateToken, async (req, re
     }
 });
 
-// Execute a single node (authenticated)
+// Execute a single node (authenticated + org-scoped)
 router.post('/workflow/:id/execute-node', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
@@ -754,6 +787,25 @@ router.post('/workflow/:id/execute-node', authenticateToken, async (req, res) =>
 
         if (!nodeId) {
             return res.status(400).json({ error: 'nodeId is required' });
+        }
+
+        // Verify workflow belongs to user's organization
+        const wfCheck = await db.get('SELECT id, organizationId FROM workflows WHERE id = ?', [id]);
+        if (!wfCheck || wfCheck.organizationId !== req.user.orgId) {
+            if (wfCheck) {
+                logSecurityEvent(db, {
+                    organizationId: req.user.orgId,
+                    userId: req.user.sub,
+                    userEmail: req.user.email,
+                    action: 'cross_tenant_execute_blocked',
+                    resourceType: 'workflow',
+                    resourceId: id,
+                    details: { targetOrg: wfCheck.organizationId, endpoint: 'POST /workflow/:id/execute-node' },
+                    ipAddress: req.ip || req.headers['x-forwarded-for'],
+                    userAgent: req.headers['user-agent']
+                });
+            }
+            return res.status(404).json({ error: 'Workflow not found' });
         }
 
         console.log(`[WorkflowExecutor] Single node execution: ${nodeId} (recursive: ${recursive})`);
@@ -805,13 +857,28 @@ router.post('/workflow/:id/execute-node', authenticateToken, async (req, res) =>
     }
 });
 
-// Get execution status (works for both local and Prefect executions)
+// Get execution status (works for both local and Prefect executions, org-scoped)
 router.get('/workflow/execution/:execId', authenticateToken, async (req, res) => {
     try {
         const { execId } = req.params;
-        const execution = await db.get('SELECT * FROM workflow_executions WHERE id = ?', [execId]);
+        const execution = await db.get('SELECT * FROM workflow_executions WHERE id = ? AND organizationId = ?', [execId, req.user.orgId]);
 
         if (!execution) {
+            // Check cross-tenant attempt
+            const exists = await db.get('SELECT id, organizationId FROM workflow_executions WHERE id = ?', [execId]);
+            if (exists) {
+                logSecurityEvent(db, {
+                    organizationId: req.user.orgId,
+                    userId: req.user.sub,
+                    userEmail: req.user.email,
+                    action: 'cross_tenant_access_blocked',
+                    resourceType: 'workflow_execution',
+                    resourceId: execId,
+                    details: { targetOrg: exists.organizationId, endpoint: 'GET /workflow/execution/:execId' },
+                    ipAddress: req.ip || req.headers['x-forwarded-for'],
+                    userAgent: req.headers['user-agent']
+                });
+            }
             return res.status(404).json({ error: 'Execution not found' });
         }
 
@@ -840,10 +907,17 @@ router.get('/workflow/execution/:execId', authenticateToken, async (req, res) =>
     }
 });
 
-// Get execution logs (works for both local and Prefect executions)
+// Get execution logs (works for both local and Prefect executions, org-scoped)
 router.get('/workflow/execution/:execId/logs', authenticateToken, async (req, res) => {
     try {
         const { execId } = req.params;
+        
+        // Verify execution belongs to user's organization
+        const execCheck = await db.get('SELECT organizationId FROM workflow_executions WHERE id = ? AND organizationId = ?', [execId, req.user.orgId]);
+        if (!execCheck) {
+            return res.status(404).json({ error: 'Execution not found' });
+        }
+        
         const logs = await db.all(
             'SELECT * FROM execution_logs WHERE executionId = ? ORDER BY timestamp ASC',
             [execId]
@@ -1052,15 +1126,20 @@ router.get('/overview/stats', authenticateToken, async (req, res) => {
     }
 });
 
-// Cancel execution
+// Cancel execution (org-scoped)
 router.post('/workflow/execution/:execId/cancel', authenticateToken, async (req, res) => {
     try {
         const { execId } = req.params;
         
-        await db.run(
-            'UPDATE workflow_executions SET status = ?, completedAt = ? WHERE id = ? AND status IN (?, ?)',
-            ['cancelled', new Date().toISOString(), execId, 'pending', 'running']
+        // Org-scoped: only cancel executions belonging to user's org
+        const result = await db.run(
+            'UPDATE workflow_executions SET status = ?, completedAt = ? WHERE id = ? AND organizationId = ? AND status IN (?, ?)',
+            ['cancelled', new Date().toISOString(), execId, req.user.orgId, 'pending', 'running']
         );
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Execution not found or already completed' });
+        }
 
         res.json({ success: true, message: 'Execution cancelled' });
     } catch (error) {
@@ -1069,13 +1148,14 @@ router.post('/workflow/execution/:execId/cancel', authenticateToken, async (req,
     }
 });
 
-// Resume paused execution (for human approval)
+// Resume paused execution (for human approval, org-scoped)
 router.post('/workflow/execution/:execId/resume', authenticateToken, async (req, res) => {
     try {
         const { execId } = req.params;
         const { approved } = req.body;
 
-        const execution = await db.get('SELECT * FROM workflow_executions WHERE id = ?', [execId]);
+        // Org-scoped: only resume executions belonging to user's org
+        const execution = await db.get('SELECT * FROM workflow_executions WHERE id = ? AND organizationId = ?', [execId, req.user.orgId]);
         
         if (!execution) {
             return res.status(404).json({ error: 'Execution not found' });
