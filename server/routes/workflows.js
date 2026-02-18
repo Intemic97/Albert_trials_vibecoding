@@ -397,9 +397,10 @@ router.get('/workflow/:id/webhook-url', authenticateToken, async (req, res) => {
         const { id } = req.params;
         const baseUrl = process.env.API_URL || process.env.FRONTEND_URL?.replace(/:\d+/, ':3001') || 'http://localhost:3001';
         
-        // Generate a simple token based on workflow id
+        // Generate a secure HMAC-SHA256 token using env secret (NOT hardcoded)
         const crypto = require('crypto');
-        const token = crypto.createHash('md5').update(id + 'webhook-secret').digest('hex').substring(0, 12);
+        const webhookSecret = process.env.WEBHOOK_SECRET || process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+        const token = crypto.createHmac('sha256', webhookSecret).update(id).digest('hex').substring(0, 24);
 
         res.json({
             webhookUrl: `${baseUrl}/api/webhook/${id}`,

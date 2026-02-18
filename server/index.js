@@ -71,7 +71,47 @@ function aiRateLimit(req, res, next) {
 }
 
 // ==================== WEBSOCKET SETUP ====================
-const wss = new WebSocketServer({ server, path: '/ws' });
+const jwt = require('jsonwebtoken');
+const WS_JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+const wss = new WebSocketServer({ noServer: true });
+
+// Authenticate WebSocket connections via JWT cookie on HTTP upgrade
+server.on('upgrade', (request, socket, head) => {
+    // Only handle /ws path
+    if (request.url !== '/ws') {
+        socket.destroy();
+        return;
+    }
+
+    // Parse auth_token from cookie header
+    const cookieHeader = request.headers.cookie || '';
+    const tokenMatch = cookieHeader.match(/auth_token=([^;]+)/);
+    const token = tokenMatch ? tokenMatch[1] : null;
+
+    if (!token) {
+        console.warn('[WS] Connection rejected: no auth_token cookie');
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+        return;
+    }
+
+    jwt.verify(token, WS_JWT_SECRET, (err, user) => {
+        if (err) {
+            console.warn('[WS] Connection rejected: invalid JWT');
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+            socket.destroy();
+            return;
+        }
+
+        // Attach verified user to request for use in connection handler
+        request.authenticatedUser = { ...user, id: user.sub };
+
+        wss.handleUpgrade(request, socket, head, (ws) => {
+            wss.emit('connection', ws, request);
+        });
+    });
+});
 
 // Track users per workflow: { workflowId: Map<socketId, { ws, user, cursor }> }
 const workflowRooms = new Map();
@@ -103,10 +143,13 @@ setInterval(() => {
     });
 }, HEARTBEAT_INTERVAL);
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, request) => {
     const socketId = generateSocketId();
     let currentWorkflowId = null;
     let userData = null;
+    
+    // Verified user from JWT (set during upgrade handshake)
+    const verifiedUser = request.authenticatedUser;
     
     ws.isAlive = true;
     ws.on('pong', () => {
@@ -119,38 +162,42 @@ wss.on('connection', (ws) => {
             
             switch (message.type) {
                 case 'subscribe_ot_alerts': {
-                    const { orgId, user } = message;
-                    if (!orgId || !user) {
-                        ws.send(JSON.stringify({ type: 'error', message: 'Missing orgId or user' }));
+                    // Use verified orgId from JWT, ignore client-sent orgId
+                    const verifiedOrgIdAlerts = verifiedUser.orgId;
+                    if (!verifiedOrgIdAlerts) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'No organization in token' }));
                         return;
                     }
-                    if (!organizationConnections.has(orgId)) {
-                        organizationConnections.set(orgId, new Set());
+                    if (!organizationConnections.has(verifiedOrgIdAlerts)) {
+                        organizationConnections.set(verifiedOrgIdAlerts, new Set());
                     }
-                    organizationConnections.get(orgId).add(ws);
-                    ws.send(JSON.stringify({ type: 'ot_alerts_subscribed', orgId }));
+                    organizationConnections.get(verifiedOrgIdAlerts).add(ws);
+                    ws.send(JSON.stringify({ type: 'ot_alerts_subscribed', orgId: verifiedOrgIdAlerts }));
                     break;
                 }
                 
                 case 'subscribe_ot_metrics': {
-                    const { orgId } = message;
-                    if (!orgId) {
-                        ws.send(JSON.stringify({ type: 'error', message: 'Missing orgId' }));
+                    // Use verified orgId from JWT, ignore client-sent orgId
+                    const verifiedOrgIdMetrics = verifiedUser.orgId;
+                    if (!verifiedOrgIdMetrics) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'No organization in token' }));
                         return;
                     }
-                    if (!organizationConnections.has(orgId)) {
-                        organizationConnections.set(orgId, new Set());
+                    if (!organizationConnections.has(verifiedOrgIdMetrics)) {
+                        organizationConnections.set(verifiedOrgIdMetrics, new Set());
                     }
-                    organizationConnections.get(orgId).add(ws);
-                    ws.send(JSON.stringify({ type: 'ot_metrics_subscribed', orgId }));
+                    organizationConnections.get(verifiedOrgIdMetrics).add(ws);
+                    ws.send(JSON.stringify({ type: 'ot_metrics_subscribed', orgId: verifiedOrgIdMetrics }));
                     break;
                 }
                 
                 case 'join': {
-                    const { workflowId: rawWorkflowId, orgId, user } = message;
+                    const { workflowId: rawWorkflowId, user } = message;
                     const workflowId = rawWorkflowId ? String(rawWorkflowId) : null;
+                    // SECURITY: Use orgId from verified JWT, never from client message
+                    const orgId = verifiedUser.orgId;
                     
-                    console.log(`[WS] Join request - workflowId: "${workflowId}" (type: ${typeof rawWorkflowId}), user: ${user?.id}, org: ${orgId}`);
+                    console.log(`[WS] Join request - workflowId: "${workflowId}" (type: ${typeof rawWorkflowId}), user: ${verifiedUser.id}, org: ${orgId} (JWT-verified)`);
                     
                     if (!workflowId) {
                         console.log('[WS] REJECTED: Missing workflowId');
@@ -160,42 +207,27 @@ wss.on('connection', (ws) => {
                     
                     (async () => {
                         try {
+                            // Directly query with org filter — no need for separate orgId check
                             const workflow = await db.get(
-                                'SELECT id, organizationId FROM workflows WHERE id = ?',
-                                [workflowId]
+                                'SELECT id, organizationId FROM workflows WHERE id = ? AND organizationId = ?',
+                                [workflowId, orgId]
                             );
                             
                             if (!workflow) {
-                                console.log(`[WS] SECURITY: Workflow ${workflowId} not found`);
+                                console.log(`[WS] SECURITY: Workflow ${workflowId} not found or not in org ${orgId}`);
                                 ws.send(JSON.stringify({ type: 'error', message: 'Workflow not found' }));
                                 return;
                             }
                             
-                            if (workflow.organizationId !== orgId) {
-                                console.log(`[WS] SECURITY: Workflow ${workflowId} belongs to org ${workflow.organizationId}, not ${orgId}`);
-                                ws.send(JSON.stringify({ type: 'error', message: 'Access denied: workflow does not belong to your organization' }));
-                                return;
-                            }
-                            
-                            const userOrg = await db.get(
-                                'SELECT userId FROM user_organizations WHERE userId = ? AND organizationId = ?',
-                                [user.id, orgId]
-                            );
-                            
-                            if (!userOrg) {
-                                console.log(`[WS] SECURITY: User ${user.id} does not belong to org ${orgId}`);
-                                ws.send(JSON.stringify({ type: 'error', message: 'Access denied: you do not belong to this organization' }));
-                                return;
-                            }
-                            
-                            console.log(`[WS] SECURITY: User ${user.id} validated for workflow ${workflowId} in org ${orgId}`);
+                            console.log(`[WS] SECURITY: User ${verifiedUser.id} validated for workflow ${workflowId} in org ${orgId} (JWT-verified)`);
                             
                             if (currentWorkflowId) {
                                 leaveRoom(socketId, currentWorkflowId);
                             }
                             
                             currentWorkflowId = workflowId;
-                            userData = user;
+                            // Use JWT-verified id, but allow client to send display info (name, photo)
+                            userData = { ...user, id: verifiedUser.id };
                             
                             if (!workflowRooms.has(workflowId)) {
                                 workflowRooms.set(workflowId, new Map());
@@ -208,10 +240,10 @@ wss.on('connection', (ws) => {
                                 ws,
                                 workflowId,
                                 user: {
-                                    id: user.id,
-                                    name: user.name || user.email?.split('@')[0] || 'Anonymous',
+                                    id: verifiedUser.id,
+                                    name: verifiedUser.name || user?.name || verifiedUser.email?.split('@')[0] || 'Anonymous',
                                     color: CURSOR_COLORS[colorIndex],
-                                    profilePhoto: user.profilePhoto
+                                    profilePhoto: user?.profilePhoto
                                 },
                                 cursor: null,
                                 orgId: orgId
@@ -226,7 +258,7 @@ wss.on('connection', (ws) => {
                             
                             const existingUsers = [];
                             room.forEach((data, id) => {
-                                if (id !== socketId && data.user?.id !== user.id) {
+                                if (id !== socketId && data.user?.id !== verifiedUser.id) {
                                     existingUsers.push({
                                         id,
                                         user: data.user,
@@ -248,7 +280,7 @@ wss.on('connection', (ws) => {
                                 type: 'user_joined',
                                 id: socketId,
                                 user: newUserData.user
-                            }, socketId, user.id);
+                            }, socketId, verifiedUser.id);
                             
                         } catch (err) {
                             console.error('[WS] Error validating join:', err);
@@ -530,14 +562,16 @@ const upload = multer({
 
 // ==================== MIDDLEWARE ====================
 
+// CORS origins from env var (comma-separated) with dev defaults
+const DEFAULT_CORS_ORIGINS = 'http://localhost:5173,http://localhost:5174,http://localhost:5175';
+const corsOrigins = (process.env.CORS_ORIGINS || DEFAULT_CORS_ORIGINS)
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+console.log(`[CORS] Allowed origins: ${corsOrigins.join(', ')}`);
+
 app.use(cors({
-    origin: [
-        'http://localhost:5173', 
-        'http://localhost:5174', 
-        'http://localhost:5175',
-        'http://178.128.170.0',
-        'https://178.128.170.0'
-    ],
+    origin: corsOrigins,
     credentials: true
 }));
 
@@ -676,3 +710,55 @@ initDb().then(database => {
 }).catch(err => {
     console.error('Failed to initialize database:', err);
 });
+
+// ==================== GRACEFUL SHUTDOWN ====================
+let isShuttingDown = false;
+
+async function gracefulShutdown(signal) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    console.log(`\n[Shutdown] ${signal} received. Closing gracefully...`);
+
+    // 1. Stop accepting new connections
+    server.close(() => {
+        console.log('[Shutdown] HTTP server closed');
+    });
+
+    // 2. Close all WebSocket connections
+    wss.clients.forEach((ws) => {
+        try {
+            ws.close(1001, 'Server shutting down');
+        } catch (_) { /* ignore */ }
+    });
+    console.log('[Shutdown] WebSocket connections closed');
+
+    // 3. Stop background services
+    try { workflowScheduler.stop(); } catch (_) { /* ignore */ }
+    console.log('[Shutdown] Workflow scheduler stopped');
+
+    try {
+        const healthChecker = getConnectionHealthChecker(db, broadcastToOrganization);
+        healthChecker.stop();
+    } catch (_) { /* ignore */ }
+
+    // 4. Close database
+    try {
+        if (db) await db.close();
+        console.log('[Shutdown] Database closed');
+    } catch (_) { /* ignore */ }
+
+    console.log('[Shutdown] Cleanup complete. Exiting.');
+    process.exit(0);
+}
+
+// Handle termination signals
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));   // Ctrl+C
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM')); // kill command
+
+// Windows: handle Ctrl+C on Windows terminal
+if (process.platform === 'win32') {
+    const readline = require('readline');
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    rl.on('close', () => gracefulShutdown('STDIN_CLOSE'));
+}

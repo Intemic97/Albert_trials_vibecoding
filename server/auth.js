@@ -163,8 +163,10 @@ async function login(req, res) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Check if email is verified (allow bypass for specific local user)
-        if (!user.emailVerified && user.email !== 'm.alcazar@intemic.com') {
+        // Check if email is verified
+        // In development, allow bypass via SKIP_EMAIL_VERIFICATION env var
+        const skipVerification = process.env.NODE_ENV !== 'production' && process.env.SKIP_EMAIL_VERIFICATION === 'true';
+        if (!user.emailVerified && !skipVerification) {
             return res.status(403).json({ 
                 error: 'Please verify your email before logging in. Check your inbox for the verification link.',
                 requiresVerification: true,
