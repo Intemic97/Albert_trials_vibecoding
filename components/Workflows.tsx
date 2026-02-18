@@ -3484,6 +3484,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                         backToList={backToList}
                         saveWorkflow={saveWorkflow}
                         openExecutionHistory={openExecutionHistory}
+                        openExportModal={openWorkflowRunner}
                         runWorkflow={runWorkflow}
                         openPublishModal={() => setShowPublishModal(true)}
                         setShowTagsModal={setShowTagsModal}

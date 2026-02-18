@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Tag, CheckCircle, FloppyDisk as Save, ClockCounterClockwise as History, Play, CaretDown, Circle, Trash } from '@phosphor-icons/react';
+import { ArrowLeft, Tag, CheckCircle, FloppyDisk as Save, ClockCounterClockwise as History, Play, CaretDown, Circle, Trash, ShareNetwork } from '@phosphor-icons/react';
 
 interface VersionInfo {
   version: number;
@@ -25,6 +25,7 @@ interface WorkflowEditorToolbarProps {
   backToList: () => void;
   saveWorkflow: () => void;
   openExecutionHistory: () => void;
+  openExportModal: () => void;
   runWorkflow: () => void;
   openPublishModal: () => void;
   setShowTagsModal: (show: boolean) => void;
@@ -38,7 +39,7 @@ interface WorkflowEditorToolbarProps {
 export const WorkflowEditorToolbar: React.FC<WorkflowEditorToolbarProps> = ({
   workflowName, setWorkflowName, currentWorkflowId, autoSaveStatus,
   isSaving, isRunning, nodesCount, backToList, saveWorkflow,
-  openExecutionHistory, runWorkflow, openPublishModal, setShowTagsModal,
+  openExecutionHistory, openExportModal, runWorkflow, openPublishModal, setShowTagsModal,
   activeVersion, versions, onRestoreVersion, onDeleteVersion
 }) => {
   const [showVersionDropdown, setShowVersionDropdown] = useState(false);
@@ -81,16 +82,25 @@ export const WorkflowEditorToolbar: React.FC<WorkflowEditorToolbarProps> = ({
       <div className="flex items-center gap-3 flex-shrink-0">
         {/* Version selector dropdown – placed with the right-side icons for even spacing */}
         {currentWorkflowId && (
-          <div className="relative flex-shrink-0" ref={dropdownRef}>
+          <div className="relative flex-shrink-0 group/draft" ref={dropdownRef}>
             <button
-              onClick={() => setShowVersionDropdown(!showVersionDropdown)}
+              onClick={() => { if (versions && versions.length > 0) setShowVersionDropdown(!showVersionDropdown); }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--border-light)] hover:bg-[var(--bg-hover)] transition-colors text-sm"
             >
               <span className="text-[var(--text-secondary)] font-medium">
                 {activeVersion != null ? `v${activeVersion}` : 'Draft'}
               </span>
-              <CaretDown size={12} className="text-[var(--text-tertiary)]" />
+              {versions && versions.length > 0 && (
+                <CaretDown size={12} className="text-[var(--text-tertiary)]" />
+              )}
             </button>
+            {/* Tooltip when no versions exist */}
+            {(!versions || versions.length === 0) && (
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 pointer-events-none group-hover/draft:opacity-100 transition-opacity shadow-lg z-50">
+                Publish your workflow to manage different versions
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 mb-[-4px]"></div>
+              </div>
+            )}
 
             {showVersionDropdown && versions && versions.length > 0 && (
               <div className="absolute top-full right-0 mt-1.5 w-48 bg-[var(--bg-card)] rounded-xl shadow-xl border border-[var(--border-light)] py-1 z-50"
@@ -210,6 +220,15 @@ export const WorkflowEditorToolbar: React.FC<WorkflowEditorToolbarProps> = ({
           title="History (Executions & Versions)"
         >
           <History size={18} className="text-[var(--text-secondary)]" weight="light" />
+        </button>
+        {/* Export as Form */}
+        <button
+          onClick={openExportModal}
+          disabled={!currentWorkflowId}
+          className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors disabled:opacity-50"
+          title="Export as Form"
+        >
+          <ShareNetwork size={18} className="text-[var(--text-secondary)]" weight="light" />
         </button>
         <button
           onClick={runWorkflow}
