@@ -160,8 +160,8 @@ router.post('/knowledge/documents', authenticateToken, knowledgeUpload.single('f
                 const docIds = folder.documentIds ? JSON.parse(folder.documentIds) : [];
                 docIds.push(id);
                 await db.run(
-                    'UPDATE knowledge_folders SET documentIds = ?, updatedAt = ? WHERE id = ?',
-                    [JSON.stringify(docIds), now, folderId]
+                    'UPDATE knowledge_folders SET documentIds = ?, updatedAt = ? WHERE id = ? AND organizationId = ?',
+                    [JSON.stringify(docIds), now, folderId, req.user.orgId]
                 );
             }
         }
@@ -214,7 +214,7 @@ router.delete('/knowledge/documents/:id', authenticateToken, async (req, res) =>
             require('fs').unlinkSync(doc.filePath);
         }
         
-        await db.run('DELETE FROM knowledge_documents WHERE id = ?', [req.params.id]);
+        await db.run('DELETE FROM knowledge_documents WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
 
         // Log activity
         await logActivity(db, {
@@ -284,8 +284,8 @@ router.post('/knowledge/documents/:id/relate', authenticateToken, async (req, re
         }
         
         await db.run(
-            'UPDATE knowledge_documents SET relatedEntityIds = ?, updatedAt = ? WHERE id = ?',
-            [JSON.stringify(relatedIds), new Date().toISOString(), req.params.id]
+            'UPDATE knowledge_documents SET relatedEntityIds = ?, updatedAt = ? WHERE id = ? AND organizationId = ?',
+            [JSON.stringify(relatedIds), new Date().toISOString(), req.params.id, req.user.orgId]
         );
         
         res.json({ success: true, relatedEntityIds: relatedIds });
@@ -339,8 +339,8 @@ router.post('/knowledge/documents/:id/extract-structured', authenticateToken, as
         };
 
         await db.run(
-            'UPDATE knowledge_documents SET metadata = ?, updatedAt = ? WHERE id = ?',
-            [JSON.stringify(mergedMetadata), new Date().toISOString(), req.params.id]
+            'UPDATE knowledge_documents SET metadata = ?, updatedAt = ? WHERE id = ? AND organizationId = ?',
+            [JSON.stringify(mergedMetadata), new Date().toISOString(), req.params.id, req.user.orgId]
         );
 
         await logActivity(db, {
@@ -546,14 +546,15 @@ router.put('/knowledge/folders/:id', authenticateToken, async (req, res) => {
         }
         
         await db.run(
-            `UPDATE knowledge_folders SET name = ?, description = ?, color = ?, parentId = ?, updatedAt = ? WHERE id = ?`,
+            `UPDATE knowledge_folders SET name = ?, description = ?, color = ?, parentId = ?, updatedAt = ? WHERE id = ? AND organizationId = ?`,
             [
                 name || folder.name,
                 description !== undefined ? description : folder.description,
                 color || folder.color,
                 parentId !== undefined ? parentId : folder.parentId,
                 now,
-                req.params.id
+                req.params.id,
+                req.user.orgId
             ]
         );
         
@@ -576,13 +577,13 @@ router.delete('/knowledge/folders/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Folder not found' });
         }
         
-        // Move children to parent folder
+        // Move children to parent folder (scoped to same org)
         await db.run(
-            'UPDATE knowledge_folders SET parentId = ? WHERE parentId = ?',
-            [folder.parentId, req.params.id]
+            'UPDATE knowledge_folders SET parentId = ? WHERE parentId = ? AND organizationId = ?',
+            [folder.parentId, req.params.id, req.user.orgId]
         );
         
-        await db.run('DELETE FROM knowledge_folders WHERE id = ?', [req.params.id]);
+        await db.run('DELETE FROM knowledge_folders WHERE id = ? AND organizationId = ?', [req.params.id, req.user.orgId]);
         
         res.json({ success: true });
     } catch (error) {
@@ -611,8 +612,8 @@ router.post('/knowledge/folders/:id/add', authenticateToken, async (req, res) =>
         if (!currentIds.includes(itemId)) {
             currentIds.push(itemId);
             await db.run(
-                `UPDATE knowledge_folders SET ${field} = ?, updatedAt = ? WHERE id = ?`,
-                [JSON.stringify(currentIds), new Date().toISOString(), req.params.id]
+                `UPDATE knowledge_folders SET ${field} = ?, updatedAt = ? WHERE id = ? AND organizationId = ?`,
+                [JSON.stringify(currentIds), new Date().toISOString(), req.params.id, req.user.orgId]
             );
         }
         
@@ -642,8 +643,8 @@ router.post('/knowledge/folders/:id/remove', authenticateToken, async (req, res)
         const updatedIds = currentIds.filter(id => id !== itemId);
         
         await db.run(
-            `UPDATE knowledge_folders SET ${field} = ?, updatedAt = ? WHERE id = ?`,
-            [JSON.stringify(updatedIds), new Date().toISOString(), req.params.id]
+            `UPDATE knowledge_folders SET ${field} = ?, updatedAt = ? WHERE id = ? AND organizationId = ?`,
+            [JSON.stringify(updatedIds), new Date().toISOString(), req.params.id, req.user.orgId]
         );
         
         res.json({ success: true, [field]: updatedIds });

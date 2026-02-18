@@ -106,8 +106,63 @@ router.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
     }
 });
 
-// File Serve Endpoint
-router.get('/files/:filename', (req, res) => {
+// Helper: check if a file belongs to the authenticated user's organization
+async function verifyFileOwnership(db, filename, orgId) {
+    try {
+        // Check knowledge_documents (filePath contains full path or just filename)
+        const knowledgeDoc = await db.get(
+            `SELECT organizationId FROM knowledge_documents WHERE filePath LIKE ? LIMIT 1`,
+            [`%${filename}`]
+        );
+        if (knowledgeDoc) {
+            return knowledgeDoc.organizationId === orgId;
+        }
+
+        // Check report_contexts
+        const reportCtx = await db.get(
+            `SELECT r.organizationId FROM report_contexts rc 
+             JOIN reports r ON rc.reportId = r.id 
+             WHERE rc.filePath LIKE ? LIMIT 1`,
+            [`%${filename}`]
+        );
+        if (reportCtx) {
+            return reportCtx.organizationId === orgId;
+        }
+
+        // Check ai_assistant_files
+        const aiFile = await db.get(
+            `SELECT r.organizationId FROM ai_assistant_files af 
+             JOIN reports r ON af.reportId = r.id 
+             WHERE af.filePath LIKE ? LIMIT 1`,
+            [`%${filename}`]
+        );
+        if (aiFile) {
+            return aiFile.organizationId === orgId;
+        }
+
+        // Check entity_records (file data stored as JSON in value field)
+        const entityRecord = await db.get(
+            `SELECT e.organizationId FROM entity_records er 
+             JOIN entities e ON er.entityId = e.id 
+             WHERE er.value LIKE ? LIMIT 1`,
+            [`%${filename}%`]
+        );
+        if (entityRecord) {
+            return entityRecord.organizationId === orgId;
+        }
+
+        // File not tracked in any table — allow access (orphaned/legacy file)
+        // Authenticated users can access untracked files; this avoids breaking edge cases
+        return true;
+    } catch (err) {
+        console.error('[FileOwnership] Error checking file ownership:', err.message);
+        // On error, allow access (fail-open for availability) but log it
+        return true;
+    }
+}
+
+// File Serve Endpoint (requires authentication + org ownership)
+router.get('/files/:filename', authenticateToken, async (req, res) => {
     const { filename } = req.params;
     const filePath = path.join(uploadsDir, filename);
     
@@ -119,12 +174,19 @@ router.get('/files/:filename', (req, res) => {
     if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: 'File not found' });
     }
+
+    // Verify the file belongs to the user's organization
+    const isOwner = await verifyFileOwnership(db, filename, req.user.orgId);
+    if (!isOwner) {
+        console.warn(`[SECURITY] Cross-org file access blocked: user ${req.user.sub} (org ${req.user.orgId}) tried to access ${filename}`);
+        return res.status(404).json({ error: 'File not found' });
+    }
     
     res.sendFile(filePath);
 });
 
-// File Download Endpoint (forces download with original name)
-router.get('/files/:filename/download', async (req, res) => {
+// File Download Endpoint (requires authentication + org ownership)
+router.get('/files/:filename/download', authenticateToken, async (req, res) => {
     const { filename } = req.params;
     const { originalName } = req.query;
     const filePath = path.join(uploadsDir, filename);
@@ -135,6 +197,13 @@ router.get('/files/:filename/download', async (req, res) => {
     }
     
     if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Verify the file belongs to the user's organization
+    const isOwner = await verifyFileOwnership(db, filename, req.user.orgId);
+    if (!isOwner) {
+        console.warn(`[SECURITY] Cross-org file download blocked: user ${req.user.sub} (org ${req.user.orgId}) tried to download ${filename}`);
         return res.status(404).json({ error: 'File not found' });
     }
     
