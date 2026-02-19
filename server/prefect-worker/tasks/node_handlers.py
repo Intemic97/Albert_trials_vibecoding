@@ -336,7 +336,7 @@ async def handle_python(node: Dict, input_data: Optional[Dict] = None, execution
     import platform
     
     config_data = node.get("config", {})
-    code = config_data.get("code", "")
+    code = config_data.get("pythonCode") or config_data.get("code") or ""
     
     if not code:
         raise ValueError("No Python code provided")
@@ -374,6 +374,7 @@ try:
             'max': max, 'min': min, 'print': print, 'range': range, 'reversed': reversed,
             'round': round, 'set': set, 'sorted': sorted, 'str': str, 'sum': sum,
             'tuple': tuple, 'type': type, 'zip': zip,
+            '__import__': __import__,  # Allow import statements
         }},
         'json': json,
         'math': __import__('math'),

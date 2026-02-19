@@ -174,6 +174,16 @@ async def execute_workflow_background(
         
         print(f"✅ Background execution completed: {execution_id}")
         
+        # Save results to database
+        db = Database()
+        await db.update_execution(
+            execution_id=execution_id,
+            status=result.get('status', 'completed'),
+            node_results=result.get('nodeResults'),
+            final_output=result.get('nodeResults'),  # Use nodeResults as finalOutput
+            error=result.get('error')
+        )
+        
     except Exception as e:
         print(f"❌ Background execution failed: {execution_id} - {str(e)}")
         
@@ -260,6 +270,22 @@ async def get_execution_status(execution_id: str):
     completed_nodes = len([l for l in logs if l["status"] == "completed"])
     failed_nodes = len([l for l in logs if l["status"] == "error"])
     
+    import json
+    
+    # Parse nodeResults and finalOutput from JSON strings
+    node_results = None
+    final_output = None
+    if execution.get("nodeResults"):
+        try:
+            node_results = json.loads(execution["nodeResults"]) if isinstance(execution["nodeResults"], str) else execution["nodeResults"]
+        except:
+            pass
+    if execution.get("finalOutput"):
+        try:
+            final_output = json.loads(execution["finalOutput"]) if isinstance(execution["finalOutput"], str) else execution["finalOutput"]
+        except:
+            pass
+    
     return {
         "executionId": execution_id,
         "workflowId": execution["workflowId"],
@@ -269,6 +295,8 @@ async def get_execution_status(execution_id: str):
         "completedAt": execution.get("completedAt"),
         "currentNodeId": execution.get("currentNodeId"),
         "error": execution.get("error"),
+        "nodeResults": node_results,
+        "finalOutput": final_output or node_results,  # Fallback to nodeResults if finalOutput not set
         "progress": {
             "totalNodes": total_nodes,
             "completedNodes": completed_nodes,

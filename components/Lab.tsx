@@ -508,11 +508,30 @@ const VisualizationCard: React.FC<{
             return source[dataMapping.valueKey];
         }
 
-        // Plain object: first numeric value
+        // Plain object: first numeric value or string that looks like a number
         if (typeof source === 'object' && source !== null && !Array.isArray(source)) {
             const vals = Object.values(source);
             const firstNumeric = vals.find(v => typeof v === 'number');
             if (firstNumeric !== undefined) return firstNumeric as number;
+            
+            // Try to parse string values that look like numbers
+            const firstString = vals.find(v => typeof v === 'string');
+            if (firstString !== undefined) {
+                const parsed = parseFloat(firstString as string);
+                if (!isNaN(parsed) && (firstString as string).trim() !== '') {
+                    return parsed;
+                }
+                return firstString as string;
+            }
+            
+            // If object has only one key, return its value (handles { "input": "20" } -> "20")
+            if (Object.keys(source).length === 1) {
+                const singleValue = vals[0];
+                if (typeof singleValue === 'string' && !isNaN(Number(singleValue)) && singleValue.trim() !== '') {
+                    return Number(singleValue);
+                }
+                return singleValue;
+            }
         }
         
         return source;
@@ -1552,9 +1571,30 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
         if (!results || typeof results !== 'object') return {};
         const extracted: Record<string, any> = {};
         Object.entries(results).forEach(([nodeId, nodeResult]: [string, any]) => {
-            if (nodeResult?.outputData !== undefined) {
-                // Store by nodeId so visualizations can reference specific nodes
-                extracted[nodeId] = nodeResult.outputData;
+            // Handle Prefect format: nodeResult.output.outputData
+            // Handle Node.js format: nodeResult.outputData
+            let outputData = null;
+            if (nodeResult?.output?.outputData !== undefined) {
+                outputData = nodeResult.output.outputData;
+            } else if (nodeResult?.outputData !== undefined) {
+                outputData = nodeResult.outputData;
+            }
+            
+            if (outputData !== null && outputData !== undefined) {
+                // If outputData is an object with a single key-value pair, extract the value
+                // This handles cases like { "input": 20 } -> 20
+                if (typeof outputData === 'object' && !Array.isArray(outputData) && Object.keys(outputData).length === 1) {
+                    const singleValue = Object.values(outputData)[0];
+                    // If it's a string that looks like a number, parse it
+                    if (typeof singleValue === 'string' && !isNaN(Number(singleValue)) && singleValue.trim() !== '') {
+                        extracted[nodeId] = Number(singleValue);
+                    } else {
+                        extracted[nodeId] = singleValue;
+                    }
+                } else {
+                    // Store by nodeId so visualizations can reference specific nodes
+                    extracted[nodeId] = outputData;
+                }
             }
         });
         console.log('[Lab] extractWorkflowData keys:', Object.keys(extracted), 'from result keys:', Object.keys(results));
@@ -1594,7 +1634,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             credentials: 'include',
-                            body: JSON.stringify({ inputs, usePrefect: false })
+                            body: JSON.stringify({ inputs, usePrefect: true })
                         });
                         if (res.ok) {
                             const data = await res.json();
@@ -1623,7 +1663,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ inputs, usePrefect: false })
+                    body: JSON.stringify({ inputs, usePrefect: true })
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -3554,7 +3594,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                             : 'The assigned workflow has no terminal (output) nodes. Add nodes to the workflow that produce results.'}
                                     </p>
                                     {selectedSimulation?.workflowId && !selectedSimulation.workflowId.startsWith('demo') && !selectedSimulation.workflowId.startsWith('preset') && (
-                                        <button
+                                                <button
                                             onClick={() => {
                                                 setShowAddVisualization(false);
                                                 navigate(`/workflow/${selectedSimulation.workflowId}`);
@@ -3563,10 +3603,10 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                         >
                                             <FlowArrow size={12} />
                                             Open workflow "{selectedSimulation.workflowName || 'Assigned Workflow'}"
-                                        </button>
-                                    )}
-                                </div>
-                            ) : (
+                                                </button>
+                                        )}
+                                    </div>
+                                ) : (
                                 <>
                                     <p className="text-xs text-[var(--text-tertiary)] mb-4">
                                         Select an output node from the workflow. The visualization type will be auto-detected based on the data.
@@ -3607,7 +3647,7 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                                             ? <Check size={16} className="text-[var(--text-tertiary)]" />
                                                             : <FlowArrow size={16} className="text-[var(--accent-primary)]" />
                                                         }
-                                                    </div>
+                                        </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                                                             {node.label || node.type}
@@ -3615,13 +3655,13 @@ export const Lab: React.FC<LabProps> = ({ entities, onNavigate }) => {
                                                         <p className="text-[11px] text-[var(--text-tertiary)] truncate">
                                                             {alreadyAdded ? 'Already added' : previewText}
                                                         </p>
-                                                    </div>
+                                    </div>
                                                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] shrink-0">
                                                         {node.type}
                                                     </span>
-                                                </button>
-                                            );
-                                        })}
+                                                    </button>
+                                                );
+                                            })}
                                     </div>
                                 </>
                             )}
