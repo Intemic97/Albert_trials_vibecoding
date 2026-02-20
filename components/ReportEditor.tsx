@@ -120,7 +120,7 @@ interface AuditLogEntry {
 const statusConfig = {
     draft: { label: 'Draft', color: 'text-amber-500', bg: 'bg-amber-500/15', icon: Clock },
     review: { label: 'Review', color: 'text-[var(--accent-primary)]', bg: 'bg-[var(--accent-primary)]/15', icon: Eye },
-    ready_to_send: { label: 'Ready to Send', color: 'text-emerald-500', bg: 'bg-emerald-500/15', icon: PaperPlaneTilt }
+    ready_to_send: { label: 'Done', color: 'text-emerald-500', bg: 'bg-emerald-500/15', icon: PaperPlaneTilt }
 };
 
 export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInfo, onViewChange }) => {
@@ -552,7 +552,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
         const labels: Record<string, string> = {
             'draft': 'Draft',
             'review': 'In Review',
-            'ready_to_send': 'Ready to Send',
+            'ready_to_send': 'Done',
         };
         return labels[status] || status;
     };
@@ -1793,7 +1793,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                         <div className="border border-emerald-500/30 rounded-lg p-4 bg-emerald-500/5">
                                             <div className="flex items-center gap-2 text-emerald-600">
                                                 <PaperPlaneTilt size={18} weight="light" />
-                                                <span className="text-sm font-medium">This section is Ready to Send</span>
+                                                <span className="text-sm font-medium">This section is Done</span>
                                             </div>
                                             <p className="text-xs text-[var(--text-tertiary)] mt-1">
                                                 Change the status back to Draft to edit the prompt or content.
@@ -1927,7 +1927,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                     }`}
                                                     dangerouslySetInnerHTML={{ __html: highlightedHtml || editingContent }}
                                                     onClick={() => selectedSection?.workflowStatus === 'draft' && setIsEditMode(true)}
-                                                    title={selectedSection?.workflowStatus === 'draft' ? 'Click to edit' : `Section is locked (${selectedSection?.workflowStatus === 'ready_to_send' ? 'Ready to Send' : 'Review'})`}
+                                                    title={selectedSection?.workflowStatus === 'draft' ? 'Click to edit' : `Section is locked (${selectedSection?.workflowStatus === 'ready_to_send' ? 'Done' : 'Review'})`}
                                                 />
                                             )}
                                         </div>
@@ -2255,7 +2255,7 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             </h2>
                                             <p className="text-sm text-[var(--text-secondary)]">
                                                 {selectedSection?.workflowStatus === 'ready_to_send' 
-                                                    ? 'This section is locked (Ready to Send)'
+                                                    ? 'This section is locked (Done)'
                                                     : `Select text to add comments • ${sectionComments.filter(c => c.status === 'open').length} open comment${sectionComments.filter(c => c.status === 'open').length !== 1 ? 's' : ''}`
                                                 }
                                             </p>

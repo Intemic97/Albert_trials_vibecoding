@@ -138,7 +138,9 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
     const [entityName, setEntityName] = useState('');
     const [properties, setProperties] = useState<CreatorProperty[]>([]);
     const [records, setRecords] = useState<CreatorRecord[]>([]);
+    const [totalRecordCount, setTotalRecordCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     // Keep refs in sync with state
     useEffect(() => { recordsRef.current = records; }, [records]);
@@ -261,9 +263,10 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
         const load = async () => {
             setLoading(true);
             try {
+                // Load only first 100 records for preview to improve load time
                 const [entityRes, recordsRes] = await Promise.all([
                     fetch(`${API_BASE}/entities/${entityId}`, { credentials: 'include' }),
-                    fetch(`${API_BASE}/entities/${entityId}/records`, { credentials: 'include' }),
+                    fetch(`${API_BASE}/entities/${entityId}/records?limit=100&includeTotal=true`, { credentials: 'include' }),
                 ]);
                 let loadedProps: CreatorProperty[] = [];
                 if (entityRes.ok) {
@@ -297,11 +300,20 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                 }
                 setProperties(loadedProps);
                 if (recordsRes.ok) {
-                    const recs = await recordsRes.json();
+                    const data = await recordsRes.json();
+                    // Handle both array response (backward compat) and object with records/total
+                    const recs = Array.isArray(data) ? data : (data.records || []);
+                    const total = Array.isArray(data) ? null : (data.total || null);
                     setRecords(recs.map((r: any) => ({
                         id: r.id,
                         values: r.values || {},
                     })));
+                    // Store total count for display
+                    if (total !== null && total > recs.length) {
+                        setTotalRecordCount(total);
+                    } else {
+                        setTotalRecordCount(null);
+                    }
                 }
             } catch (error) {
                 console.error('Error loading entity:', error);
@@ -1202,7 +1214,11 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                     <TableIcon size={14} weight="light" />
                                     Table
                                 </span>
-                                <span className="text-xs text-[var(--text-tertiary)]">{records.length} {records.length === 1 ? 'record' : 'records'}</span>
+                                <span className="text-xs text-[var(--text-tertiary)]">
+                                    {totalRecordCount !== null && totalRecordCount > records.length
+                                        ? `Showing ${records.length} of ${totalRecordCount.toLocaleString()} records`
+                                        : `${records.length} ${records.length === 1 ? 'record' : 'records'}`}
+                                </span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="relative">
@@ -1777,6 +1793,47 @@ export const EntityCreator: React.FC<EntityCreatorProps> = ({ entityId, isNew, o
                                     </tfoot>
                                 </table>
                             </div>
+                            
+                            {/* Load More Button */}
+                            {totalRecordCount !== null && totalRecordCount > records.length && (
+                                <div className="flex justify-center mt-4">
+                                    <button
+                                        onClick={async () => {
+                                            if (loadingMore || !entityId) return;
+                                            setLoadingMore(true);
+                                            try {
+                                                const offset = records.length;
+                                                const res = await fetch(`${API_BASE}/entities/${entityId}/records?limit=100&offset=${offset}`, { credentials: 'include' });
+                                                if (res.ok) {
+                                                    const data = await res.json();
+                                                    const newRecords = Array.isArray(data) ? data : (data.records || []);
+                                                    setRecords(prev => [...prev, ...newRecords.map((r: any) => ({
+                                                        id: r.id,
+                                                        values: r.values || {},
+                                                    }))]);
+                                                }
+                                            } catch (error) {
+                                                console.error('Error loading more records:', error);
+                                            } finally {
+                                                setLoadingMore(false);
+                                            }
+                                        }}
+                                        disabled={loadingMore}
+                                        className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-light)] hover:border-[var(--border-medium)] rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                    >
+                                        {loadingMore ? (
+                                            <>
+                                                <SpinnerGap size={14} className="animate-spin" weight="light" />
+                                                Loading...
+                                            </>
+                                        ) : (
+                                            <>
+                                                Load more ({Math.min(100, (totalRecordCount || 0) - records.length)} more available)
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

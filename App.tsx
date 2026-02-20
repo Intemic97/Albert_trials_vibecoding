@@ -717,7 +717,8 @@ function AuthenticatedApp() {
     const fetchRecords = async () => {
         if (!activeEntityId) return;
         try {
-            const res = await fetch(`${API_BASE}/entities/${activeEntityId}/records`, { credentials: 'include' });
+            // Limit to 100 records for preview to improve load time
+            const res = await fetch(`${API_BASE}/entities/${activeEntityId}/records?limit=100`, { credentials: 'include' });
             const data = await res.json();
             if (Array.isArray(data)) {
                 setRecords(data);

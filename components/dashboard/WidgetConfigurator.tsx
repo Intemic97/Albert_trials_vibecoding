@@ -61,6 +61,11 @@ const AGGREGATIONS = [
     { value: 'max', label: 'Maximum' },
 ];
 
+const AGGREGATIONS_WITH_NONE = [
+    { value: 'none', label: 'None (Raw Data)' },
+    ...AGGREGATIONS
+];
+
 const CHART_COLORS = [
     ['#5B7476', '#84C4D1', '#3d8a84', '#5ba9a3'],
     ['#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE'],
@@ -240,6 +245,10 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
 
         const aggregate = (values: number[]) => {
             if (values.length === 0) return 0;
+            if (aggregation === 'none') {
+                // For "none", return the first value (raw data, no aggregation)
+                return values[0] || 0;
+            }
             switch (aggregation) {
                 case 'sum':
                     return values.reduce((a, b) => a + b, 0);
@@ -412,6 +421,21 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
 
         // Group by X column if specified
         if (xAxisColumn && xCol) {
+            // If aggregation is "none", don't group - return raw data
+            if (aggregation === 'none') {
+                return records.slice(0, limit).map(record => {
+                    const xValue = record.values?.[xAxisColumn] || 'Unknown';
+                    const yValue = parseFloat(record.values?.[yAxisColumn]) || 0;
+                    return {
+                        name: String(xValue),
+                        value: yValue,
+                        [xCol.name]: String(xValue),
+                        [yCol.name]: yValue
+                    };
+                });
+            }
+            
+            // Otherwise, group and aggregate
             const groups: Record<string, number[]> = {};
             
             records.forEach(record => {
@@ -833,20 +857,32 @@ export const WidgetConfigurator: React.FC<WidgetConfiguratorProps> = ({
                                     </div>
 
                                     {/* Aggregation */}
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                                            Aggregation
-                                        </label>
-                                        <select
-                                            value={aggregation}
-                                            onChange={e => setAggregation(e.target.value)}
-                                            className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
-                                        >
-                                            {AGGREGATIONS.map(agg => (
-                                                <option key={agg.value} value={agg.value}>{agg.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    {(() => {
+                                        // Check if X-axis is a date column (by name pattern, since type might vary)
+                                        const xCol = allColumns.find(c => c.id === xAxisColumn);
+                                        const isDateColumn = xCol && /fecha|date|time|timestamp/i.test(xCol.name);
+                                        // For time-series charts (line, area), allow "None" option when X-axis is a date
+                                        const isTimeSeriesChart = ['line_chart', 'area_chart'].includes(template.id);
+                                        const showNoneOption = isTimeSeriesChart && isDateColumn;
+                                        const aggregationOptions = showNoneOption ? AGGREGATIONS_WITH_NONE : AGGREGATIONS;
+                                        
+                                        return (
+                                            <div>
+                                                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                                                    Aggregation {showNoneOption && <span className="text-[var(--text-tertiary)]">(optional for time series)</span>}
+                                                </label>
+                                                <select
+                                                    value={aggregation}
+                                                    onChange={e => setAggregation(e.target.value)}
+                                                    className="w-full px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-light)] rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
+                                                >
+                                                    {aggregationOptions.map(agg => (
+                                                        <option key={agg.value} value={agg.value}>{agg.label}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        );
+                                    })()}
 
                                     {/* Heatmap row grouping */}
                                     {template.id === 'heatmap' && (

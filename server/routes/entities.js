@@ -256,6 +256,8 @@ router.get('/entities/:id/audit', authenticateToken, async (req, res) => {
 // Helper to resolve relation values
 router.get('/entities/:id/records', authenticateToken, async (req, res) => {
     const { id } = req.params;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+    const includeTotal = req.query.includeTotal === 'true';
     try {
         // Verify entity belongs to user's organization
         const entity = await db.get('SELECT id FROM entities WHERE id = ? AND organizationId = ?', [id, req.user.orgId]);
@@ -263,7 +265,21 @@ router.get('/entities/:id/records', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Entity not found or access denied' });
         }
 
-        const records = await db.all('SELECT * FROM records WHERE entityId = ?', [id]);
+        // Get total count if requested
+        let totalCount = null;
+        if (includeTotal && limit && limit > 0) {
+            const countResult = await db.get('SELECT COUNT(*) as count FROM records WHERE entityId = ?', [id]);
+            totalCount = countResult?.count || 0;
+        }
+
+        // Apply limit and offset if specified
+        let records;
+        const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
+        if (limit && limit > 0) {
+            records = await db.all('SELECT * FROM records WHERE entityId = ? ORDER BY createdAt DESC LIMIT ? OFFSET ?', [id, limit, offset]);
+        } else {
+            records = await db.all('SELECT * FROM records WHERE entityId = ?', [id]);
+        }
 
         const recordsWithValues = await Promise.all(records.map(async (record) => {
             const values = await db.all('SELECT * FROM record_values WHERE recordId = ?', [record.id]);
@@ -274,7 +290,12 @@ router.get('/entities/:id/records', authenticateToken, async (req, res) => {
             return { ...record, values: valuesMap };
         }));
 
-        res.json(recordsWithValues);
+        // If includeTotal is requested, return object with records and total
+        if (includeTotal && totalCount !== null) {
+            res.json({ records: recordsWithValues, total: totalCount });
+        } else {
+            res.json(recordsWithValues);
+        }
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch records' });
