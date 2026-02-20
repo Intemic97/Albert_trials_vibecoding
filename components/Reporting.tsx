@@ -266,9 +266,19 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
         }
     };
 
-    const handleUseGeneratedTemplate = () => {
+    const handlePreviewTemplate = () => {
         if (aiGeneratedTemplate) {
-            setEditingTemplate(aiGeneratedTemplate);
+            // Transform flat sections to nested structure if needed
+            // AI-generated templates have flat sections with parentId, need to convert to nested
+            const templateWithNestedSections = {
+                ...aiGeneratedTemplate,
+                sections: aiGeneratedTemplate.sections && aiGeneratedTemplate.sections.length > 0
+                    ? (('parentId' in (aiGeneratedTemplate.sections[0] || {}))
+                        ? transformSectionsToNested(aiGeneratedTemplate.sections as any[])
+                        : aiGeneratedTemplate.sections)
+                    : []
+            };
+            setEditingTemplate(templateWithNestedSections);
             setShowAiAssistant(false);
             setShowTemplateModal(true);
             setAiPrompt('');
@@ -381,7 +391,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             setShowAiAssistant(false);
             setAiPrompt('');
             setAiGeneratedTemplate(null);
-            alert(`Template and document created. Suggested entities created: ${createdEntities}.`);
+            // Navigate directly to the document without showing alert
             if (createdReport?.id) {
                 navigate(`/documents/${createdReport.id}`);
             }
@@ -706,7 +716,12 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
     const handleSaveTemplate = async (templateData: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
         try {
-            if (editingTemplate) {
+            // If editingTemplate exists and has a real ID (not AI-generated), update it
+            // AI-generated templates have IDs starting with "ai_", which should be treated as new
+            const isNewTemplate = !editingTemplate || !editingTemplate.id || editingTemplate.id.startsWith('ai_');
+            
+            if (!isNewTemplate && editingTemplate) {
+                // Update existing template
                 const res = await fetch(`${API_BASE}/report-templates/${editingTemplate.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -715,8 +730,14 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                 });
                 if (res.ok) {
                     fetchTemplates();
+                } else {
+                    const errorText = await res.text();
+                    console.error('Error updating template:', errorText);
+                    alert('Failed to update template. Please try again.');
+                    return;
                 }
             } else {
+                // Create new template
                 const res = await fetch(`${API_BASE}/report-templates`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -725,6 +746,11 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                 });
                 if (res.ok) {
                     fetchTemplates();
+                } else {
+                    const errorText = await res.text();
+                    console.error('Error creating template:', errorText);
+                    alert('Failed to create template. Please try again.');
+                    return;
                 }
             }
             setShowTemplateModal(false);
@@ -732,6 +758,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             setTemplateUsage(null);
         } catch (error) {
             console.error('Error saving template:', error);
+            alert('Failed to save template. Please try again.');
         }
     };
 
@@ -1284,24 +1311,15 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
 
                                     <div className="flex gap-2 justify-end">
                                         <button
-                                            onClick={() => {
-                                                setAiGeneratedTemplate(null);
-                                                setAiPrompt('');
-                                            }}
-                                            className="flex items-center px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                                            onClick={handlePreviewTemplate}
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
                                         >
-                                            Try Again
-                                        </button>
-                                        <button
-                                            onClick={handleUseGeneratedTemplate}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md"
-                                        >
-                                            Use This Template
+                                            Preview Template
                                         </button>
                                         <button
                                             onClick={handleCreateAllWithAI}
                                             disabled={isApplyingAiBundle}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border border-[var(--border-light)] text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg text-xs font-medium transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                            className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)] text-white rounded-lg text-xs font-medium transition-all shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
                                         >
                                             {isApplyingAiBundle ? (
                                                 <>
@@ -1309,7 +1327,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                                                     Creating...
                                                 </>
                                             ) : (
-                                                <>Create Template + Document + Entities</>
+                                                <>Use Template</>
                                             )}
                                         </button>
                                     </div>
