@@ -8,6 +8,7 @@ import {
   FileText, 
   Lightning, 
   Leaf, 
+  Cloud,
   PencilSimple, 
   WarningCircle, 
   GitMerge, 
@@ -62,6 +63,7 @@ export const DRAGGABLE_ITEMS: DraggableItem[] = [
   { type: 'limsFetch', label: 'LIMS Connector', icon: Flask, description: 'Fetch data from Laboratory Information Management System', category: 'Data' },
   { type: 'esios', label: 'Energy Prices', icon: Lightning, description: 'Fetch prices from Red Eléctrica', category: 'Data' },
   { type: 'climatiq', label: 'Emission Factors', icon: Leaf, description: 'Search CO2 emission factors', category: 'Data' },
+  { type: 'weather', label: 'Weather Data', icon: Cloud, description: 'Fetch weather data from Open-Meteo', category: 'Data' },
   { type: 'manualInput', label: 'Manual Data Input', icon: PencilSimple, description: 'Define a variable with a value', category: 'Data' },
   
   // OT / Industrial Data Sources

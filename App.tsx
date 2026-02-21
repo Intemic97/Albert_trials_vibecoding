@@ -44,7 +44,6 @@ sessionStorage.removeItem('chunk_reload');
 
 // Lazy-loaded components with auto-retry on stale chunk errors
 const Workflows = lazyWithRetry(() => import('./components/Workflows').then(m => ({ default: m.Workflows as any })));
-const WorkflowEditor = lazyWithRetry(() => import('./components/Workflows/WorkflowEditor').then(m => ({ default: m.WorkflowEditor as any })));
 const ReportEditor = lazyWithRetry(() => import('./components/ReportEditor').then(m => ({ default: m.ReportEditor as any })));
 const Dashboard = lazyWithRetry(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard as any })));
 const Overview = lazyWithRetry(() => import('./components/Overview').then(m => ({ default: m.Overview as any })));
@@ -197,7 +196,6 @@ function AuthenticatedApp() {
     const currentView = getCurrentView();
     const hideSidebarForRoutes = location.pathname.match(/^\/documents\/[^/]+$/) ||
         location.pathname.match(/^\/workflow\/[^/]+$/) ||
-        location.pathname.match(/^\/workflows-v2(\/|$)/) ||
         location.pathname.match(/^\/inteligencia/) ||
         location.pathname.match(/^\/copilots/) ||
         location.pathname.match(/^\/documentation/);
@@ -1597,17 +1595,6 @@ function AuthenticatedApp() {
                     } />
                     <Route path="/workflow/:workflowId" element={
                         <Workflows entities={entities} onViewChange={handleNavigate} onEntityCreated={fetchEntities} />
-                    } />
-                    {/* New modular workflow editor (v2) */}
-                    <Route path="/workflows-v2" element={
-                        <div className="flex-1 flex flex-col min-h-0 overflow-hidden h-full">
-                            <WorkflowEditor entities={entities} onViewChange={handleNavigate} />
-                        </div>
-                    } />
-                    <Route path="/workflows-v2/:workflowId" element={
-                        <div className="flex-1 flex flex-col min-h-0 overflow-hidden h-full">
-                            <WorkflowEditor entities={entities} onViewChange={handleNavigate} />
-                        </div>
                     } />
                     <Route path="/templates" element={
                         <Reporting entities={entities} companyInfo={undefined} onViewChange={handleNavigate} view="templates" />

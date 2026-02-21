@@ -64,7 +64,7 @@ import {
   RenameColumnsConfigPanel, VisualizationConfigPanel, ClimatiqConfigPanel,
   HumanApprovalConfigPanel, ExcelConfigPanel, PdfConfigPanel,
   SaveRecordsConfigPanel, LLMConfigPanel, PythonConfigPanel,
-  ScheduleConfigPanel,
+  ScheduleConfigPanel, WeatherConfigPanel,
 } from './Workflows/panels';
 
 // Import node execution hook
@@ -343,6 +343,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
     const [showExitConfirmation, setShowExitConfirmation] = useState<boolean>(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
+    // Weather Node State
+    const [configuringWeatherNodeId, setConfiguringWeatherNodeId] = useState<string | null>(null);
     // ESIOS Node State
     const [configuringEsiosNodeId, setConfiguringEsiosNodeId] = useState<string | null>(null);
     const [esiosArchiveId, setEsiosArchiveId] = useState<string>('1001'); // PVPC indicator ID
@@ -1265,6 +1267,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         setConfiguringOsiPiNodeId(null);
         setConfiguringFranmitNodeId(null);
         setConfiguringConveyorNodeId(null);
+        setConfiguringWeatherNodeId(null);
         setConfiguringEsiosNodeId(null);
         setConfiguringClimatiqNodeId(null);
         setConfiguringHumanApprovalNodeId(null);
@@ -2018,6 +2021,11 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
         setScheduleType('interval');
         setScheduleTime('09:00');
         setScheduleRepeat('daily');
+    };
+
+    const openWeatherConfig = (nodeId: string) => {
+        const node = nodes.find(n => n.id === nodeId);
+        if (node && node.type === 'weather') setConfiguringWeatherNodeId(nodeId);
     };
 
     const openEsiosConfig = (nodeId: string) => {
@@ -3125,6 +3133,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                 return !!node.config?.whatsappTo;
             case 'dataVisualization':
                 return !!node.config?.generatedWidget;
+            case 'weather':
+                return !!((node.config as any)?.latitude && (node.config as any)?.longitude);
             case 'esios':
                 return !!node.config?.esiosArchiveId;
             case 'climatiq':
@@ -3220,6 +3230,7 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
             case 'statisticalAnalysis': return 'text-emerald-600';
             case 'alertAgent': return 'text-orange-600';
             case 'pdfReport': return 'text-red-600';
+            case 'weather': return 'text-blue-600';
             case 'esios': return 'text-cyan-600';
             case 'climatiq': return 'text-sky-600';
             case 'join': return 'text-cyan-600';
@@ -4015,6 +4026,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                 openWhatsAppConfig(node.id);
                                             } else if (node.type === 'dataVisualization') {
                                                 openVisualizationConfig(node.id);
+                                            } else if (node.type === 'weather') {
+                                                openWeatherConfig(node.id);
                                             } else if (node.type === 'esios') {
                                                 openEsiosConfig(node.id);
                                             } else if (node.type === 'climatiq') {
@@ -4222,6 +4235,8 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                                                     openWhatsAppConfig(node.id);
                                                                 } else if (node.type === 'dataVisualization') {
                                                                     openVisualizationConfig(node.id);
+                                                                } else if (node.type === 'weather') {
+                                                                    openWeatherConfig(node.id);
                                                                 } else if (node.type === 'esios') {
                                                                     openEsiosConfig(node.id);
                                                                 } else if (node.type === 'climatiq') {
@@ -5104,6 +5119,17 @@ export const Workflows: React.FC<WorkflowsProps> = ({ entities, onViewChange, on
                                 openFeedbackPopup={openFeedbackPopup}
                                 nodes={nodes}
                                 connections={connections}
+                            />
+                        )}
+
+                        {/* Weather Configuration Panel */}
+                        {configuringWeatherNodeId && (
+                            <WeatherConfigPanel
+                                nodeId={configuringWeatherNodeId!}
+                                node={nodes.find(n => n.id === configuringWeatherNodeId)}
+                                onSave={handlePanelSave}
+                                onClose={() => setConfiguringWeatherNodeId(null)}
+                                openFeedbackPopup={openFeedbackPopup}
                             />
                         )}
 

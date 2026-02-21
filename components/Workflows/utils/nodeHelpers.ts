@@ -148,6 +148,7 @@ export const isNodeConfigured = (node: WorkflowNode): boolean => {
         'dataVisualization': (n) => !!n.config?.generatedWidget,
         'esios': (n) => !!n.config?.esiosArchiveId,
         'climatiq': (n) => !!n.config?.climatiqFactor,
+        'weather': (n) => !!(n.config?.latitude && n.config?.longitude),
         'humanApproval': (n) => !!n.config?.assignedUserId,
         'comment': (n) => !!n.config?.commentText,
         'trigger': () => true,

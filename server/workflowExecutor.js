@@ -316,6 +316,7 @@ class WorkflowExecutor {
             dataVisualization: () => this.handleDataVisualization(node, inputData),
             esios: () => this.handleEsios(node, inputData),
             climatiq: () => this.handleClimatiq(node, inputData),
+            weather: () => this.handleWeather(node, inputData),
             splitColumns: () => this.handleSplitColumns(node, inputData),
             comment: () => this.handleComment(node, inputData),
             humanApproval: () => this.handleHumanApproval(node, inputData),
@@ -2013,6 +2014,53 @@ finally:
             };
         } catch (error) {
             throw new Error(`Climatiq request failed: ${error.message}`);
+        }
+    }
+
+    async handleWeather(node, inputData) {
+        const latitude = node.config?.latitude || 40.4168;
+        const longitude = node.config?.longitude || -3.7038;
+        const date = node.config?.date || new Date().toISOString().split('T')[0];
+        const forecastDays = node.config?.forecastDays || 7;
+
+        try {
+            // Open-Meteo API - free, no API key required
+            const endDate = new Date(new Date(date).getTime() + (forecastDays - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&timezone=auto&start_date=${date}&end_date=${endDate}`;
+            
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Weather API returned ${response.status}`);
+            }
+            const data = await response.json();
+
+            // Transform data: each day becomes a separate row with timestamp
+            // This makes it easier to use in workflows and visualizations
+            const dailyRecords = data.daily.time.map((dateStr, index) => {
+                // Create timestamp at noon (12:00) for that date in the location's timezone
+                const timestamp = new Date(`${dateStr}T12:00:00`).toISOString();
+                
+                return {
+                    timestamp: timestamp,
+                    date: dateStr,
+                    latitude: data.latitude,
+                    longitude: data.longitude,
+                    timezone: data.timezone,
+                    temperature_max: data.daily.temperature_2m_max[index],
+                    temperature_min: data.daily.temperature_2m_min[index],
+                    precipitation: data.daily.precipitation_sum[index],
+                    wind_speed_max: data.daily.wind_speed_10m_max[index],
+                    weather_code: data.daily.weather_code ? data.daily.weather_code[index] : null
+                };
+            });
+
+            return {
+                success: true,
+                message: `Weather data fetched for ${date} (${forecastDays} days)`,
+                outputData: dailyRecords
+            };
+        } catch (error) {
+            throw new Error(`Weather request failed: ${error.message}`);
         }
     }
 

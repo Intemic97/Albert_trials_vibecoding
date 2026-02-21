@@ -77,6 +77,8 @@ export const getNodeIconColor = (type: NodeType): string => {
       return 'text-yellow-600';
     case 'climatiq':
       return 'text-emerald-600';
+    case 'weather':
+      return 'text-blue-600';
     case 'humanApproval':
       return 'text-orange-600';
     case 'alertAgent':
@@ -141,7 +143,9 @@ export const WorkflowNode: React.FC<WorkflowNodeProps> = ({
   return (
     <div
       data-node-id={node.id}
-      onClick={() => onNodeClick(node.id)}
+      onClick={(e) => {
+        onNodeClick(node.id);
+      }}
       onDoubleClick={(e) => {
         e.stopPropagation();
         onConfigure(node.id);

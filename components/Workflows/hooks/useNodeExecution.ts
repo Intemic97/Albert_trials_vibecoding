@@ -992,6 +992,55 @@ export function useNodeExecution(deps: NodeExecutionDeps): NodeExecutionReturn {
           }
           break;
 
+        case 'weather': {
+          const latitude = node.config?.latitude || 40.4168;
+          const longitude = node.config?.longitude || -3.7038;
+          const date = node.config?.date || new Date().toISOString().split('T')[0];
+          const forecastDays = node.config?.forecastDays || 7;
+          const endDate = new Date(new Date(date).getTime() + (forecastDays - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&timezone=auto&start_date=${date}&end_date=${endDate}`;
+          try {
+            const response = await fetch(`${API_BASE}/proxy`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                url, method: 'GET',
+                headers: {}
+              }),
+              credentials: 'include'
+            });
+            if (response.ok) {
+              const data = await response.json();
+              // Transform data: each day becomes a separate row with timestamp
+              const dailyRecords = data.daily.time.map((dateStr: string, index: number) => {
+                const timestamp = new Date(`${dateStr}T12:00:00`).toISOString();
+                return {
+                  timestamp: timestamp,
+                  date: dateStr,
+                  latitude: data.latitude,
+                  longitude: data.longitude,
+                  timezone: data.timezone,
+                  temperature_max: data.daily.temperature_2m_max[index],
+                  temperature_min: data.daily.temperature_2m_min[index],
+                  precipitation: data.daily.precipitation_sum[index],
+                  wind_speed_max: data.daily.wind_speed_10m_max[index],
+                  weather_code: data.daily.weather_code ? data.daily.weather_code[index] : null
+                };
+              });
+              nodeData = dailyRecords;
+              result = `Fetched weather data for ${date} (${forecastDays} days, ${dailyRecords.length} records)`;
+            } else {
+              const errorData = await response.json();
+              throw new Error(errorData.error || `Weather API request failed: ${response.status}`);
+            }
+          } catch (error: any) {
+            console.error('Weather request error:', error);
+            result = `Error: ${error.message || 'Failed to fetch weather data'}`;
+            nodeData = [{ error: error.message }];
+          }
+          break;
+        }
+
         case 'excelInput':
           if (node.config?.useGCS && node.config?.gcsPath) {
             nodeData = node.config.previewData || [];

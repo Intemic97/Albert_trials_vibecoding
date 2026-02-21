@@ -16,6 +16,7 @@ export { StatisticalConfigPanel } from './StatisticalConfigPanel';
 export { AlertAgentConfigPanel } from './AlertAgentConfigPanel';
 export { PdfReportConfigPanel } from './PdfReportConfigPanel';
 export { EsiosConfigPanel } from './EsiosConfigPanel';
+export { WeatherConfigPanel } from './WeatherConfigPanel';
 export { AddFieldConfigPanel } from './AddFieldConfigPanel';
 export { ManualInputConfigPanel } from './ManualInputConfigPanel';
 export { EmailConfigPanel } from './EmailConfigPanel';

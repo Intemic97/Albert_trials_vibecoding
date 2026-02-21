@@ -167,6 +167,7 @@ type ConfiguringNodeType =
   | 'pdf'
   | 'manualInput'
   | 'http'
+  | 'weather'
   | 'webhook'
   | 'mysql'
   | 'sap'

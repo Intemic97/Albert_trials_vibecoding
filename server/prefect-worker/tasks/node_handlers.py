@@ -1235,6 +1235,58 @@ async def handle_climatiq(node: Dict, input_data: Optional[Dict] = None, executi
     except Exception as e:
         raise ValueError(f"Climatiq request failed: {str(e)}")
 
+@task(name="weather_fetch", retries=2)
+async def handle_weather(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
+    """Handle Weather data fetch from Open-Meteo API"""
+    from datetime import datetime, timedelta
+    
+    config_data = node.get("config", {})
+    latitude = config_data.get("latitude", 40.4168)
+    longitude = config_data.get("longitude", -3.7038)
+    date = config_data.get("date") or datetime.now().strftime("%Y-%m-%d")
+    forecast_days = config_data.get("forecastDays", 7)
+    
+    try:
+        # Calculate end date
+        start_date_obj = datetime.strptime(date, "%Y-%m-%d")
+        end_date_obj = start_date_obj + timedelta(days=forecast_days - 1)
+        end_date = end_date_obj.strftime("%Y-%m-%d")
+        
+        # Open-Meteo API - free, no API key required
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&timezone=auto&start_date={date}&end_date={end_date}"
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Transform data: each day becomes a separate row with timestamp
+            daily_records = []
+            for i, date_str in enumerate(data["daily"]["time"]):
+                # Create timestamp at noon (12:00) for that date
+                timestamp = datetime.strptime(f"{date_str} 12:00:00", "%Y-%m-%d %H:%M:%S").isoformat() + "Z"
+                
+                daily_records.append({
+                    "timestamp": timestamp,
+                    "date": date_str,
+                    "latitude": data.get("latitude"),
+                    "longitude": data.get("longitude"),
+                    "timezone": data.get("timezone"),
+                    "temperature_max": data["daily"]["temperature_2m_max"][i],
+                    "temperature_min": data["daily"]["temperature_2m_min"][i],
+                    "precipitation": data["daily"]["precipitation_sum"][i],
+                    "wind_speed_max": data["daily"]["wind_speed_10m_max"][i],
+                    "weather_code": data["daily"].get("weather_code", [None] * len(data["daily"]["time"]))[i] if "weather_code" in data["daily"] else None
+                })
+            
+            return {
+                "success": True,
+                "message": f"Weather data fetched for {date} ({forecast_days} days)",
+                "outputData": daily_records
+            }
+    except Exception as e:
+        raise ValueError(f"Weather request failed: {str(e)}")
+
 @task(name="split_columns", retries=0)
 async def handle_split_columns(node: Dict, input_data: Optional[Dict] = None, execution_context: Optional[Dict] = None) -> Dict:
     """Handle split columns node - split data into two outputs"""
@@ -1682,6 +1734,7 @@ NODE_HANDLERS = {
     "dataVisualization": handle_data_visualization,
     "esios": handle_esios,
     "climatiq": handle_climatiq,
+    "weather": handle_weather,
     # Logic nodes
     "splitColumns": handle_split_columns,
     "humanApproval": handle_human_approval,
