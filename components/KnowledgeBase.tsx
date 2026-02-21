@@ -141,6 +141,15 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ entities, onNaviga
         }
     }, []);
 
+    // Re-fetch folders when entities change (e.g. after importing examples into a folder)
+    const prevEntitiesLengthRef = useRef(entities.length);
+    useEffect(() => {
+        if (entities.length !== prevEntitiesLengthRef.current) {
+            prevEntitiesLengthRef.current = entities.length;
+            fetchFolders();
+        }
+    }, [entities.length]);
+
     // API calls
     const fetchFolders = async () => {
         setIsLoadingFolders(true);

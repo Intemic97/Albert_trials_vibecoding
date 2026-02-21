@@ -162,6 +162,36 @@ async function importUseCasePackage(db, orgId, packageObj, userId = null, option
         }
     }
 
+    // --- Move imported entities into "Imported Examples" folder ---
+    if (entities.length > 0) {
+        try {
+            const entityIds = entities.map(e => e.id);
+            const existingFolder = await db.get(
+                'SELECT * FROM knowledge_folders WHERE organizationId = ? AND name = ?',
+                [org, 'Imported Examples']
+            );
+            
+            if (existingFolder) {
+                const currentEntityIds = existingFolder.entityIds ? JSON.parse(existingFolder.entityIds) : [];
+                const mergedIds = [...new Set([...currentEntityIds, ...entityIds])];
+                await db.run(
+                    'UPDATE knowledge_folders SET entityIds = ?, updatedAt = ? WHERE id = ?',
+                    [JSON.stringify(mergedIds), now, existingFolder.id]
+                );
+            } else {
+                const folderId = 'fold_' + generateId();
+                await db.run(
+                    `INSERT INTO knowledge_folders (id, organizationId, name, description, color, parentId, documentIds, entityIds, createdBy, createdAt, updatedAt)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [folderId, org, 'Imported Examples', 'Example entities created from imports', '#f59e0b', null, '[]', JSON.stringify(entityIds), userIdVal || '', now, now]
+                );
+            }
+        } catch (folderErr) {
+            // Non-critical: don't fail the entire import if folder creation fails
+            console.error('Could not organize imported entities into folder:', folderErr);
+        }
+    }
+
     // --- Workflow ---
     const workflow = pkg.workflow;
     if (workflow && workflow.id && workflow.data) {

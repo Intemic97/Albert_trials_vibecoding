@@ -192,8 +192,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
             
             const folderName = entityFolderNameMap.get(group.entity.id);
             // Use real entityType if available, fallback to name-based detection
-            const category: EntityCategory = (group.entity as any).entityType && (group.entity as any).entityType !== 'generic'
-                ? (group.entity as any).entityType as EntityCategory
+            const rawType = (group.entity as any).entityType;
+            const category: EntityCategory = rawType && rawType !== 'generic' && ENTITY_CATEGORY_CONFIG[rawType as EntityCategory]
+                ? rawType as EntityCategory
                 : detectEntityCategory(group.entity.name, folderName);
             const categoryColor = ENTITY_CATEGORY_CONFIG[category].color;
             

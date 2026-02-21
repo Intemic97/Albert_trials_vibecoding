@@ -944,6 +944,48 @@ export const Dashboard: React.FC<DashboardProps> = ({ entities, onNavigate, onVi
                 ]
             });
 
+            // Move newly created example entities into an "Imported Examples" folder
+            if (createdEntitiesCount > 0) {
+                try {
+                    const createdEntityIds = [extrusionEntity, productionEntity, rawMaterialEntity, ordersEntity]
+                        .filter(Boolean)
+                        .map((e: any) => e.id);
+                    
+                    // Check if "Imported Examples" folder already exists
+                    const foldersRes = await fetch(`${API_BASE}/knowledge/folders`, { credentials: 'include' });
+                    const existingFolders = foldersRes.ok ? await foldersRes.json() : [];
+                    let examplesFolder = existingFolders.find((f: any) => f.name === 'Imported Examples');
+                    
+                    if (!examplesFolder) {
+                        // Create the folder
+                        const createFolderRes = await fetch(`${API_BASE}/knowledge/folders`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                name: 'Imported Examples',
+                                description: 'Example entities created from dashboard presets',
+                                color: '#f59e0b',
+                                entityIds: createdEntityIds
+                            })
+                        });
+                        if (createFolderRes.ok) examplesFolder = await createFolderRes.json();
+                    } else {
+                        // Add new entity IDs to existing folder
+                        for (const entityId of createdEntityIds) {
+                            await fetch(`${API_BASE}/knowledge/folders/${examplesFolder.id}/add`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({ type: 'entity', itemId: entityId })
+                            });
+                        }
+                    }
+                } catch (folderErr) {
+                    console.error('Could not organize examples into folder:', folderErr);
+                }
+            }
+
             if (createdEntitiesCount > 0 || seededEntitiesCount > 0) {
                 success(
                     'Preset entities prepared',
