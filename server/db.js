@@ -1204,6 +1204,14 @@ async function initDb() {
     await db.exec(`ALTER TABLE workflows ADD COLUMN isPublic INTEGER DEFAULT 0`);
   } catch (e) { /* column exists */ }
 
+  // Migration: Add itemType and widgetConfig to template_sections for graph/widget items in reports
+  try {
+    await db.exec(`ALTER TABLE template_sections ADD COLUMN itemType TEXT DEFAULT 'text'`);
+  } catch (e) { /* column exists */ }
+  try {
+    await db.exec(`ALTER TABLE template_sections ADD COLUMN widgetConfig TEXT`);
+  } catch (e) { /* column exists */ }
+
   return db;
 }
 

@@ -12,6 +12,8 @@ import { Entity } from '../types';
 import { PromptInput } from './PromptInput';
 import { API_BASE } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { DynamicChart, WidgetConfig } from './DynamicChart';
+import { ChartBar } from '@phosphor-icons/react';
 
 interface ReportEditorProps {
     entities: Entity[];
@@ -26,6 +28,8 @@ interface TemplateSection {
     content: string;
     generationRules: string;
     sortOrder: number;
+    itemType?: 'text' | 'graph';
+    widgetConfig?: any;
     // Merged from report_sections
     reportSectionId?: string;
     generatedContent?: string | null;
@@ -116,6 +120,92 @@ interface AuditLogEntry {
     details: string | null;
     createdAt: string;
 }
+
+// Graph section renderer - loads entity data and renders a DynamicChart
+const ReportGraphSection: React.FC<{ widgetConfig: any; height?: number }> = ({ widgetConfig, height = 300 }) => {
+    const [chartData, setChartData] = useState<any[] | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const loadData = async () => {
+            // If widget config has embedded data, use it directly
+            if (widgetConfig?.data && Array.isArray(widgetConfig.data) && widgetConfig.data.length > 0) {
+                setChartData(widgetConfig.data);
+                setLoading(false);
+                return;
+            }
+
+            // Otherwise, try to fetch from entity
+            const entityId = widgetConfig?.dataConfig?.entityId;
+            if (!entityId) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/entities/${entityId}/records?limit=500`, { credentials: 'include' });
+                if (res.ok) {
+                    const records = await res.json();
+                    const recordArr = Array.isArray(records) ? records : records.records || [];
+                    
+                    // Simple data processing - map entity records to chart format
+                    const dc = widgetConfig.dataConfig;
+                    const processed = recordArr.map((r: any) => {
+                        const row: any = {};
+                        if (dc.xAxisColumn) row.name = String(r.values?.[dc.xAxisColumn] ?? '');
+                        if (dc.yAxisColumn) row.value = parseFloat(r.values?.[dc.yAxisColumn]) || 0;
+                        // Copy all values for flexibility
+                        if (r.values) Object.entries(r.values).forEach(([k, v]) => { row[k] = v; });
+                        return row;
+                    });
+                    setChartData(processed);
+                }
+            } catch (e) {
+                console.error('Error loading chart data:', e);
+            }
+            setLoading(false);
+        };
+        loadData();
+    }, [widgetConfig]);
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center" style={{ height }}>
+                <SpinnerGap size={24} weight="light" className="animate-spin text-[var(--text-tertiary)]" />
+            </div>
+        );
+    }
+
+    if (!chartData || chartData.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center text-[var(--text-tertiary)]" style={{ height }}>
+                <ChartBar size={40} weight="light" className="mb-2 opacity-50" />
+                <p className="text-sm">No chart data available</p>
+            </div>
+        );
+    }
+
+    // Build WidgetConfig for DynamicChart
+    const dc = widgetConfig.dataConfig || {};
+    const chartConfig: WidgetConfig = {
+        type: widgetConfig.type === 'bar_chart' ? 'bar'
+            : widgetConfig.type === 'line_chart' ? 'line'
+            : widgetConfig.type === 'area_chart' ? 'area'
+            : widgetConfig.type === 'pie_chart' ? 'pie'
+            : widgetConfig.type === 'kpi' ? 'bar'
+            : widgetConfig.type === 'gauge' ? 'gauge'
+            : widgetConfig.type || 'bar',
+        title: widgetConfig.title || 'Chart',
+        description: widgetConfig.description || '',
+        data: chartData,
+        xAxisKey: 'name',
+        dataKey: 'value',
+        colors: widgetConfig.colors,
+        dataConfig: dc
+    };
+
+    return <DynamicChart config={chartConfig} height={height} />;
+};
 
 const statusConfig = {
     draft: { label: 'Draft', color: 'text-amber-500', bg: 'bg-amber-500/15', icon: Clock },
@@ -348,6 +438,8 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
             title: parent.title,
             content: parent.content || '',
             generationRules: parent.generationRules || '',
+            itemType: parent.itemType || 'text',
+            widgetConfig: parent.widgetConfig || null,
             items: flatSections
                 .filter(s => s.parentId === parent.id)
                 .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -355,7 +447,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                     id: item.id,
                     title: item.title,
                     content: item.content || '',
-                    generationRules: item.generationRules || ''
+                    generationRules: item.generationRules || '',
+                    itemType: item.itemType || 'text',
+                    widgetConfig: item.widgetConfig || null
                 })),
             isExpanded: true
         })).sort((a, b) => {
@@ -1160,7 +1254,11 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                     : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
                                             }`}
                                         >
-                                            <StatusIcon size={16} className={status.color} />
+                                            {section.itemType === 'graph' ? (
+                                                <ChartBar size={16} className="text-blue-500 shrink-0" />
+                                            ) : (
+                                                <StatusIcon size={16} className={status.color} />
+                                            )}
                                             <span className="flex-1 truncate text-sm">{section.title}</span>
                                             {sectionCommentCount > 0 && (
                                                 <span className="px-1.5 py-0.5 text-xs bg-amber-500/20 text-amber-500 rounded-full font-medium">
@@ -1200,7 +1298,11 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                                     : 'hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
                                                             }`}
                                                         >
-                                                            <SubStatusIcon size={14} className={subStatus.color} />
+                                                            {sub.itemType === 'graph' ? (
+                                                                <ChartBar size={14} className="text-blue-500 shrink-0" />
+                                                            ) : (
+                                                                <SubStatusIcon size={14} className={subStatus.color} />
+                                                            )}
                                                             <span className="flex-1 truncate">{sub.title}</span>
                                                             {subCommentCount > 0 && (
                                                                 <span className="px-1.5 py-0.5 text-xs bg-amber-500/20 text-amber-500 rounded-full font-medium">
@@ -1302,9 +1404,17 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                             >
                                                 <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between">
                                                     <div>
-                                                        <h2 className="text-lg font-normal text-[var(--text-primary)]">
-                                                            {section.title}
-                                                        </h2>
+                                                        <div className="flex items-center gap-2">
+                                                            {section.itemType === 'graph' && (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                                                                    <ChartBar size={12} weight="fill" />
+                                                                    {section.widgetConfig?.type?.replace('_', ' ').toUpperCase() || 'Graph'}
+                                                                </span>
+                                                            )}
+                                                            <h2 className="text-lg font-normal text-[var(--text-primary)]">
+                                                                {section.title}
+                                                            </h2>
+                                                        </div>
                                                         {section.content && (
                                                             <p className="text-sm text-[var(--text-secondary)] mt-1">{section.content}</p>
                                                         )}
@@ -1355,7 +1465,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                     )}
                                                 </div>
                                                 <div className="p-6 min-h-[200px]">
-                                                    {section.generatedContent ? (
+                                                    {section.itemType === 'graph' && section.widgetConfig ? (
+                                                        <ReportGraphSection widgetConfig={section.widgetConfig} height={320} />
+                                                    ) : section.generatedContent ? (
                                                         <div className="prose prose-slate max-w-none whitespace-pre-wrap">
                                                             {section.generatedContent}
                                                         </div>
@@ -1781,9 +1893,11 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                     </div>
 
                                     {selectedSection?.generationRules && (
-                                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg mb-4">
+                                        <div className={`p-3 ${selectedSection.itemType === 'graph' ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-amber-500/10 border border-amber-500/20'} rounded-lg mb-4`}>
                                             <p className="text-sm text-[var(--text-secondary)]">
-                                                <strong className="text-amber-500">Generation Rules:</strong> {selectedSection.generationRules}
+                                                <strong className={selectedSection.itemType === 'graph' ? 'text-blue-600' : 'text-amber-500'}>
+                                                    {selectedSection.itemType === 'graph' ? 'Graph Explanation:' : 'Generation Rules:'}
+                                                </strong> {selectedSection.generationRules}
                                             </p>
                                         </div>
                                     )}
@@ -1811,8 +1925,22 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                         </div>
                                     ) : (
                                         <div className="border border-[var(--border-light)] rounded-lg p-4 bg-[var(--bg-tertiary)]">
+                                            {/* Graph item: show chart above prompt */}
+                                            {selectedSection?.itemType === 'graph' && selectedSection?.widgetConfig && (
+                                                <div className="mb-4 border border-blue-200 rounded-lg bg-blue-50/30 overflow-hidden">
+                                                    <div className="px-3 py-2 bg-blue-100/50 border-b border-blue-200 flex items-center gap-2">
+                                                        <ChartBar size={14} weight="fill" className="text-blue-600" />
+                                                        <span className="text-xs font-medium text-blue-700">
+                                                            {selectedSection.widgetConfig.type?.replace('_', ' ').toUpperCase()} — {selectedSection.widgetConfig.title || 'Chart'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="p-3">
+                                                        <ReportGraphSection widgetConfig={selectedSection.widgetConfig} height={250} />
+                                                    </div>
+                                                </div>
+                                            )}
                                             <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-                                                Write your prompt for this section
+                                                {selectedSection?.itemType === 'graph' ? 'Refine your graph' : 'Write your prompt for this section'}
                                             </label>
                                             <PromptInput
                                                 key={selectedSectionId}
@@ -1821,7 +1949,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                 onGenerate={handleGenerate}
                                                 isGenerating={isGenerating}
                                                 initialValue={selectedSection?.userPrompt || ''}
-                                                placeholder="Describe what you want in this section. Mention @entities to include data..."
+                                                placeholder={selectedSection?.itemType === 'graph' 
+                                                    ? "Describe what you want to see in this graph" 
+                                                    : "Describe what you want in this section. Mention @entities to include data..."}
                                                 buttonLabel="Generate"
                                             />
                                         </div>
@@ -2943,6 +3073,8 @@ interface ModalTemplateItem {
     title: string;
     content: string;
     generationRules: string;
+    itemType?: 'text' | 'graph';
+    widgetConfig?: any;
 }
 
 interface TemplateEditModalProps {
@@ -2967,7 +3099,9 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     id: item.id,
                     title: item.title || '',
                     content: item.content || '',
-                    generationRules: item.generationRules || ''
+                    generationRules: item.generationRules || '',
+                    itemType: item.itemType || 'text',
+                    widgetConfig: item.widgetConfig || null
                 })) : [],
                 isExpanded: true
             }));
@@ -3189,10 +3323,18 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                                             {section.items.length > 0 ? (
                                                 <div className="space-y-3">
                                                     {section.items.map((item, iIdx) => (
-                                                        <div key={iIdx} className="bg-[var(--bg-tertiary)] rounded-lg p-3 border border-[var(--border-light)]">
+                                                        <div key={iIdx} className={`rounded-lg p-3 border ${item.itemType === 'graph' ? 'bg-blue-50/50 border-blue-200' : 'bg-[var(--bg-tertiary)] border-[var(--border-light)]'}`}>
                                                             <div className="flex items-start gap-2 mb-2">
                                                                 <DotsSixVertical size={16} weight="light" className="text-slate-300 mt-2 shrink-0" />
                                                                 <div className="flex-1 space-y-2">
+                                                                    {item.itemType === 'graph' && (
+                                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                                            <ChartBar size={14} weight="fill" className="text-blue-600" />
+                                                                            <span className="text-xs font-medium text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                                                                                {item.widgetConfig?.type?.replace('_', ' ').toUpperCase() || 'Graph'}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
                                                                     <div>
                                                                         <label className="text-xs text-[var(--text-secondary)]">Item Title</label>
                                                                         <input
@@ -3203,19 +3345,23 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="text-xs text-[var(--text-secondary)]">Content</label>
+                                                                        <label className="text-xs text-[var(--text-secondary)]">{item.itemType === 'graph' ? 'Content' : 'Content'}</label>
                                                                         <textarea
                                                                             value={item.content}
                                                                             onChange={(e) => updateItem(sIdx, iIdx, { content: e.target.value })}
+                                                                            placeholder={item.itemType === 'graph' ? 'Description of what this graph shows...' : ''}
                                                                             rows={2}
                                                                             className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-[var(--accent-primary)] outline-none text-sm resize-none"
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="text-xs text-[var(--text-secondary)]">Generation Rules <span className="text-[var(--text-tertiary)]">(optional)</span></label>
+                                                                        <label className="text-xs text-[var(--text-secondary)]">
+                                                                            {item.itemType === 'graph' ? 'Graph Explanation' : 'Generation Rules'} <span className="text-[var(--text-tertiary)]">(optional)</span>
+                                                                        </label>
                                                                         <textarea
                                                                             value={item.generationRules}
                                                                             onChange={(e) => updateItem(sIdx, iIdx, { generationRules: e.target.value })}
+                                                                            placeholder={item.itemType === 'graph' ? 'Explain what this graph shows...' : 'Special instructions for AI generation...'}
                                                                             rows={2}
                                                                             className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-[var(--accent-primary)] outline-none text-sm resize-none"
                                                                         />

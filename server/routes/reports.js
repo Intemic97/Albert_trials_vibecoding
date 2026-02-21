@@ -311,13 +311,18 @@ router.get('/report-templates', authenticateToken, async (req, res) => {
         
         // For each template, get its sections
         for (const template of templates) {
-            template.sections = await db.all(
-                `SELECT id, parentId, title, content, generationRules, sortOrder 
+            const rawSections = await db.all(
+                `SELECT id, parentId, title, content, generationRules, sortOrder, itemType, widgetConfig 
                  FROM template_sections 
                  WHERE templateId = ? 
                  ORDER BY sortOrder ASC`,
                 [template.id]
             );
+            template.sections = rawSections.map(s => ({
+                ...s,
+                itemType: s.itemType || 'text',
+                widgetConfig: s.widgetConfig ? (() => { try { return JSON.parse(s.widgetConfig); } catch(e) { return null; } })() : null
+            }));
         }
         
         res.json(templates);
@@ -340,13 +345,18 @@ router.get('/report-templates/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Template not found' });
         }
         
-        template.sections = await db.all(
-            `SELECT id, parentId, title, content, generationRules, sortOrder 
+        const rawSections = await db.all(
+            `SELECT id, parentId, title, content, generationRules, sortOrder, itemType, widgetConfig 
              FROM template_sections 
              WHERE templateId = ? 
              ORDER BY sortOrder ASC`,
             [id]
         );
+        template.sections = rawSections.map(s => ({
+            ...s,
+            itemType: s.itemType || 'text',
+            widgetConfig: s.widgetConfig ? (() => { try { return JSON.parse(s.widgetConfig); } catch(e) { return null; } })() : null
+        }));
         
         res.json(template);
     } catch (error) {
@@ -385,9 +395,9 @@ router.post('/report-templates', authenticateToken, async (req, res) => {
                         const item = section.items[j];
                         const itemId = Math.random().toString(36).substr(2, 9);
                         await db.run(
-                            `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
-                             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                            [itemId, id, sectionId, item.title, item.content || '', item.generationRules || '', j]
+                            `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder, itemType, widgetConfig)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [itemId, id, sectionId, item.title, item.content || '', item.generationRules || '', j, item.itemType || 'text', item.widgetConfig ? JSON.stringify(item.widgetConfig) : null]
                         );
                     }
                 }
@@ -529,14 +539,14 @@ router.put('/report-templates/:id', authenticateToken, async (req, res) => {
                         
                         if (itemExists) {
                             await db.run(
-                                `UPDATE template_sections SET title = ?, content = ?, generationRules = ?, sortOrder = ?, parentId = ? WHERE id = ?`,
-                                [item.title, item.content || '', item.generationRules || '', j, sectionId, itemId]
+                                `UPDATE template_sections SET title = ?, content = ?, generationRules = ?, sortOrder = ?, parentId = ?, itemType = ?, widgetConfig = ? WHERE id = ?`,
+                                [item.title, item.content || '', item.generationRules || '', j, sectionId, item.itemType || 'text', item.widgetConfig ? JSON.stringify(item.widgetConfig) : null, itemId]
                             );
                         } else {
                             await db.run(
-                                `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder)
-                                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                                [itemId, id, sectionId, item.title, item.content || '', item.generationRules || '', j]
+                                `INSERT INTO template_sections (id, templateId, parentId, title, content, generationRules, sortOrder, itemType, widgetConfig)
+                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                [itemId, id, sectionId, item.title, item.content || '', item.generationRules || '', j, item.itemType || 'text', item.widgetConfig ? JSON.stringify(item.widgetConfig) : null]
                             );
                         }
                     }
@@ -675,6 +685,10 @@ router.get('/reports/:id', authenticateToken, async (req, res) => {
         // Merge template sections with report sections
         const sections = templateSections.map(ts => {
             const rs = reportSections.find(r => r.templateSectionId === ts.id);
+            let parsedWidgetConfig = null;
+            if (ts.widgetConfig) {
+                try { parsedWidgetConfig = JSON.parse(ts.widgetConfig); } catch (e) { /* ignore */ }
+            }
             return {
                 id: templateToReportIdMap[ts.id], // Use mapped ID
                 templateSectionId: ts.id,
@@ -687,7 +701,9 @@ router.get('/reports/:id', authenticateToken, async (req, res) => {
                 userPrompt: rs?.userPrompt || null,
                 sectionStatus: rs?.status || 'empty',
                 workflowStatus: rs?.workflowStatus || 'draft',
-                generatedAt: rs?.generatedAt || null
+                generatedAt: rs?.generatedAt || null,
+                itemType: ts.itemType || 'text',
+                widgetConfig: parsedWidgetConfig
             };
         });
         

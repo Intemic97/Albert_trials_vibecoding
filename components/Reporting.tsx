@@ -5,12 +5,14 @@ import { Entity } from '../types';
 import { 
     Sparkles, FileText, FlaskConical, Clipboard, Wrench, AlertTriangle, Download,
     Plus, Trash2, Edit3, X, ChevronDown, ChevronRight, GripVertical, Save, Loader2,
-    Clock, User, Calendar, FileCheck, MoreVertical, Search, Bot, Send
+    Clock, User, Calendar, FileCheck, MoreVertical, Search, Bot, Send, BarChart2, Type
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { PromptInput } from './PromptInput';
 import { API_BASE } from '../config';
+import { WidgetGallery, WidgetTemplate } from './dashboard/WidgetGallery';
+import { WidgetConfigurator, WidgetFullConfig } from './dashboard/WidgetConfigurator';
 
 interface ReportingProps {
     entities: Entity[];
@@ -25,6 +27,8 @@ interface TemplateItem {
     title: string;
     content: string;
     generationRules: string;
+    itemType?: 'text' | 'graph';
+    widgetConfig?: WidgetFullConfig | null;
 }
 
 // Template section with items (subsections)
@@ -207,6 +211,8 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
             title: parent.title,
             content: parent.content || '',
             generationRules: parent.generationRules || '',
+            itemType: parent.itemType || 'text',
+            widgetConfig: parent.widgetConfig || null,
             items: flatSections
                 .filter(s => s.parentId === parent.id)
                 .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -214,7 +220,9 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                     id: item.id,
                     title: item.title,
                     content: item.content || '',
-                    generationRules: item.generationRules || ''
+                    generationRules: item.generationRules || '',
+                    itemType: item.itemType || 'text',
+                    widgetConfig: item.widgetConfig || null,
                 })),
             isExpanded: true
         })).sort((a, b) => {
@@ -1196,6 +1204,7 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                         setTemplateUsage(null);
                     }}
                     usage={templateUsage}
+                    entities={entities}
                 />
             )}
 
@@ -1507,9 +1516,10 @@ interface TemplateEditModalProps {
     onSave: (template: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>) => void;
     onClose: () => void;
     usage?: { inUse: boolean; reportCount: number; reports: any[] } | null;
+    entities?: Entity[];
 }
 
-const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave, onClose, usage }) => {
+const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave, onClose, usage, entities }) => {
     const [name, setName] = useState(template?.name || '');
     const [description, setDescription] = useState(template?.description || '');
     const [icon, setIcon] = useState(template?.icon || 'FileText');
@@ -1518,6 +1528,11 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
     );
     const [isSaving, setIsSaving] = useState(false);
     const [showUsageWarning, setShowUsageWarning] = useState(false);
+
+    // Item type picker state
+    const [showItemTypePicker, setShowItemTypePicker] = useState<number | null>(null); // sectionIndex
+    const [showWidgetGallery, setShowWidgetGallery] = useState<number | null>(null); // sectionIndex
+    const [showWidgetConfigurator, setShowWidgetConfigurator] = useState<{ sectionIndex: number; widgetTemplate: WidgetTemplate } | null>(null);
 
     const iconOptions = [
         { value: 'FileText', label: 'Document', Icon: FileText },
@@ -1544,10 +1559,45 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
         setSections(sections.map((s, i) => i === index ? { ...s, isExpanded: !s.isExpanded } : s));
     };
 
-    const addItem = (sectionIndex: number) => {
+    const handleAddItemClick = (sectionIndex: number) => {
+        setShowItemTypePicker(sectionIndex);
+    };
+
+    const addTextItem = (sectionIndex: number) => {
         const newSections = [...sections];
-        newSections[sectionIndex].items.push({ title: '', content: '', generationRules: '' });
+        newSections[sectionIndex].items.push({ title: '', content: '', generationRules: '', itemType: 'text' });
         setSections(newSections);
+        setShowItemTypePicker(null);
+    };
+
+    const addGraphItem = (sectionIndex: number) => {
+        setShowItemTypePicker(null);
+        setShowWidgetGallery(sectionIndex);
+    };
+
+    const handleWidgetSelected = (widgetTemplate: WidgetTemplate) => {
+        if (showWidgetGallery === null) return;
+        setShowWidgetGallery(null);
+        setShowWidgetConfigurator({ sectionIndex: showWidgetGallery, widgetTemplate });
+    };
+
+    const handleWidgetConfigured = (config: WidgetFullConfig) => {
+        if (!showWidgetConfigurator) return;
+        const { sectionIndex } = showWidgetConfigurator;
+        const newSections = [...sections];
+        newSections[sectionIndex].items.push({
+            title: config.title || config.type,
+            content: config.description || '',
+            generationRules: '',
+            itemType: 'graph',
+            widgetConfig: config
+        });
+        setSections(newSections);
+        setShowWidgetConfigurator(null);
+    };
+
+    const addItem = (sectionIndex: number) => {
+        handleAddItemClick(sectionIndex);
     };
 
     const removeItem = (sectionIndex: number, itemIndex: number) => {
@@ -1740,17 +1790,31 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                                             {section.items.length > 0 ? (
                                                 <div className="space-y-3">
                                                     {section.items.map((item, iIdx) => (
-                                                        <div key={iIdx} className="bg-[var(--bg-secondary)] rounded-lg p-3 border border-[var(--border-light)]">
+                                                        <div key={iIdx} className={`rounded-lg p-3 border ${item.itemType === 'graph' ? 'bg-blue-50/50 border-blue-200' : 'bg-[var(--bg-secondary)] border-[var(--border-light)]'}`}>
                                                             <div className="flex items-start gap-2 mb-2">
                                                                 <GripVertical size={16} className="text-[var(--text-tertiary)] mt-2 shrink-0" />
                                                                 <div className="flex-1 space-y-2">
+                                                                    {/* Type badge for graph items */}
+                                                                    {item.itemType === 'graph' && (
+                                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                                            <BarChart2 size={14} className="text-blue-600" />
+                                                                            <span className="text-xs font-medium text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded">
+                                                                                {item.widgetConfig?.type?.replace('_', ' ').toUpperCase() || 'Graph'}
+                                                                            </span>
+                                                                            {item.widgetConfig?.dataConfig?.entityName && (
+                                                                                <span className="text-xs text-[var(--text-tertiary)]">
+                                                                                    from {item.widgetConfig.dataConfig.entityName}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
                                                                     <div>
                                                                         <label className="text-xs text-[var(--text-secondary)]">Item Title</label>
                                                                         <input
                                                                             type="text"
                                                                             value={item.title}
                                                                             onChange={(e) => updateItem(sIdx, iIdx, { title: e.target.value })}
-                                                                            placeholder="e.g., Audit key compliance indicators"
+                                                                            placeholder={item.itemType === 'graph' ? 'e.g., Revenue trend by month' : 'e.g., Audit key compliance indicators'}
                                                                             className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm"
                                                                         />
                                                                     </div>
@@ -1759,17 +1823,19 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                                                                         <textarea
                                                                             value={item.content}
                                                                             onChange={(e) => updateItem(sIdx, iIdx, { content: e.target.value })}
-                                                                            placeholder="Description or details for this item..."
+                                                                            placeholder={item.itemType === 'graph' ? 'Description of what this graph shows...' : 'Description or details for this item...'}
                                                                             rows={2}
                                                                             className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none"
                                                                         />
                                                                     </div>
                                                                     <div>
-                                                                        <label className="text-xs text-[var(--text-secondary)]">Generation Rules <span className="text-[var(--text-tertiary)]">(optional)</span></label>
+                                                                        <label className="text-xs text-[var(--text-secondary)]">
+                                                                            {item.itemType === 'graph' ? 'Graph Explanation' : 'Generation Rules'} <span className="text-[var(--text-tertiary)]">(optional)</span>
+                                                                        </label>
                                                                         <textarea
                                                                             value={item.generationRules}
                                                                             onChange={(e) => updateItem(sIdx, iIdx, { generationRules: e.target.value })}
-                                                                            placeholder="e.g., Use formal tone, include specific examples, max 200 words..."
+                                                                            placeholder={item.itemType === 'graph' ? 'e.g., Shows the trend of density values over different batches...' : 'e.g., Use formal tone, include specific examples, max 200 words...'}
                                                                             rows={2}
                                                                             className="w-full px-2 py-1.5 border border-[var(--border-light)] rounded focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none text-sm resize-none"
                                                                         />
@@ -1844,6 +1910,70 @@ const TemplateEditModal: React.FC<TemplateEditModalProps> = ({ template, onSave,
                     </button>
                 </div>
             </div>
+
+            {/* Item Type Picker Modal */}
+            {showItemTypePicker !== null && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowItemTypePicker(null)}>
+                    <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+                    <div 
+                        className="relative bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl p-6 w-full max-w-sm"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <h3 className="text-sm font-medium text-[var(--text-primary)] mb-4">Add Item</h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => addTextItem(showItemTypePicker)}
+                                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-light)] hover:border-teal-500 hover:bg-teal-50/50 transition-all group"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] group-hover:bg-teal-100 flex items-center justify-center transition-colors">
+                                    <Type size={20} className="text-[var(--text-secondary)] group-hover:text-teal-600" />
+                                </div>
+                                <span className="text-sm font-medium text-[var(--text-primary)]">Text Item</span>
+                                <span className="text-xs text-[var(--text-tertiary)] text-center">Written content section</span>
+                            </button>
+                            <button
+                                onClick={() => addGraphItem(showItemTypePicker)}
+                                className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[var(--border-light)] hover:border-blue-500 hover:bg-blue-50/50 transition-all group"
+                            >
+                                <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                                    <BarChart2 size={20} className="text-[var(--text-secondary)] group-hover:text-blue-600" />
+                                </div>
+                                <span className="text-sm font-medium text-[var(--text-primary)]">Graph Item</span>
+                                <span className="text-xs text-[var(--text-tertiary)] text-center">Chart or visualization</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Widget Gallery Modal */}
+            {showWidgetGallery !== null && (
+                <div style={{ zIndex: 60 }}>
+                    <WidgetGallery
+                        onSelect={handleWidgetSelected}
+                        onClose={() => setShowWidgetGallery(null)}
+                    />
+                </div>
+            )}
+
+            {/* Widget Configurator Modal */}
+            {showWidgetConfigurator && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowWidgetConfigurator(null)}>
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                    <div 
+                        className="relative w-full max-w-4xl max-h-[90vh] overflow-auto bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <WidgetConfigurator
+                            template={showWidgetConfigurator.widgetTemplate}
+                            entities={entities}
+                            onSave={handleWidgetConfigured}
+                            onCancel={() => setShowWidgetConfigurator(null)}
+                            submitLabel="Add to Template"
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
