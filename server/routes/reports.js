@@ -583,7 +583,7 @@ router.put('/report-templates/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Delete template
+// Delete template (cascade: also deletes associated reports)
 router.delete('/report-templates/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
@@ -598,10 +598,27 @@ router.delete('/report-templates/:id', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'Template not found' });
         }
         
-        // Sections will be cascade deleted
+        // Delete associated reports and their children first (reports -> report_sections -> report_comments)
+        const associatedReports = await db.all(
+            'SELECT id FROM reports WHERE templateId = ?', [id]
+        );
+        
+        for (const report of associatedReports) {
+            // Delete comments on report sections
+            await db.run(
+                `DELETE FROM report_comments WHERE sectionId IN (SELECT id FROM report_sections WHERE reportId = ?)`,
+                [report.id]
+            );
+            // Delete report sections
+            await db.run('DELETE FROM report_sections WHERE reportId = ?', [report.id]);
+            // Delete the report itself
+            await db.run('DELETE FROM reports WHERE id = ?', [report.id]);
+        }
+        
+        // Now safe to delete template (sections cascade via FK)
         await db.run('DELETE FROM report_templates WHERE id = ?', [id]);
         
-        res.json({ message: 'Template deleted' });
+        res.json({ message: 'Template deleted', deletedReports: associatedReports.length });
     } catch (error) {
         console.error('Error deleting template:', error);
         res.status(500).json({ error: 'Failed to delete template' });

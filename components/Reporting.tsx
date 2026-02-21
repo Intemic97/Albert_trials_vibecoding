@@ -125,6 +125,12 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
     const [reportsLoading, setReportsLoading] = useState(true);
     const [showNewReportModal, setShowNewReportModal] = useState(false);
     
+    // Delete template confirmation modal state
+    const [deleteConfirmTemplate, setDeleteConfirmTemplate] = useState<ReportTemplate | null>(null);
+    const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+    const [deleteConfirmLoading, setDeleteConfirmLoading] = useState(false);
+    const [deleteConfirmReportCount, setDeleteConfirmReportCount] = useState(0);
+    
     // Organization users for reviewer dropdown
     const [orgUsers, setOrgUsers] = useState<OrgUser[]>([]);
     
@@ -699,27 +705,48 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
         e.stopPropagation();
         e.preventDefault();
         
-        // Use setTimeout to escape the click event chain before showing confirm
-        setTimeout(async () => {
-            if (!window.confirm('Are you sure you want to delete this template?')) return;
-
-            try {
-                const res = await fetch(`${API_BASE}/report-templates/${templateId}`, {
-                    method: 'DELETE',
-                    credentials: 'include'
-                });
-                if (res.ok) {
-                    setTemplates(prev => prev.filter(t => t.id !== templateId));
-                } else {
-                    const errData = await res.json().catch(() => ({}));
-                    console.error('Delete failed:', res.status, errData);
-                    window.alert(`Failed to delete template: ${errData.error || res.statusText}`);
-                }
-            } catch (error) {
-                console.error('Error deleting template:', error);
-                window.alert('Failed to delete template. Please try again.');
+        const template = templates.find(t => t.id === templateId);
+        if (!template) return;
+        
+        // Fetch usage to know how many documents are associated
+        try {
+            const usageRes = await fetch(`${API_BASE}/report-templates/${templateId}/usage`, { credentials: 'include' });
+            const usage = usageRes.ok ? await usageRes.json() : { reportCount: 0 };
+            setDeleteConfirmReportCount(usage.reportCount || 0);
+        } catch {
+            setDeleteConfirmReportCount(0);
+        }
+        
+        setDeleteConfirmTemplate(template);
+        setDeleteConfirmInput('');
+        setDeleteConfirmLoading(false);
+    };
+    
+    const executeDeleteTemplate = async () => {
+        if (!deleteConfirmTemplate) return;
+        setDeleteConfirmLoading(true);
+        
+        try {
+            const res = await fetch(`${API_BASE}/report-templates/${deleteConfirmTemplate.id}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            if (res.ok) {
+                setTemplates(prev => prev.filter(t => t.id !== deleteConfirmTemplate.id));
+                // Also remove reports that were using this template
+                setReports(prev => prev.filter(r => r.templateId !== deleteConfirmTemplate.id));
+                setDeleteConfirmTemplate(null);
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                console.error('Delete failed:', res.status, errData);
+                window.alert(`Failed to delete template: ${errData.error || res.statusText}`);
             }
-        }, 0);
+        } catch (error) {
+            console.error('Error deleting template:', error);
+            window.alert('Failed to delete template. Please try again.');
+        } finally {
+            setDeleteConfirmLoading(false);
+        }
     };
 
     const handleSaveTemplate = async (templateData: Omit<ReportTemplate, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -1206,6 +1233,77 @@ export const Reporting: React.FC<ReportingProps> = ({ entities, companyInfo, onV
                     usage={templateUsage}
                     entities={entities}
                 />
+            )}
+
+            {/* Delete Template Confirmation Modal */}
+            {deleteConfirmTemplate && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDeleteConfirmTemplate(null)}>
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                    <div className="relative bg-[var(--bg-card)] rounded-xl border border-[var(--border-light)] shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+                        <button 
+                            onClick={() => setDeleteConfirmTemplate(null)} 
+                            className="absolute top-4 right-4 p-1.5 hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                        >
+                            <X size={16} className="text-[var(--text-tertiary)]" />
+                        </button>
+                        
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                                <AlertTriangle size={20} className="text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-semibold text-[var(--text-primary)]">Delete Template</h3>
+                                <p className="text-xs text-[var(--text-tertiary)]">This action cannot be undone</p>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-3 mb-5">
+                            {deleteConfirmReportCount > 0 ? (
+                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                    <p className="text-sm text-red-800">
+                                        <strong>Warning:</strong> This template has <strong>{deleteConfirmReportCount} document{deleteConfirmReportCount !== 1 ? 's' : ''}</strong> associated. 
+                                        Deleting this template will also <strong>permanently delete</strong> all associated documents and their content.
+                                    </p>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-[var(--text-secondary)]">
+                                    Are you sure you want to delete the template <strong>"{deleteConfirmTemplate.name}"</strong>? This will permanently remove the template and all its sections.
+                                </p>
+                            )}
+                            
+                            <div>
+                                <label className="block text-sm text-[var(--text-secondary)] mb-1.5">
+                                    Type <strong className="text-[var(--text-primary)]">{deleteConfirmTemplate.name}</strong> to confirm
+                                </label>
+                                <input
+                                    type="text"
+                                    value={deleteConfirmInput}
+                                    onChange={(e) => setDeleteConfirmInput(e.target.value)}
+                                    placeholder={deleteConfirmTemplate.name}
+                                    className="w-full px-3 py-2 border border-[var(--border-light)] rounded-lg text-sm focus:ring-2 focus:ring-red-500/30 focus:border-red-400 outline-none transition-all"
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+                        
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setDeleteConfirmTemplate(null)}
+                                className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={executeDeleteTemplate}
+                                disabled={deleteConfirmInput !== deleteConfirmTemplate.name || deleteConfirmLoading}
+                                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+                            >
+                                {deleteConfirmLoading && <Loader2 size={14} className="animate-spin" />}
+                                Delete Template{deleteConfirmReportCount > 0 ? ` & ${deleteConfirmReportCount} Document${deleteConfirmReportCount !== 1 ? 's' : ''}` : ''}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* New Report Modal */}
