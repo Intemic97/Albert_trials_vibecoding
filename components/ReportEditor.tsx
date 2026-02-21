@@ -1331,11 +1331,34 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                 {/* Export Button */}
                                 <div className="max-w-4xl mx-auto flex justify-end">
                                     <button
-                                        onClick={() => {
-                                            // Create a printable version
-                                            const printContent = document.getElementById('preview-scroll-container');
-                                            if (!printContent) return;
+                                        onClick={async () => {
+                                            // Capture all graph sections as images first
+                                            const chartImages: Record<string, string> = {};
                                             
+                                            for (const parentSection of parentSections) {
+                                                const subsections = getSubsections(parentSection.id);
+                                                const allSections = [parentSection, ...subsections];
+                                                for (const section of allSections) {
+                                                    if (section.itemType === 'graph' && section.widgetConfig) {
+                                                        const chartEl = document.getElementById(`chart-capture-${section.id}`);
+                                                        if (chartEl) {
+                                                            try {
+                                                                const html2canvas = (await import('html2canvas')).default;
+                                                                const canvas = await html2canvas(chartEl, {
+                                                                    backgroundColor: '#ffffff',
+                                                                    scale: 2,
+                                                                    useCORS: true,
+                                                                    logging: false
+                                                                });
+                                                                chartImages[section.id] = canvas.toDataURL('image/png');
+                                                            } catch (e) {
+                                                                console.error('Error capturing chart:', e);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
                                             const printWindow = window.open('', '_blank');
                                             if (!printWindow) return;
                                             
@@ -1358,31 +1381,42 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                         .section { margin-bottom: 24px; page-break-inside: avoid; }
                                                         .header { margin-bottom: 32px; padding-bottom: 16px; border-bottom: 2px solid #0d9488; }
                                                         .meta { color: #64748b; font-size: 14px; }
+                                                        .chart-image { max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0; }
+                                                        .chart-label { display: inline-block; background: #dbeafe; color: #1d4ed8; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
                                                         @media print {
                                                             body { padding: 20px; }
+                                                            .section { page-break-inside: avoid; }
                                                         }
                                                     </style>
                                                 </head>
                                                 <body>
                                                     <div class="header">
                                                         <h1>${report?.name || 'Report'}</h1>
-                                                        <p class="meta">${report?.trail || ''} • Created by ${report?.createdByName || 'Unknown'}</p>
+                                                        <p class="meta">Created by ${report?.createdByName || 'Unknown'}</p>
                                                     </div>
                                                     ${parentSections.map(parentSection => {
                                                         const subsections = getSubsections(parentSection.id);
                                                         const allSections = [parentSection, ...subsections];
-                                                        return allSections.map(section => `
+                                                        return allSections.map(section => {
+                                                            const isGraph = section.itemType === 'graph' && chartImages[section.id];
+                                                            const chartTypeLabel = section.widgetConfig?.type?.replace('_', ' ').toUpperCase() || 'GRAPH';
+                                                            return `
                                                             <div class="section">
-                                                                <h2>${section.title}</h2>
-                                                                ${section.generatedContent ? `<p>${section.generatedContent.replace(/\n/g, '</p><p>')}</p>` : '<p style="color: #94a3b8; font-style: italic;">No content generated</p>'}
+                                                                <h2>${isGraph ? `<span class="chart-label">${chartTypeLabel}</span> ` : ''}${section.title}</h2>
+                                                                ${isGraph
+                                                                    ? `<img class="chart-image" src="${chartImages[section.id]}" alt="${section.title}" />${section.generatedContent ? `<p>${section.generatedContent.replace(/\n/g, '</p><p>')}</p>` : ''}`
+                                                                    : section.generatedContent 
+                                                                        ? `<p>${section.generatedContent.replace(/\n/g, '</p><p>')}</p>` 
+                                                                        : '<p style="color: #94a3b8; font-style: italic;">No content generated</p>'
+                                                                }
                                                             </div>
-                                                        `).join('');
+                                                        `}).join('');
                                                     }).join('')}
                                                 </body>
                                                 </html>
                                             `);
                                             printWindow.document.close();
-                                            printWindow.print();
+                                            setTimeout(() => printWindow.print(), 300);
                                         }}
                                         className="flex items-center gap-2 px-3 py-2 bg-[var(--accent-primary)] text-white rounded-lg hover:bg-[var(--accent-primary-hover)] transition-colors text-sm font-medium"
                                     >
@@ -1466,7 +1500,9 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
                                                 </div>
                                                 <div className="p-6 min-h-[200px]">
                                                     {section.itemType === 'graph' && section.widgetConfig ? (
-                                                        <ReportGraphSection widgetConfig={section.widgetConfig} height={320} />
+                                                        <div id={`chart-capture-${section.id}`}>
+                                                            <ReportGraphSection widgetConfig={section.widgetConfig} height={320} />
+                                                        </div>
                                                     ) : section.generatedContent ? (
                                                         <div className="prose prose-slate max-w-none whitespace-pre-wrap">
                                                             {section.generatedContent}
