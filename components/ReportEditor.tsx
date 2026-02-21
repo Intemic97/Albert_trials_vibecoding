@@ -1940,24 +1940,56 @@ export const ReportEditor: React.FC<ReportEditorProps> = ({ entities, companyInf
 
                                     {/* Prompt Input */}
                                     {selectedSection?.workflowStatus === 'ready_to_send' ? (
-                                        <div className="border border-emerald-500/30 rounded-lg p-4 bg-emerald-500/5">
-                                            <div className="flex items-center gap-2 text-emerald-600">
-                                                <PaperPlaneTilt size={18} weight="light" />
-                                                <span className="text-sm font-medium">This section is Done</span>
+                                        <div className="space-y-4">
+                                            {/* Show graph even when Done */}
+                                            {selectedSection?.itemType === 'graph' && selectedSection?.widgetConfig && (
+                                                <div className="border border-blue-200 rounded-lg bg-blue-50/30 overflow-hidden">
+                                                    <div className="px-3 py-2 bg-blue-100/50 border-b border-blue-200 flex items-center gap-2">
+                                                        <ChartBar size={14} weight="fill" className="text-blue-600" />
+                                                        <span className="text-xs font-medium text-blue-700">
+                                                            {selectedSection.widgetConfig.type?.replace('_', ' ').toUpperCase()} — {selectedSection.widgetConfig.title || 'Chart'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="p-3">
+                                                        <ReportGraphSection widgetConfig={selectedSection.widgetConfig} height={250} />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="border border-emerald-500/30 rounded-lg p-4 bg-emerald-500/5">
+                                                <div className="flex items-center gap-2 text-emerald-600">
+                                                    <PaperPlaneTilt size={18} weight="light" />
+                                                    <span className="text-sm font-medium">This section is Done</span>
+                                                </div>
+                                                <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                                                    Change the status back to Draft to edit the prompt or content.
+                                                </p>
                                             </div>
-                                            <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                                                Change the status back to Draft to edit the prompt or content.
-                                            </p>
                                         </div>
                                     ) : selectedSection?.workflowStatus === 'review' ? (
-                                        <div className="border border-[var(--accent-primary)]/30 rounded-lg p-4 bg-[var(--accent-primary)]/5">
-                                            <div className="flex items-center gap-2 text-[var(--accent-primary)]">
-                                                <Eye size={18} weight="light" />
-                                                <span className="text-sm font-medium">This section is in Review</span>
+                                        <div className="space-y-4">
+                                            {/* Show graph even when in Review */}
+                                            {selectedSection?.itemType === 'graph' && selectedSection?.widgetConfig && (
+                                                <div className="border border-blue-200 rounded-lg bg-blue-50/30 overflow-hidden">
+                                                    <div className="px-3 py-2 bg-blue-100/50 border-b border-blue-200 flex items-center gap-2">
+                                                        <ChartBar size={14} weight="fill" className="text-blue-600" />
+                                                        <span className="text-xs font-medium text-blue-700">
+                                                            {selectedSection.widgetConfig.type?.replace('_', ' ').toUpperCase()} — {selectedSection.widgetConfig.title || 'Chart'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="p-3">
+                                                        <ReportGraphSection widgetConfig={selectedSection.widgetConfig} height={250} />
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="border border-[var(--accent-primary)]/30 rounded-lg p-4 bg-[var(--accent-primary)]/5">
+                                                <div className="flex items-center gap-2 text-[var(--accent-primary)]">
+                                                    <Eye size={18} weight="light" />
+                                                    <span className="text-sm font-medium">This section is in Review</span>
+                                                </div>
+                                                <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                                                    Change the status back to Draft to edit the prompt or content.
+                                                </p>
                                             </div>
-                                            <p className="text-xs text-[var(--text-tertiary)] mt-1">
-                                                Change the status back to Draft to edit the prompt or content.
-                                            </p>
                                         </div>
                                     ) : (
                                         <div className="border border-[var(--border-light)] rounded-lg p-4 bg-[var(--bg-tertiary)]">
